@@ -6,6 +6,49 @@
 #define V_WRITE_BUFFER_SIZE 8192
 
 
+f64
+vstd_pow(f64 a, f64 b)
+{
+	if (b < 0) 
+	{
+		b = -b;
+		while(b--)
+		{
+			a *= 1/a; 
+		}
+	}
+	else
+	{
+		while(b--)
+		{
+			a*=a;
+		}
+	}
+	return a;
+}
+
+f64
+vstd_str_to_double(char *str)
+{
+	f64 result;
+	b32 flag = false;
+	i32 magic = 0;
+	for(i32 index = 0; str[index] != 0; ++index)
+	{
+		char c = str[index];
+		if(c != '.')
+		{
+			result = (result*10)+(c-'0');
+			if(flag) magic--;
+		}
+		else
+		{
+			flag = 1;
+		}
+	}
+	return result * vstd_pow(10, magic);
+	
+}
 
 inline b32
 is_alnum(char c)

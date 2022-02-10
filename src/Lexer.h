@@ -33,5 +33,6 @@ i16 get_token();
 
 void initialize_compiler();
 void compile_file(char *path);
+u8 *get_next_identifier();
 
 #endif //_LEXER_H

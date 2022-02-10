@@ -28,10 +28,10 @@ typedef enum _ast_type
 	type_for,
 	type_if,
 	type_expression,
-	type_add,
-	type_subtract,
-	type_multiply,
-	type_divide,
+	type_add = '+',
+	type_subtract = '-',
+	type_multiply = '*',
+	type_divide = '/',
 	type_constant
 } ast_type;
 
@@ -80,7 +80,6 @@ typedef union _ast_union
 	ast_func function;
 	ast_expression expression;
 	ast_assignment assignment;
-	
 } ast_union;
 
 struct _abstract_syntax_tree
@@ -93,5 +92,8 @@ struct _abstract_syntax_tree
 
 auto_number
 evaluate_expression(ast_expression *tree);
+
+ast_expression
+tokens_to_ast_expression(i16 *tokens, i16 amount);
 
 #endif //_PARSER_H

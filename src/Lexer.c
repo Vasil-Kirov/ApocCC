@@ -4,6 +4,7 @@ static u8 *at_buffer;
 static str_hash_table *KeywordTable;
 static i16 *token_buffer;
 static u8 **identifier_buffer;
+static u64 last_identifier;
 
 void
 initialize_compiler()
@@ -17,6 +18,12 @@ initialize_compiler()
 	shput(KeywordTable, "cast", tok_cast);
 	shput(KeywordTable, "if", tok_if);
 	shput(KeywordTable, "for", tok_for);
+}
+
+u8 *
+get_next_identifier()
+{
+	return identifier_buffer[last_identifier++];
 }
 
 static void

@@ -62,5 +62,8 @@ main(int argc, char *argv[])
 	
 	auto_number result = evaluate_expression(&test);
 	LG_INFO("Test result: %d", result.number.signed_long);
+	
+	ResetTemporaryMemory();
+	ResetCompileMemory();
 	return 0;
 }

@@ -55,7 +55,7 @@ ResetTemporaryMemory()
 }
 
 void
-ResetDebugMemory()
+ResetCompileMemory()
 {
 	// NOTE(Vasko): probably not a good idea, since windows will think I am using the memory
 #if 0

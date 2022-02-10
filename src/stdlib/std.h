@@ -31,6 +31,9 @@ is_alnum(char c);
 inline b32
 is_number(char c);
 
+f64
+vstd_str_to_double(char *str);
+
 void
 vstd_vsnsprintf(char *Buffer, size_t FormatSize, const char *FormatString, va_list Args);
 
