@@ -1,0 +1,37 @@
+$import "Basic"
+
+
+// This is a comment
+
+func name(type: param) -> ret_type
+{
+	type: value = param;
+
+	value += 2;
+	++value;
+	value++;
+
+	i32 []: arr = { 1, 2, 3}
+	u32 [4096]: arr = {}; // 0 init
+
+	u32 *: pointer = *value;
+	pointer = arr;
+
+	u32: some_var = 10.456;
+
+	arr[2] = 0;
+
+
+	-> value;
+}
+
+
+func main() -> void
+{
+	print: { " Number #", name -> . };
+	name -> _;
+	i32: variable = name -> .;
+	i32: other_variable;
+	name -> other_variable;
+	Basic.print: { "ok" };
+}

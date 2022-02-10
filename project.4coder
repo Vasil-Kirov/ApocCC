@@ -1,0 +1,60 @@
+version(1);
+
+project_name = "Compiler";
+
+patterns = {
+	"*.c",
+	"*.cpp",
+	"*.h",
+	"*.hpp",
+	"*.bat",
+	"*.sh",
+	"*.4coder",
+	"*.4coder",
+};
+
+
+
+blacklist_patterns = {
+	".*"
+};
+
+
+load_paths = {
+	{ {".", .relative = true, .recursive = true}, {.os = "win"}},
+	{ {".", .relative = true, .recursive = true}, {.os = "linux"}},
+};
+
+
+command_list = {
+	{
+		.name = "build",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cursor_at_end = false,
+		.cmd = { { "build", .os = "win" } }
+	},
+	{
+		.name = "run",
+		.out = "*run*",
+		.footer_panel = false,
+		.save_dirty_files = true,
+		.cursor_at_end = false,
+		.cmd = { { "bin\Main.exe", .os = "win" } }
+	},
+	{
+		.name = "visual_studio",
+		.out = "",
+		.footer_panel = false,
+		.save_dirty_files = false,
+		.cursor_at_end = false,
+		.cmd = { { "devenv bin\Main.exe", .os = "win" } }
+	},
+};
+
+
+fkey_command[1]  = "build";
+fkey_command[2]  = "run";
+fkey_command[10] = "visual_studio";
+
