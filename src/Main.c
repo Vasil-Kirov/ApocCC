@@ -39,29 +39,15 @@ main(int argc, char *argv[])
 	initialize_compiler();
 	
 	will_compile = true;
-	compile_file("D:\\Programming\\Compiler\\Syntax.txt");
+	compile_file("D:\\Programming\\Compiler\\Test.apoc");
+	i16 *tokens = get_token_array();
+	i16 size = 0;
+	while(tokens[size] != tok_eof) ++size;
+	tokens_to_ast_expression(tokens, size);
+	
+	
 	if(!will_compile) return 1;
 	
-	ast_expression test = {};
-	ast_expression fleft = {};
-	ast_expression fright = {};
-	ast_expression sleft = {};
-	
-	test.type = type_constant;
-	test.left = &fleft;
-	test.left->right = &fright;
-	test.left->left = &sleft;
-	
-	test.left->type = type_add;
-	test.left->right->type = type_constant;
-	test.left->right->number.type = auto_signed;
-	test.left->right->number.number.signed_long = 2;
-	test.left->left->type = type_constant;
-	test.left->left->number.type = auto_signed;
-	test.left->left->number.number.signed_long = 2;
-	
-	auto_number result = evaluate_expression(&test);
-	LG_INFO("Test result: %d", result.number.signed_long);
 	
 	ResetTemporaryMemory();
 	ResetCompileMemory();

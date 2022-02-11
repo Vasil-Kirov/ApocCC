@@ -1,25 +1,6 @@
 #include <Parser.h>
 
-auto_number
-add_auto_numbers(auto_number a, auto_number b)
-{
-	auto_number result = {};
-	result.type = a.type;
-	switch(a.type)
-	{
-		case auto_signed:
-		{
-			result.number.signed_long = a.number.signed_long + b.number.signed_long;
-		}break;
-		default:
-		{
-			LG_FATAL("not implemented");
-		}break;
-	}
-	return result;
-}
-
-auto_number
+double
 evaluate_expression(ast_expression *tree)
 {
 	if(tree->left != 0)
@@ -34,7 +15,7 @@ evaluate_expression(ast_expression *tree)
 		}break;
 		case type_add:
 		{
-			tree->number = add_auto_numbers(tree->number, evaluate_expression(tree->right));
+			tree->number = tree->number + evaluate_expression(tree->right);
 		}break;
 		default:
 		{
@@ -44,43 +25,84 @@ evaluate_expression(ast_expression *tree)
 	return tree->number;
 }
 
-
-// 2 * 3 + 4
+i32
+get_operator_precedence(char op)
+{
+	switch(op)
+	{
+		case '+':
+		case '-':
+		return 0; break;
+		case '*':
+		case '/':
+		return 1; break;
+		case '(':
+		return 2; break;
+		case ')':
+		return 3; break;
+		
+		default:
+		{
+			LG_FATAL("Unexpected token when parsing math expression %c", op);
+			return INT32_MIN;
+		}break;
+	}
+}
 ast_expression
 tokens_to_ast_expression(i16 *tokens, i16 amount)
 {
-	ast_expression result = {};
-	ast_expression *current = &result;
+	ast_type *output_queue = NULL;
+	stack operator_stack = {.top = -1, .array = NULL};
+	
 	for(i32 token_index = 0; token_index < amount; ++token_index)
 	{
-		ast_expression *new_expression = AllocateCompileMemory(sizeof(ast_expression));
-		switch(tokens[token_index])
+		i32 stack_top = stack_peek(operator_stack);
+		if(stack_top == INT32_MIN)
 		{
-			case tok_number:
+			stack_top = -1;
+		}
+		else stack_top = get_operator_precedence(stack_top);
+		if(tokens[token_index] == tok_number)
+		{
+			arrput(output_queue, (ast_type)tok_number);
+		}
+		else
+		{
+			i32 prec = get_operator_precedence(tokens[token_index]);
+			
+			if (prec == 3)
 			{
-				new_expression->number.type = auto_real64;
-				new_expression->number.number.real64 = vstd_str_to_double((char *)get_next_identifier());
-			}break;
-			case type_add:
+				i32 op;
+				do
+				{
+					op = stack_pop(&operator_stack);
+					if(op != '(')
+						arrput(output_queue, op);
+					
+				} while(op != '(');
+			}
+			else if(prec <= stack_top)
 			{
-				new_expression->left = type_add;
-			}break;
-			case type_subtract:
-			{
-				new_expression->left = type_subtract;
-			}break;
-			case type_multiply:
-			{
-				new_expression->right = type_multiply;
-			}break;
-			case type_divide:
-			{
-				new_expression->right = type_divide;
-			}break;
-			case '(':
-			{
+				if(stack_top != 2)
+					arrput(output_queue, stack_pop(&operator_stack));
 				
-			}break;
+				stack_push(&operator_stack, tokens[token_index]);
+			}
+			else 
+			{
+				stack_push(&operator_stack, tokens[token_index]);
+			}
 		}
 	}
+	
+	i32 op = 0;
+	while(op != INT32_MIN)
+	{
+		op = stack_pop(&operator_stack);
+		if(op != INT32_MIN)
+			arrput(output_queue, op);
+	}
+	
+	arrfree(operator_stack.array);
+	arrfree(output_queue);
 }

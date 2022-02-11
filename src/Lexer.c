@@ -6,6 +6,8 @@ static i16 *token_buffer;
 static u8 **identifier_buffer;
 static u64 last_identifier;
 
+i16 *get_token_array() { return token_buffer; }
+
 void
 initialize_compiler()
 {

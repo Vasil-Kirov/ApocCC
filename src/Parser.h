@@ -6,22 +6,6 @@
 typedef struct _abstract_syntax_tree ast_node;
 typedef struct _ast_expression       ast_expression;
 
-typedef union unkown_number
-{
-	i64 signed_long;
-	u64 unsigned_long;
-	f32 real32;
-	double real64;
-} unknown_number;
-
-typedef enum _auto_type
-{
-	auto_signed,
-	auto_unsigned,
-	auto_real32,
-	auto_real64
-} auto_type;
-
 typedef enum _ast_type
 {
 	type_func,
@@ -35,11 +19,41 @@ typedef enum _ast_type
 	type_constant
 } ast_type;
 
-typedef struct _auto_number
+typedef struct _stack
 {
-	unknown_number number;
-	auto_type type;
-} auto_number;
+	i32 top;
+	i32 *array;
+} stack;
+
+b32
+is_stack_empty(stack s)
+{
+	return (s.top == -1);
+}
+
+void
+stack_push(stack *s, i32 item)
+{
+	++s->top;
+	arrins(s->array, s->top, item);
+}
+
+i32
+stack_pop(stack *s)
+{
+	if(is_stack_empty(*s))
+		return INT32_MIN;
+	
+	return s->array[s->top--];
+}
+
+i32
+stack_peek(stack s)
+{
+	if(is_stack_empty(s))
+		return INT32_MIN;
+	return s.array[s.top];
+}
 
 typedef struct _ast_func
 {
@@ -62,7 +76,7 @@ typedef struct _ast_if
 struct _ast_expression
 {
 	ast_type type;
-	auto_number number;
+	double number;
 	ast_expression *left;
 	ast_expression *right;
 };
@@ -90,7 +104,7 @@ struct _abstract_syntax_tree
 	ast_union *right;
 };
 
-auto_number
+double
 evaluate_expression(ast_expression *tree);
 
 ast_expression

@@ -99,7 +99,7 @@ DOCUMENTATION
           Appends the item b to the end of array a. Returns b.
 
       arrins:
-        T arrins(T* a, int p, T b);
+        T arrins(T* a, int p, T b)`;
           Inserts the item b into the middle of array a, into a[p],
           moving the rest of the array over. Returns b.
 
