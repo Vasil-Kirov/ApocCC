@@ -3,36 +3,46 @@
 
 typedef struct _ap_memory
 {
+	u16 ChunkIndex;
 	void *Start;
 	void *End;
 	void *Current;
+	u64 ChunkSize;
+	u64 MaxSize;
 } ap_memory;
 
 
 
 
-static ap_memory MemoryAllocators[3];
+static ap_memory MemoryAllocators[2];
 
 
-#define PERM_SIZE MB(1024)
-#define COMP_SIZE MB(2048)
-#define TEMP_SIZE GB(1)
+#define PERM_SIZE GB(4)
+#define COMP_SIZE GB(8)
+
+#define COMP_CHUNK MB(512)
+#define PERM_CHUNK MB(256)
+
 
 void
-InitAPMem(ap_memory *Memory, u64 Size)
+InitAPMem(ap_memory *Memory, u64 Size, u64 ChunkSize)
 {
-	Memory->Start = PlatformAllocateChunk(Size);
-	Memory->End = (u8 *)Memory->Start + Size; 
+	Memory->Start = PlatformReserveMemory(Size);
+	PlatformAllocateReserved(Memory->Start, ChunkSize);
+	
+	Memory->End = (u8 *)Memory->Start + ChunkSize; 
 	Memory->Current = Memory->Start;
+	Memory->ChunkIndex = 1;
+	Memory->ChunkSize = ChunkSize;
+	Memory->MaxSize = Size;
 }
 
 
 void
 InitializeMemory()
 {
-	InitAPMem(&MemoryAllocators[PERM_INDEX], PERM_SIZE);
-	InitAPMem(&MemoryAllocators[COMP_INDEX], COMP_SIZE);
-	InitAPMem(&MemoryAllocators[TEMP_INDEX], TEMP_SIZE);
+	InitAPMem(&MemoryAllocators[PERM_INDEX], PERM_SIZE, PERM_CHUNK);
+	InitAPMem(&MemoryAllocators[COMP_INDEX], COMP_SIZE, PERM_CHUNK);
 }
 
 void *
@@ -40,18 +50,18 @@ AllocateMemory(u64 Size, i8 Index)
 {
 	void *Result = MemoryAllocators[Index].Current;
 	MemoryAllocators[Index].Current = (char *)MemoryAllocators[Index].Current + Size;
-	if((char *)MemoryAllocators[Index].Current > (char *)MemoryAllocators[Index].End)
+	while((char *)MemoryAllocators[Index].Current > (char *)MemoryAllocators[Index].End)
 	{
-		const char *NAME[3] = { "permanent", "debug", "temporary" };
-		LG_FATAL("MEMORY OVERFLOW when allocating %s memory", NAME[Index]);
+		if(MemoryAllocators[Index].ChunkIndex * MemoryAllocators[Index].ChunkSize > MemoryAllocators[Index].MaxSize)
+		{
+			const char *NAME[2] = { "permanent", "debug" };
+			LG_FATAL("MEMORY OVERFLOW when allocating %s memory", NAME[Index]);
+		}
+		PlatformAllocateReserved((u8 *)MemoryAllocators[Index].Start + MemoryAllocators[Index].ChunkIndex * MemoryAllocators[Index].ChunkSize, MemoryAllocators[Index].ChunkSize);
+		MemoryAllocators[Index].ChunkIndex++;
+		MemoryAllocators[Index].End = (u8 *)MemoryAllocators[Index].End + MemoryAllocators[Index].ChunkSize;
 	}
 	return Result;
-}
-
-void
-ResetTemporaryMemory()
-{
-	MemoryAllocators[TEMP_INDEX].Current = MemoryAllocators[TEMP_INDEX].Start;
 }
 
 void

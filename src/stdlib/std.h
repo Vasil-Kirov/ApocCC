@@ -4,6 +4,8 @@
 #include <Basic.h>
 
 
+
+
 #define vstd_printf(str, ...) _vstd_Printf(sizeof(str) - 1, str, __VA_ARGS__)
 #define vstd_sprintf(buff, str, ...) _vstd_sPrintf(sizeof(str) - 1, buff, str, __VA_ARGS__)
 
@@ -15,6 +17,15 @@ struct vstdRect
     int y2;
 };
 
+
+size_t
+vstd_strlen(char *str);
+
+char *
+vstd_strcat_multiple(char *output, int amount, ...);
+
+void
+vstd_stepout_dir(char *path);
 
 inline b32
 is_whitespace(char c);
@@ -45,9 +56,6 @@ vstd_strchr(char *str, char chr);
 
 char *
 vstd_strstr(char *str1, char *str2);
-
-size_t
-vstd_strlen(char *str);
 
 void
 vstd_strcat(char *dst, const char *src);

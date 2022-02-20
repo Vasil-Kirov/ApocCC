@@ -194,6 +194,18 @@ PlatformHandleMessages()
 }
 
 void *
+PlatformReserveMemory(u64 Size)
+{
+	return VirtualAlloc(NULL, Size, MEM_RESERVE, PAGE_READWRITE);
+}
+
+void
+PlatformAllocateReserved(void *Address, u64 Size)
+{
+	VirtualAlloc(Address, Size, MEM_COMMIT, PAGE_READWRITE);
+}
+
+void *
 PlatformAllocateChunk(u64 Size)
 {
 	return VirtualAlloc(NULL, Size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
@@ -213,9 +225,12 @@ PlatformGetFileSize(char *Path)
 	
 	if(File == INVALID_HANDLE_VALUE) return 0;
 	
-	u64 Size = GetFileSize(File, NULL);
+	
+	LARGE_INTEGER Size;
+	GetFileSizeEx(File, &Size);
 	CloseHandle(File);
-	return Size;
+	
+	return Size.QuadPart;
 }
 
 b32
@@ -226,15 +241,27 @@ PlatformReadEntireFile(void *Data, u64 *Size, char *Path)
 	{
 		return false;
 	}
-	*Size = GetFileSize(File, NULL);
+	LARGE_INTEGER FileSize;
+	GetFileSizeEx(File, &FileSize);
+	*Size = FileSize.QuadPart;
 	
-	DWORD HaveRead;
-	ReadFile(File, Data, (DWORD)*Size, &HaveRead, NULL);
-	
-	if(HaveRead == 0)
+	u64 HaveRead = 0;
+	while(FileSize.QuadPart > 0)
 	{
-		CloseHandle(File);
-		return false;
+		DWORD ReadThisLoop;
+		DWORD ToRead = (DWORD)FileSize.QuadPart;
+		if(FileSize.QuadPart > UINT32_MAX)
+		{
+			ToRead = UINT32_MAX;
+		}
+		ReadFile(File, Data+HaveRead, ToRead, &ReadThisLoop, NULL);
+		if(ReadThisLoop == 0)
+		{
+			CloseHandle(File);
+			return false;
+		}
+		FileSize.QuadPart -= ReadThisLoop;
+		HaveRead += ReadThisLoop;
 	}
 	
 	CloseHandle(File);

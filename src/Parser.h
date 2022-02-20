@@ -19,41 +19,46 @@ typedef enum _ast_type
 	type_constant
 } ast_type;
 
+typedef struct _type_and_identifier
+{
+	ast_type type;
+	u64 iden_index;
+} type_and_identifier;
+
+// NOTE(Vasko): START OF STACK IMPLEMENTATION
+#define STACK_INFO_SIZE 12
+#pragma pack(push, 1)
 typedef struct _stack
 {
 	i32 top;
-	i32 *array;
-} stack;
+	i32 capacity;
+	i32 default_value;
+} _internal_stack;
+#pragma pack(pop)
 
-b32
-is_stack_empty(stack s)
-{
-	return (s.top == -1);
-}
 
-void
-stack_push(stack *s, i32 item)
-{
-	++s->top;
-	arrins(s->array, s->top, item);
-}
+#define stack_allocate(arr, memory_index, max_size) void *_s_location = \
+AllocateMemory(max_size+STACK_INFO_SIZE, memory_index); \
+arr = _s_location+STACK_INFO_SIZE; ((_internal_stack *)((i8 *)arr-STACK_INFO_SIZE))->top = -1; \
+((_internal_stack *)((i8 *)arr-STACK_INFO_SIZE))->capacity = max_size; \
+((_internal_stack *)((i8 *)arr-STACK_INFO_SIZE))->default_value = INT32_MIN
 
-i32
-stack_pop(stack *s)
-{
-	if(is_stack_empty(*s))
-		return INT32_MIN;
-	
-	return s->array[s->top--];
-}
+#define stack_header(arr) ((_internal_stack *)((i8 *)arr-STACK_INFO_SIZE))
 
-i32
-stack_peek(stack s)
-{
-	if(is_stack_empty(s))
-		return INT32_MIN;
-	return s.array[s.top];
-}
+#define stack_set_default_value(s, value) stack_header(s)->default_value = value
+
+#define is_stack_full(s) stack_header(s)->top == stack_header(s)->capacity - 1
+
+#define is_stack_empty(s) stack_header(s)->top == -1
+
+#define stack_push(s, item) if(is_stack_full(s)) { LG_FATAL("Expression stack overflow"); } \
+s[++stack_header(s)->top] = item
+
+#define stack_pop(s) is_stack_empty(s) ? (typeof(*s)){stack_header(s)->default_value} : s[stack_header(s)->top--]
+
+#define stack_peek(s) is_stack_empty(s) ? (typeof(*s)){stack_header(s)->default_value} : s[stack_header(s)->top]
+
+// END OF STACK IMPLEMENTATION
 
 typedef struct _ast_func
 {
@@ -108,6 +113,9 @@ double
 evaluate_expression(ast_expression *tree);
 
 ast_expression
-tokens_to_ast_expression(i16 *tokens, i16 amount);
+tokens_to_ast_expression(token_iden *tokens, i16 amount);
+
+void
+ast_from_tokens();
 
 #endif //_PARSER_H

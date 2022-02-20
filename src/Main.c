@@ -39,17 +39,11 @@ main(int argc, char *argv[])
 	initialize_compiler();
 	
 	will_compile = true;
-	compile_file("D:\\Programming\\Compiler\\Test.apoc");
-	i16 *tokens = get_token_array();
-	i16 size = 0;
-	while(tokens[size] != tok_eof) ++size;
-	tokens_to_ast_expression(tokens, size);
+	compile_file("W:\\Apocalypse\\Test.apoc");
+	if(!will_compile) return -1;
+	ast_from_tokens();
+	if(!will_compile) return -1;
 	
-	
-	if(!will_compile) return 1;
-	
-	
-	ResetTemporaryMemory();
 	ResetCompileMemory();
 	return 0;
 }

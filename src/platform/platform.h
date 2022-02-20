@@ -59,6 +59,12 @@ u64
 PlatformGetFileSize(char *Path);
 
 void *
+PlatformReserveMemory(u64 Size);
+
+void
+PlatformAllocateReserved(void *Address, u64 Size);
+
+void *
 PlatformAllocateChunk(u64 Size);
 
 void

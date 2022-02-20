@@ -5,10 +5,11 @@
 #include <Builtin.h>
 #define V_WRITE_BUFFER_SIZE 8192
 
-
 f64
 vstd_pow(f64 a, f64 b)
 {
+	if(b == 0) return 1;
+	
 	if (b < 0) 
 	{
 		b = -b;
@@ -27,10 +28,39 @@ vstd_pow(f64 a, f64 b)
 	return a;
 }
 
+char *
+vstd_strcat_multiple(char *output, int amount, ...)
+{
+	va_list args;
+	va_start(args, amount);
+	while(amount > 0)
+	{
+		vstd_strcat(output, va_arg(args, char *));
+		
+		amount--;
+	}
+	return output;
+}
+
+void
+vstd_stepout_dir(char *path)
+{
+	size_t size = vstd_strlen(path);
+	for(size_t index = size-2; index >= 0; --index)
+	{
+		if(path[index] == '\\' || path[index] == '/')
+		{
+			path[index+1] = 0;
+			break;
+		}
+	} 
+	return;
+}
+
 f64
 vstd_str_to_double(char *str)
 {
-	f64 result;
+	f64 result = 0;
 	b32 flag = false;
 	i32 magic = 0;
 	for(i32 index = 0; str[index] != 0; ++index)
@@ -48,6 +78,12 @@ vstd_str_to_double(char *str)
 	}
 	return result * vstd_pow(10, magic);
 	
+}
+
+inline b32
+is_special_char(char c)
+{
+	return ((c >= '!' && '/' <= c) || (c >= ':' && '@' <= c) || (c >= '[' && c <= '`') || (c >= '{' && c <= '~'));
 }
 
 inline b32
