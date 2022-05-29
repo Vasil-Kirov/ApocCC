@@ -3,25 +3,47 @@
 #ifndef _PARSER_H
 #define _PARSER_H
 
-typedef struct _abstract_syntax_tree ast_node;
-typedef struct _ast_expression       ast_expression;
+typedef struct _abstract_syntax_tree Ast_Node;
+typedef struct _ast_expression       Ast_Expression;
 
 typedef enum _ast_type
 {
-	type_func,
-	type_for,
-	type_if,
-	type_expression,
+	type_notype = 0,
+	
+	type_assignment = -44,
+	type_func = -43,
+	type_for = -42,
+	type_if = -41,
+	type_expression = -40,
+	type_constant = -39,
+	type_var = -38,
+	
 	type_add = '+',
 	type_subtract = '-',
 	type_multiply = '*',
 	type_divide = '/',
-	type_constant
-} ast_type;
+	
+	type_root = -100
+} Ast_Type;
+
+typedef enum _var_type
+{
+	byte1  = 0x001,
+	byte2  = 0x002,
+	byte4  = 0x004,
+	byte8  = 0x008,
+	ubyte  = 0x010,
+	ubyte2 = 0x020,
+	ubyte4 = 0x040,
+	ubyte8 = 0x080,
+	real32 = 0x100,
+	real64 = 0x200,
+	empty  = 0x400 // void
+} Var_Type;
 
 typedef struct _type_and_identifier
 {
-	ast_type type;
+	Ast_Type type;
 	u64 iden_index;
 } type_and_identifier;
 
@@ -60,62 +82,105 @@ s[++stack_header(s)->top] = item
 
 // END OF STACK IMPLEMENTATION
 
+
+typedef struct _ast_node_array
+{
+	Ast_Node **nodes;
+	int count;
+} Ast_Node_Array;
+
+typedef struct _ast_variable
+{
+	Var_Type type;
+	b32 is_pointer;
+	u64 identifier_index;
+} Ast_Variable;
+
 typedef struct _ast_func
 {
-	ast_node *arguments;
-	ast_node *body;
-} ast_func;
+	Var_Type type;
+	u64 identifier_index;
+	Ast_Node **arguments; // Simple DArray
+} Ast_Func;
 
 typedef struct _ast_for
 {
-	ast_expression *condition;
-	ast_node *branch;
-} ast_for;
+	Ast_Expression *condition;
+	Ast_Node *branch;
+} Ast_For;
 
 typedef struct _ast_if
 {
-	ast_expression *condition;
-	ast_node *branch;
-} ast_if;
+	Ast_Expression *condition;
+	Ast_Node *branch;
+} Ast_If;
 
 struct _ast_expression
 {
-	ast_type type;
+	Ast_Type type;
 	double number;
-	ast_expression *left;
-	ast_expression *right;
+	Ast_Expression *left;
+	Ast_Expression *right;
 };
 
 typedef struct _ast_assignment
 {
-	ast_node *variable;
-	ast_expression *expression;
-} ast_assignment;
+	
+} Ast_Assignment;
+
+typedef struct _ast_call
+{
+	u64 identifier_index;
+	Ast_Node_Array arguments;
+} Ast_Call;
 
 typedef union _ast_union
 {
-	ast_if condition;
-	ast_for loop;
-	ast_func function;
-	ast_expression expression;
-	ast_assignment assignment;
-} ast_union;
+	Ast_If condition;
+	Ast_For loop;
+	Ast_Func function;
+	Ast_Expression expression;
+	Ast_Assignment assignment;
+	Ast_Variable variable;
+	Ast_Call func_call;
+} Ast_Union;
 
 struct _abstract_syntax_tree
 {
-	ast_type type;
-	ast_union *left;
-	ast_union *middle;
-	ast_union *right;
+	Ast_Type type;
+	Ast_Union value;
+	Ast_Node *left;
+	Ast_Node *right;
 };
 
 double
-evaluate_expression(ast_expression *tree);
+evaluate_expression(Ast_Expression *tree);
 
-ast_expression
-tokens_to_ast_expression(token_iden *tokens, i16 amount);
+Ast_Expression
+tokens_to_ast_expression(Token_Iden *tokens, i16 amount);
+
+Ast_Node *
+parse_line_identifier(Token_Iden first_token);
+
+Ast_Variable *
+parse_function_arguments(u8 *func_name);
+
+Ast_Node *
+parse_variable_declaration();
+
+Ast_Node *
+parse_declaration_left(Token_Iden *tokens, int count);
+
+Ast_Node *
+parse_declaration_right(b32 equal_passed);
 
 void
 ast_from_tokens();
+
+Ast_Node *
+parse_next_token();
+
+Ast_Node *
+parse_func();
 
 #endif //_PARSER_H

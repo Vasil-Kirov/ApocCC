@@ -71,9 +71,14 @@ vstd_str_to_double(char *str)
 			result = (result*10)+(c-'0');
 			if(flag) magic--;
 		}
-		else
+		else if (c=='.')
 		{
 			flag = 1;
+		}
+		else 
+		{
+			// TODO(Vasko): better error handling
+			LG_FATAL("Expected number, got something else");
 		}
 	}
 	return result * vstd_pow(10, magic);
@@ -107,7 +112,7 @@ is_non_special_char(char c)
 inline b32
 is_whitespace(char c)
 {
-	return (c == ' ' || c == '\r' || c == '\n' || c == '\t');
+	return (c == ' ' || c == '\r' || c == '\v' || c == '\n' || c == '\t');
 }
 
 inline b32

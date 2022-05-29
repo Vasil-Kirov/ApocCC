@@ -1,0 +1,16 @@
+
+- A way for a variable to be allocated before calling a function and then act as if
+	it was passed in the function but be returned and not make the person
+	calling the function actually declare it themselves. Something like this:
+	```
+	func add_strs(a:* char, b:* char, out:[256]char) -> void {
+		concat(out, a);
+		concat(out, b);
+	}
+	
+	// it actually allocates new_string here(before the call) and passes a pointer to the function
+	new_string:[256] char = add_strs("Hello", " World!" /* new_string is secretly passed here */);
+	// the function doesn't actually return anything but acts like it does
+	print(new_string);
+	// prints "Hello World!"
+	```

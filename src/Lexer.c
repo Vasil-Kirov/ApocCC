@@ -1,8 +1,11 @@
 #include <Lexer.h>
 static u8 *at_buffer;
 static str_hash_table *KeywordTable;
-static token_iden *token_buffer;
+static str_hash_table *TypeTable;
+static Token_Iden *token_buffer;
+static u64 last_token;
 static u8 **identifier_buffer;
+static u64 current_line;
 
 
 
@@ -20,9 +23,33 @@ initialize_compiler()
 	shput(KeywordTable, "for", tok_for);
 	shput(KeywordTable, "switch", tok_switch);
 	shput(KeywordTable, "case", tok_case);
+	shput(KeywordTable, "as", tok_as);
+	
+	// NOTE(Vasko): Add basic types to string hash table
+	shput(TypeTable, "i8",  byte1);
+	shput(TypeTable, "i16", byte2);
+	shput(TypeTable, "i32", byte4);
+	shput(TypeTable, "i64", byte8);
+	shput(TypeTable, "u8",  ubyte);
+	shput(TypeTable, "u16", ubyte2);
+	shput(TypeTable, "u32", ubyte4);
+	shput(TypeTable, "u64", ubyte8);
+	shput(TypeTable, "r32", real32);
+	shput(TypeTable, "r64", real64);
+	shput(TypeTable, "void", empty);
 }
 
+Var_Type
+look_up_identifier_for_type(u8 *type_str)
+{
+	return shget(TypeTable, type_str);
+}
 
+Token_Iden
+get_next_token() { return token_buffer[last_token++]; }
+
+Token_Iden
+peek_next_token() { return token_buffer[last_token]; }
 
 u8 *
 get_identifier(u64 index)
@@ -45,21 +72,28 @@ compile_file(char *path)
 	}
 	
 	entire_file file_buffer;
-	file_buffer.data = AllocateCompileMemory(PlatformGetFileSize(path));
+	
+	file_buffer.size = PlatformGetFileSize(path)+1;
+	file_buffer.data = AllocateCompileMemory(file_buffer.size);
+	memset(file_buffer.data, 0, file_buffer.size);
 	if(PlatformReadEntireFile(file_buffer.data, &file_buffer.size, path) == false)
 	{
 		LG_FATAL("Couldn't find input file %s", path);
 	}
 	at_buffer = file_buffer.data;
+	
 	shdefault(KeywordTable, INT16_MAX);
+	shdefault(TypeTable, 0);
+	current_line = 1;
+	
 	while(at_buffer - (u8 *)file_buffer.data < (i64)file_buffer.size)
 	{
-		token_iden to_put = get_token();
+		Token_Iden to_put = get_token(path);
 		if(to_put.token != ' ')
 			arrput(token_buffer, to_put);
 	}
 	
-	token_iden eof_token = {.token = tok_eof, .identifier_index = 0};
+	Token_Iden eof_token = {.token = tok_eof, .identifier_index = 0};
 	arrput(token_buffer, eof_token);
 	
 	for(i32 index = 0; index < arrlen(token_buffer); ++index)
@@ -71,10 +105,14 @@ compile_file(char *path)
 	}
 }
 
-static token_iden get_token()
+// NOTE(Vasko): file is here to be put into the token, for easier error messages
+static Token_Iden get_token(char *file)
 {
 	while(is_whitespace(*at_buffer))
 	{
+		if(*at_buffer == '\n')
+			current_line++;
+		
 		at_buffer++;
 	}
 	
@@ -106,9 +144,9 @@ static token_iden get_token()
 			u64 index = arrlen(identifier_buffer);
 			arrput(identifier_buffer, identifier);
 			
-			return (token_iden){.token = token, .identifier_index = index};
+			return (Token_Iden){.token = token, .identifier_index = index, .line = current_line, .file = file};
 		}
-		return (token_iden){.token = token, .identifier_index = 0};
+		return (Token_Iden){.token = token, .identifier_index = 0, .line = current_line, .file = file};
 	}
 	else if(is_number(last_char))
 	{
@@ -119,8 +157,8 @@ static token_iden get_token()
 			{
 				if(found_dot)
 				{
-					raise_token_syntax_error("Number has an extra dot", &at_buffer);
-					return get_token();
+					raise_token_syntax_error("Number has an extra dot", &at_buffer, file, current_line);
+					return get_token(file);
 				}
 				found_dot = true;
 			}
@@ -134,15 +172,17 @@ static token_iden get_token()
 		u64 index = arrlen(identifier_buffer);
 		arrput(identifier_buffer, number_string);
 		
-		return (token_iden){.token = tok_number, .identifier_index = index};
+		return (Token_Iden){.token = tok_number, .identifier_index = index, .line = current_line, .file = file};
 	}
 	else
 	{
 		i16 token = check_for_char_combination((char **)&at_buffer);
 		if(token != ' ')
 			at_buffer++;
+		else
+			return get_token(file);
 		
-		return (token_iden){.token = token, .identifier_index = 0};
+		return (Token_Iden){.token = token, .identifier_index = 0, .line = current_line, .file = file};
 	}
 }
 
@@ -227,6 +267,8 @@ check_for_char_combination(char **buf)
 			if(next_char(at) == '/')
 			{
 				while (**buf != '\n') (*buf)++;
+				(**buf)++;
+				current_line++;
 				return ' ';
 			}
 			else return '/';

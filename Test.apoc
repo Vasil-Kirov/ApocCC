@@ -1,9 +1,22 @@
 
 // This is a comment
 
-func main :: () -> i32
+func get_10(string:* i8) -> void
 {
 	var: i32 = 10;
-		// This is also a comment
 	-> var;
+}
+
+struct Two_Nums
+{
+	num1: i32;
+	num2: i32;
+}
+// no ; after struct declaration
+
+func main(arg_count: i32, args:* i8) -> i32
+{
+	nums: Two_Nums = Two_Nums { 9, get_10("irrelevant") };
+	
+	-> nums;
 }

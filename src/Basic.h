@@ -52,6 +52,10 @@ typedef struct _entire_file
 #define ADD_LOGGER Assert(false)
 
 void
-raise_token_syntax_error(const char *error_msg, u8 **at_buffer);
+raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file, u64 line);
+
+#include <Lexer.h>
+void
+raise_parsing_unexpected_token(const char *expected_tok, Token_Iden token);
 
 #endif //_BASIC_H
