@@ -1,0 +1,1176 @@
+
+.vscode/c_cpp_properties.json,2064
+        {03,26
+            "name": "Linux",name4,36
+                "${default}",06,94
+                "${workspaceFolder}/engine/src/**",17,124
+                "/usr/include",28,176
+                "/usr/local/include"39,208
+            "includePath": [includePath5,65
+                "VIPOC_DEBUG",012,285
+                "VIPOC_EXPORT",113,316
+                "VIPOC_LINUX",214,348
+                "__AVX__",315,379
+                "__AVX2__"416,406
+            "defines": [defines11,260
+            "compilerPath": "/usr/bin/clang",compilerPath18,448
+            "cStandard": "c11",cStandard19,494
+            "cppStandard": "c++11",cppStandard20,526
+            "intelliSenseMode": "clang-x64"intelliSenseMode21,562
+        {123,617
+            "name": "Win32",name24,627
+                "${default}",026,685
+                "${workspaceFolder}",127,715
+                "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.19041.0\\um\\",228,753
+                "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.19041.0\\winrt\\wrl",329,843
+                "${workspaceFolder}/src",430,939
+                "${workspaceFolder}/include"531,981
+            "includePath": [includePath25,656
+                "VIPOC_DEBUG",034,1066
+                "VIPOC_EXPORT",135,1097
+                "VIPOC_WIN32",236,1129
+                "__AVX__",337,1160
+                "__SSE4_2__",438,1187
+                "RLD_EXPORTS"539,1217
+            "defines": [defines33,1041
+            "windowsSdkVersion": "10.0.19041.0",windowsSdkVersion41,1262
+            "compilerPath": "C:\\Program Files\\LLVM\\bin\\clang.exe",compilerPath42,1311
+            "cStandard": "c11",cStandard43,1382
+            "cppStandard": "c++14",cppStandard44,1414
+            "intelliSenseMode": "windows-clang-x64",intelliSenseMode45,1450
+                "/Zc:preprocessor-"047,1533
+            "compilerArgs": [compilerArgs46,1503
+    "configurations": [configurations2,2
+    "version": 4version51,1600
+
+.vscode/launch.json,1025
+    "version": "0.2.0",version2,3
+        {04,53
+            "name": "(Windows) Launch",name5,64
+            "type": "cppvsdbg",type6,105
+            "request": "launch",request7,138
+            "program": "${workspaceFolder}/bin/game.exe",program8,172
+            "args": [],args9,231
+            "stopAtEntry": false,stopAtEntry10,256
+            "cwd": "${workspaceFolder}/bin/",cwd11,291
+            "environment": [],environment12,338
+            "console": "newExternalWindow",console13,370
+        {115,427
+            "name": "(Linux) Launch",name16,438
+            "type": "cppvsdbg",type17,477
+            "request": "launch",request18,510
+            "program": "${workspaceFolder}/bin/game",program19,544
+            "args": [],args20,599
+            "stopAtEntry": false,stopAtEntry21,624
+            "cwd": "${workspaceFolder}/bin/",cwd22,659
+            "environment": []environment23,706
+    "configurations": [configurations3,28
+    "compounds": []compounds26,756
+
+.vscode/settings.json,2007
+        "renderer.h": "c",renderer.h3,32
+        "vp_memory.h": "c",vp_memory.h4,60
+        "platform.h": "c",platform.h5,89
+        "cmath": "c",cmath6,117
+        "cglm.h": "c",cglm.h7,140
+        "windowsx.h": "c",windowsx.h8,164
+        "entity.h": "c",entity.h9,192
+        "defines.h": "c",defines.h10,218
+        "application.h": "c",application.h11,245
+        "core.h": "c",core.h12,276
+        "input.h": "c",input.h13,300
+        "load_gl_black_magic.h": "c",load_gl_black_magic.h14,325
+        "xutility": "c",xutility15,364
+        "type_traits": "c",type_traits16,390
+        "xtr1common": "c",xtr1common17,419
+        "glx.h": "c",glx.h18,447
+        "limits.h": "c",limits.h19,470
+        "stdlib.h": "c",stdlib.h20,496
+        "stat.h": "c",stat.h21,522
+        "unistd.h": "c",unistd.h22,546
+        "mman.h": "c",mman.h23,572
+        "time.h": "c",time.h24,596
+        "errno.h": "c",errno.h25,620
+        "*.rh": "cpp",*.rh26,645
+        "lexer.h": "c",lexer.h27,669
+        "std.h": "c",std.h28,694
+        "basic.h": "c",basic.h29,717
+        "stb_ds.h": "c"stb_ds.h30,742
+    "files.associations": {files.associations2,3
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.block": "ignore",C_Cpp.vcFormat.newLine.beforeOpenBrace.block32,775
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.function": "newLine",C_Cpp.vcFormat.newLine.beforeOpenBrace.function33,838
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.lambda": "newLine",C_Cpp.vcFormat.newLine.beforeOpenBrace.lambda34,905
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.namespace": "newLine",C_Cpp.vcFormat.newLine.beforeOpenBrace.namespace35,970
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.type": "newLine",C_Cpp.vcFormat.newLine.beforeOpenBrace.type36,1038
+    "C_Cpp.vcFormat.wrap.preserveBlocks": "oneLiners",C_Cpp.vcFormat.wrap.preserveBlocks37,1101
+    "C_Cpp.vcFormat.space.withinInitializerListBraces": trueC_Cpp.vcFormat.space.withinInitializerListBraces38,1157
+
+.vscode/tasks.json,1919
+        {03,19
+            "type": "shell",type4,30
+            "label": "Build Engine",label5,60
+                "command": "${workspaceFolder}/engine/build.bat debug"command7,124
+            "windows": {windows6,98
+                "command": "${workspaceFolder}/engine/build.sh debug"command10,236
+            "linux": {linux9,212
+                "cwd": "${workspaceFolder}/engine"cwd13,349
+            "options": {options12,323
+            "group": "build",group15,417
+            "detail": "Task generated by Debugger."detail16,448
+        {118,513
+            "type": "shell",type19,524
+            "label": "Build Game",label20,554
+                "command": "${workspaceFolder}/game/build.bat debug"command22,616
+            "windows": {windows21,590
+                "command": "${workspaceFolder}/game/build.sh debug"command25,726
+            "linux": {linux24,702
+                "cwd": "${workspaceFolder}/game"cwd28,837
+            "options": {options27,811
+            "group": "build",group30,903
+            "detail": "Task generated by Debugger."detail31,934
+        {233,999
+            "type": "shell",type34,1010
+            "label": "Build All",label35,1040
+                "command": "${workspaceFolder}/build-all.bat"command37,1101
+            "windows": {windows36,1075
+                "command": "${workspaceFolder}/build-all.sh"command40,1204
+            "linux": {linux39,1180
+                "cwd": "${workspaceFolder}"cwd43,1308
+            "options": {options42,1282
+                "kind": "build",kind46,1393
+                "isDefault": trueisDefault47,1427
+            "group": {group45,1369
+                "reveal": "silent",reveal50,1509
+                "clear": trueclear51,1546
+            "presentation": {presentation49,1478
+            "problemMatcher": []problemMatcher53,1609
+    "tasks": [tasks2,3
+
+bin/.vs/Main/project-colors.json,904
+  "Version": 1,Version2,3
+      "ProjectGuid": "a2fe74e1-b743-11d0-ae1a-00a0c90fffc3",ProjectGuid5,86
+      "DisplayName": "Miscellaneous Files",DisplayName6,148
+      "ColorIndex": -1ColorIndex7,193
+    "a2fe74e1-b743-11d0-ae1a-00a0c90fffc3": {a2fe74e1-b743-11d0-ae1a-00a0c90fffc34,39
+      "ProjectGuid": "2613f74f-d993-49ca-90ee-cc9f580e451b",ProjectGuid10,272
+      "DisplayName": "Main",DisplayName11,334
+      "ColorIndex": 0ColorIndex12,364
+    "2613f74f-d993-49ca-90ee-cc9f580e451b": {2613f74f-d993-49ca-90ee-cc9f580e451b9,225
+      "ProjectGuid": "a7a2a36c-3c53-4ccb-b52e-425623e2dda5",ProjectGuid15,442
+      "DisplayName": "Miscellaneous Files",DisplayName16,504
+      "ColorIndex": 1ColorIndex17,549
+    "a7a2a36c-3c53-4ccb-b52e-425623e2dda5": {a7a2a36c-3c53-4ccb-b52e-425623e2dda514,395
+  "ProjectMap": {ProjectMap3,20
+  "NextColorIndex": 2NextColorIndex20,585
+
+bin/.vs/Main/v17/.suo,0
+
+bin/.vs/Main/v17/Browse.VC.db,0
+
+bin/.vs/Main/v17/ipch/AutoPCH/191d20640875f433/PARSER.ipch,0
+
+bin/.vs/Main/v17/ipch/AutoPCH/5ea533616ebf5c6e/PARSER.ipch,0
+
+bin/.vs/Main/v17/ipch/AutoPCH/63158180bb2e6d83/PARSER.ipch,0
+
+bin/.vs/Main/v17/ipch/AutoPCH/a3666a032c2b0e81/PARSER.ipch,0
+
+bin/.vs/Main/v17/ipch/AutoPCH/bb8b0d00c9dac064/PARSER.ipch,0
+
+bin/.vs/Main/v17/ipch/AutoPCH/bbd34690d9e9d783/PARSER.ipch,0
+
+bin/.vs/Main/v17/ipch/AutoPCH/c308b82a126e052f/PARSER.ipch,0
+
+bin/.vs/Main/v17/ipch/AutoPCH/dd5809029991849c/PARSER.ipch,0
+
+bin/Errors.log,0
+
+bin/Main.ilk,0
+
+bin/Main.pdb,0
+
+bin/Main.sln,0
+
+bin/vc140.pdb,0
+
+bison-test/parser.y,1108
+%token	tok_eof = -1,tok_eof6,9
+%token	tok_func   = -2,tok_func8,32
+%token	tok_extern = -3,tok_extern9,56
+%token	tok_arrow  = -4,tok_arrow10,80
+%token	tok_struct = -5,tok_struct11,104
+%token	tok_cast   = -6,tok_cast12,128
+%token	tok_if     = -7,tok_if13,152
+%token	tok_for    = -8,tok_for14,176
+%token	tok_identifier = -9,tok_identifier16,202
+%token	tok_const_str  = -10,tok_const_str17,230
+%token	tok_number = -11,tok_number18,259
+%token	tok_logical_or = -12,tok_logical_or20,286
+%token	tok_logical_is = -13,tok_logical_is21,315
+%token	tok_logical_isnot = -14,tok_logical_isnot22,344
+%token	tok_logical_and = -15,tok_logical_and23,376
+%token	tok_binary_lshift = -16,tok_binary_lshift25,408
+%token	tok_binary_rshift = -17,tok_binary_rshift26,440
+%token	tok_const  = -18,tok_const28,474
+%token	tok_switch = -19,tok_switch29,499
+%token	tok_case   = -20,tok_case30,524
+%token	tok_as     = -21,tok_as31,549
+%token	tok_import = -22,tok_import33,576
+%token	tok_run    = -23,tok_run34,601
+%token	tok_must   = -24,tok_must35,626
+%token	tok_all    = -25,tok_all36,651
+
+build.bat,20
+:ERRORERROR26,504
+
+Console.lnk,0
+
+include/Builtin.h,17947
+#define PSNIP_BUILTIN_HPSNIP_BUILTIN_H16,629
+#  define PSNIP_BUILTIN_GNU_HAS_BUILTIN(PSNIP_BUILTIN_GNU_HAS_BUILTIN19,693
+#  define PSNIP_BUILTIN_GNU_HAS_BUILTIN(PSNIP_BUILTIN_GNU_HAS_BUILTIN21,853
+#  define PSNIP_BUILTIN_GNU_HAS_BUILTIN(PSNIP_BUILTIN_GNU_HAS_BUILTIN23,963
+#  define PSNIP_BUILTIN_GNU_HAS_BUILTIN(PSNIP_BUILTIN_GNU_HAS_BUILTIN25,1101
+#  define PSNIP_BUILTIN_CLANG_HAS_BUILTIN(PSNIP_BUILTIN_CLANG_HAS_BUILTIN29,1216
+#  define PSNIP_BUILTIN_CLANG_HAS_BUILTIN(PSNIP_BUILTIN_CLANG_HAS_BUILTIN31,1332
+#  define PSNIP_BUILTIN_CLANG_HAS_BUILTIN(PSNIP_BUILTIN_CLANG_HAS_BUILTIN33,1414
+#  define PSNIP_BUILTIN_MSVC_HAS_INTRIN(PSNIP_BUILTIN_MSVC_HAS_INTRIN37,1520
+#  define PSNIP_BUILTIN_MSVC_HAS_INTRIN(PSNIP_BUILTIN_MSVC_HAS_INTRIN39,1648
+#  define PSNIP_BUILTIN_MSVC_HAS_INTRIN(PSNIP_BUILTIN_MSVC_HAS_INTRIN41,1760
+#  define PSNIP_BUILTIN_MSVC_HAS_INTRIN(PSNIP_BUILTIN_MSVC_HAS_INTRIN43,1925
+#  define PSNIP_BUILTIN_MSVC_HAS_INTRIN(PSNIP_BUILTIN_MSVC_HAS_INTRIN45,2048
+#    define PSNIP_BUILTIN__ENABLE_X86PSNIP_BUILTIN__ENABLE_X8657,2390
+#    define PSNIP_BUILTIN__ENABLE_X86PSNIP_BUILTIN__ENABLE_X8659,2456
+#    define PSNIP_BUILTIN__ENABLE_AMD64PSNIP_BUILTIN__ENABLE_AMD6466,2632
+#    define PSNIP_BUILTIN__ENABLE_AMD64PSNIP_BUILTIN__ENABLE_AMD6468,2700
+#    define psnip_int64_t psnip_int64_t86,3232
+#    define psnip_uint64_t psnip_uint64_t89,3309
+#    define psnip_int32_t psnip_int32_t92,3387
+#    define psnip_uint32_t psnip_uint32_t95,3464
+#    define psnip_int16_t psnip_int16_t98,3542
+#    define psnip_uint16_t psnip_uint16_t101,3619
+#    define psnip_int8_t psnip_int8_t104,3696
+#    define psnip_uint8_t psnip_uint8_t107,3770
+#  define PSNIP_BUILTIN_LIKELY(PSNIP_BUILTIN_LIKELY112,3881
+#  define PSNIP_BUILTIN_UNLIKELY(PSNIP_BUILTIN_UNLIKELY113,3939
+#  define PSNIP_BUILTIN_LIKELY(PSNIP_BUILTIN_LIKELY115,4060
+#  define PSNIP_BUILTIN_UNLIKELY(PSNIP_BUILTIN_UNLIKELY116,4128
+#  define PSNIP_BUILTIN_LIKELY(PSNIP_BUILTIN_LIKELY118,4205
+#  define PSNIP_BUILTIN_UNLIKELY(PSNIP_BUILTIN_UNLIKELY119,4254
+#    define PSNIP_BUILTIN__COMPILER_ATTRIBUTES PSNIP_BUILTIN__COMPILER_ATTRIBUTES124,4383
+#    define PSNIP_BUILTIN__COMPILER_ATTRIBUTESPSNIP_BUILTIN__COMPILER_ATTRIBUTES126,4468
+#    define PSNIP_BUILTIN__INLINE PSNIP_BUILTIN__INLINE130,4558
+#    define PSNIP_BUILTIN__INLINE PSNIP_BUILTIN__INLINE132,4673
+#    define PSNIP_BUILTIN__INLINE PSNIP_BUILTIN__INLINE134,4754
+#    define PSNIP_BUILTIN__INLINE PSNIP_BUILTIN__INLINE136,4847
+#    define PSNIP_BUILTIN__INLINEPSNIP_BUILTIN__INLINE138,4900
+#  define PSNIP_BUILTIN__FUNCTION PSNIP_BUILTIN__FUNCTION141,4947
+#define PSNIP_BUILTIN__SUFFIX_B PSNIP_BUILTIN__SUFFIX_B144,5056
+#define PSNIP_BUILTIN__SUFFIX_S PSNIP_BUILTIN__SUFFIX_S145,5092
+#define PSNIP_BUILTIN__SUFFIX_ PSNIP_BUILTIN__SUFFIX_146,5128
+#define PSNIP_BUILTIN__SUFFIX_L PSNIP_BUILTIN__SUFFIX_L147,5164
+#define PSNIP_BUILTIN__SUFFIX_LL PSNIP_BUILTIN__SUFFIX_LL148,5200
+#    define PSNIP_BUILTIN__SIZEOF_CHAR PSNIP_BUILTIN__SIZEOF_CHAR152,5335
+#    define PSNIP_BUILTIN__SIZEOF_CHAR PSNIP_BUILTIN__SIZEOF_CHAR154,5436
+#    define PSNIP_BUILTIN__SIZEOF_CHAR PSNIP_BUILTIN__SIZEOF_CHAR156,5546
+#    define PSNIP_BUILTIN__SIZEOF_CHAR PSNIP_BUILTIN__SIZEOF_CHAR158,5672
+#    define PSNIP_BUILTIN__SIZEOF_SHRT PSNIP_BUILTIN__SIZEOF_SHRT164,5832
+#    define PSNIP_BUILTIN__SIZEOF_SHRT PSNIP_BUILTIN__SIZEOF_SHRT166,5933
+#    define PSNIP_BUILTIN__SIZEOF_SHRT PSNIP_BUILTIN__SIZEOF_SHRT168,6043
+#    define PSNIP_BUILTIN__SIZEOF_SHRT PSNIP_BUILTIN__SIZEOF_SHRT170,6169
+#    define PSNIP_BUILTIN__SIZEOF_INT PSNIP_BUILTIN__SIZEOF_INT176,6326
+#    define PSNIP_BUILTIN__SIZEOF_INT PSNIP_BUILTIN__SIZEOF_INT178,6424
+#    define PSNIP_BUILTIN__SIZEOF_INT PSNIP_BUILTIN__SIZEOF_INT180,6531
+#    define PSNIP_BUILTIN__SIZEOF_INT PSNIP_BUILTIN__SIZEOF_INT182,6654
+#    define PSNIP_BUILTIN__SIZEOF_LONG PSNIP_BUILTIN__SIZEOF_LONG188,6813
+#    define PSNIP_BUILTIN__SIZEOF_LONG PSNIP_BUILTIN__SIZEOF_LONG190,6914
+#    define PSNIP_BUILTIN__SIZEOF_LONG PSNIP_BUILTIN__SIZEOF_LONG192,7024
+#    define PSNIP_BUILTIN__SIZEOF_LONG PSNIP_BUILTIN__SIZEOF_LONG194,7150
+#    define PSNIP_BUILTIN__SIZEOF_LLONG PSNIP_BUILTIN__SIZEOF_LLONG200,7313
+#    define PSNIP_BUILTIN__SIZEOF_LLONG PSNIP_BUILTIN__SIZEOF_LLONG202,7417
+#    define PSNIP_BUILTIN__SIZEOF_LLONG PSNIP_BUILTIN__SIZEOF_LLONG204,7530
+#    define PSNIP_BUILTIN__SIZEOF_LLONG PSNIP_BUILTIN__SIZEOF_LLONG206,7659
+#    define PSNIP_BUILTIN_SUFFIX_INT8 PSNIP_BUILTIN_SUFFIX_INT8212,7820
+#    define PSNIP_BUILTIN_SUFFIX_INT8 PSNIP_BUILTIN_SUFFIX_INT8214,7924
+#    define PSNIP_BUILTIN_SUFFIX_INT8 PSNIP_BUILTIN_SUFFIX_INT8216,8027
+#    define PSNIP_BUILTIN_SUFFIX_INT8 PSNIP_BUILTIN_SUFFIX_INT8218,8130
+#    define PSNIP_BUILTIN_SUFFIX_INT8 PSNIP_BUILTIN_SUFFIX_INT8220,8235
+#    define PSNIP_BUILTIN_SUFFIX_INT16 PSNIP_BUILTIN_SUFFIX_INT16226,8401
+#    define PSNIP_BUILTIN_SUFFIX_INT16 PSNIP_BUILTIN_SUFFIX_INT16228,8507
+#    define PSNIP_BUILTIN_SUFFIX_INT16 PSNIP_BUILTIN_SUFFIX_INT16230,8612
+#    define PSNIP_BUILTIN_SUFFIX_INT16 PSNIP_BUILTIN_SUFFIX_INT16232,8717
+#    define PSNIP_BUILTIN_SUFFIX_INT16 PSNIP_BUILTIN_SUFFIX_INT16234,8824
+#    define PSNIP_BUILTIN_SUFFIX_INT32 PSNIP_BUILTIN_SUFFIX_INT32240,8991
+#    define PSNIP_BUILTIN_SUFFIX_INT32 PSNIP_BUILTIN_SUFFIX_INT32242,9097
+#    define PSNIP_BUILTIN_SUFFIX_INT32 PSNIP_BUILTIN_SUFFIX_INT32244,9202
+#    define PSNIP_BUILTIN_SUFFIX_INT32 PSNIP_BUILTIN_SUFFIX_INT32246,9307
+#    define PSNIP_BUILTIN_SUFFIX_INT32 PSNIP_BUILTIN_SUFFIX_INT32248,9414
+#    define PSNIP_BUILTIN_SUFFIX_INT64 PSNIP_BUILTIN_SUFFIX_INT64254,9604
+#    define PSNIP_BUILTIN_SUFFIX_INT64 PSNIP_BUILTIN_SUFFIX_INT64256,9711
+#    define PSNIP_BUILTIN_SUFFIX_INT64 PSNIP_BUILTIN_SUFFIX_INT64258,9817
+#    define PSNIP_BUILTIN_SUFFIX_INT64 PSNIP_BUILTIN_SUFFIX_INT64260,9922
+#    define PSNIP_BUILTIN_SUFFIX_INT64 PSNIP_BUILTIN_SUFFIX_INT64262,10027
+#    define PSNIP_BUILTIN_SUFFIX_INT64 PSNIP_BUILTIN_SUFFIX_INT64264,10134
+#    define PSNIP_BUILTIN__VARIANT2_INT8(PSNIP_BUILTIN__VARIANT2_INT8270,10297
+#    define PSNIP_BUILTIN__VARIANT2_INT8(PSNIP_BUILTIN__VARIANT2_INT8272,10419
+#    define PSNIP_BUILTIN__VARIANT_INT8(PSNIP_BUILTIN__VARIANT_INT8274,10541
+#    define PSNIP_BUILTIN__VARIANT2_INT8(PSNIP_BUILTIN__VARIANT2_INT8275,10620
+#    define PSNIP_BUILTIN__VARIANT_INT8(PSNIP_BUILTIN__VARIANT_INT8277,10739
+#    define PSNIP_BUILTIN__VARIANT2_INT8(PSNIP_BUILTIN__VARIANT2_INT8278,10821
+#    define PSNIP_BUILTIN__VARIANT_INT8(PSNIP_BUILTIN__VARIANT_INT8280,10943
+#    define PSNIP_BUILTIN__VARIANT2_INT8(PSNIP_BUILTIN__VARIANT2_INT8281,11026
+#    define PSNIP_BUILTIN__VARIANT2_INT16(PSNIP_BUILTIN__VARIANT2_INT16287,11209
+#    define PSNIP_BUILTIN__VARIANT2_INT16(PSNIP_BUILTIN__VARIANT2_INT16289,11333
+#    define PSNIP_BUILTIN__VARIANT_INT16(PSNIP_BUILTIN__VARIANT_INT16291,11457
+#    define PSNIP_BUILTIN__VARIANT2_INT16(PSNIP_BUILTIN__VARIANT2_INT16292,11537
+#    define PSNIP_BUILTIN__VARIANT_INT16(PSNIP_BUILTIN__VARIANT_INT16294,11658
+#    define PSNIP_BUILTIN__VARIANT2_INT16(PSNIP_BUILTIN__VARIANT2_INT16295,11741
+#    define PSNIP_BUILTIN__VARIANT_INT16(PSNIP_BUILTIN__VARIANT_INT16297,11865
+#    define PSNIP_BUILTIN__VARIANT2_INT16(PSNIP_BUILTIN__VARIANT2_INT16298,11949
+#    define PSNIP_BUILTIN__VARIANT2_INT32(PSNIP_BUILTIN__VARIANT2_INT32304,12133
+#    define PSNIP_BUILTIN__VARIANT2_INT32(PSNIP_BUILTIN__VARIANT2_INT32306,12257
+#    define PSNIP_BUILTIN__VARIANT_INT32(PSNIP_BUILTIN__VARIANT_INT32308,12381
+#    define PSNIP_BUILTIN__VARIANT2_INT32(PSNIP_BUILTIN__VARIANT2_INT32309,12461
+#    define PSNIP_BUILTIN__VARIANT_INT32(PSNIP_BUILTIN__VARIANT_INT32311,12582
+#    define PSNIP_BUILTIN__VARIANT2_INT32(PSNIP_BUILTIN__VARIANT2_INT32312,12665
+#    define PSNIP_BUILTIN__VARIANT_INT32(PSNIP_BUILTIN__VARIANT_INT32314,12789
+#    define PSNIP_BUILTIN__VARIANT2_INT32(PSNIP_BUILTIN__VARIANT2_INT32315,12873
+#    define PSNIP_BUILTIN__VARIANT2_INT64(PSNIP_BUILTIN__VARIANT2_INT64321,13057
+#    define PSNIP_BUILTIN__VARIANT2_INT64(PSNIP_BUILTIN__VARIANT2_INT64323,13181
+#    define PSNIP_BUILTIN__VARIANT_INT64(PSNIP_BUILTIN__VARIANT_INT64325,13305
+#    define PSNIP_BUILTIN__VARIANT2_INT64(PSNIP_BUILTIN__VARIANT2_INT64326,13385
+#    define PSNIP_BUILTIN__VARIANT_INT64(PSNIP_BUILTIN__VARIANT_INT64328,13506
+#    define PSNIP_BUILTIN__VARIANT2_INT64(PSNIP_BUILTIN__VARIANT2_INT64329,13589
+#    define PSNIP_BUILTIN__VARIANT_INT64(PSNIP_BUILTIN__VARIANT_INT64331,13713
+#    define PSNIP_BUILTIN__VARIANT2_INT64(PSNIP_BUILTIN__VARIANT2_INT64332,13797
+#define PSNIP_BUILTIN__FFS_DEFINE_PORTABLE(PSNIP_BUILTIN__FFS_DEFINE_PORTABLE342,13975
+#  define psnip_builtin_ffs(psnip_builtin_ffs379,15461
+#  define psnip_builtin_ffsl(psnip_builtin_ffsl380,15512
+#  define psnip_builtin_ffsll(psnip_builtin_ffsll381,15564
+#  define psnip_builtin_ffs32(psnip_builtin_ffs32382,15617
+#  define psnip_builtin_ffs64(psnip_builtin_ffs64383,15690
+int psnip_builtin_ffsll(long long v) {psnip_builtin_ffsll387,15856
+int psnip_builtin_ffsl(long v) {psnip_builtin_ffsl404,16291
+int psnip_builtin_ffs(int v) {psnip_builtin_ffs413,16469
+#    define __builtin_ffsll(__builtin_ffsll422,16749
+#    define __builtin_ffsl(__builtin_ffsl423,16804
+#    define __builtin_ffs(__builtin_ffs424,16858
+#  define psnip_builtin_ffs32(psnip_builtin_ffs32429,16966
+#  define psnip_builtin_ffs64(psnip_builtin_ffs64433,17088
+#define PSNIP_BUILTIN__CLZ_DEFINE_PORTABLE(PSNIP_BUILTIN__CLZ_DEFINE_PORTABLE438,17202
+#  define psnip_builtin_clz(psnip_builtin_clz477,18811
+#  define psnip_builtin_clzl(psnip_builtin_clzl478,18862
+#  define psnip_builtin_clzll(psnip_builtin_clzll479,18914
+#  define psnip_builtin_clz32(psnip_builtin_clz32480,18967
+#  define psnip_builtin_clz64(psnip_builtin_clz64481,19040
+#  define psnip_builtin_clz32(psnip_builtin_clz32589,22637
+#  define psnip_builtin_clz64(psnip_builtin_clz64593,22759
+#define PSNIP_BUILTIN__CTZ_DEFINE_PORTABLE(PSNIP_BUILTIN__CTZ_DEFINE_PORTABLE598,22873
+#  define psnip_builtin_ctz(psnip_builtin_ctz632,24325
+#  define psnip_builtin_ctzl(psnip_builtin_ctzl633,24376
+#  define psnip_builtin_ctzll(psnip_builtin_ctzll634,24428
+#  define psnip_builtin_ctz32(psnip_builtin_ctz32635,24481
+#  define psnip_builtin_ctz64(psnip_builtin_ctz64636,24554
+#  define psnip_builtin_ctz32(psnip_builtin_ctz32724,27829
+#  define psnip_builtin_ctz64(psnip_builtin_ctz64728,27951
+#define PSNIP_BUILTIN__PARITY_DEFINE_PORTABLE(PSNIP_BUILTIN__PARITY_DEFINE_PORTABLE733,28068
+#  define psnip_builtin_parity(psnip_builtin_parity744,28443
+#  define psnip_builtin_parityl(psnip_builtin_parityl745,28500
+#  define psnip_builtin_parityll(psnip_builtin_parityll746,28558
+#  define psnip_builtin_parity32(psnip_builtin_parity32747,28617
+#  define psnip_builtin_parity64(psnip_builtin_parity64748,28696
+#  define psnip_builtin_parity32(psnip_builtin_parity32761,29258
+#  define psnip_builtin_parity64(psnip_builtin_parity64765,29389
+#define PSNIP_BUILTIN__POPCOUNT_DEFINE_PORTABLE(PSNIP_BUILTIN__POPCOUNT_DEFINE_PORTABLE770,29514
+#  define psnip_builtin_popcount(psnip_builtin_popcount780,29996
+#  define psnip_builtin_popcountl(psnip_builtin_popcountl781,30057
+#  define psnip_builtin_popcountll(psnip_builtin_popcountll782,30119
+#  define psnip_builtin_popcount32(psnip_builtin_popcount32783,30182
+#  define psnip_builtin_popcount64(psnip_builtin_popcount64784,30265
+#  define psnip_builtin_popcount32(psnip_builtin_popcount32797,30857
+#  define psnip_builtin_popcount64(psnip_builtin_popcount64801,30994
+#define PSNIP_BUILTIN__CLRSB_DEFINE_PORTABLE(PSNIP_BUILTIN__CLRSB_DEFINE_PORTABLE806,31120
+#  define psnip_builtin_clrsb(psnip_builtin_clrsb815,31495
+#    define psnip_builtin_clrsbl(psnip_builtin_clrsbl817,31584
+#  define psnip_builtin_clrsbll(psnip_builtin_clrsbll830,32156
+#  define psnip_builtin_clrsb32(psnip_builtin_clrsb32831,32213
+#  define psnip_builtin_clrsb64(psnip_builtin_clrsb64832,32290
+#  define psnip_builtin_clrsb32(psnip_builtin_clrsb32845,32828
+#  define psnip_builtin_clrsb64(psnip_builtin_clrsb64849,32956
+#define PSNIP_BUILTIN__ADDC_DEFINE_PORTABLE(PSNIP_BUILTIN__ADDC_DEFINE_PORTABLE854,33075
+#  define psnip_builtin_addcb(psnip_builtin_addcb870,33535
+#  define psnip_builtin_addcs(psnip_builtin_addcs871,33611
+#  define psnip_builtin_addc(psnip_builtin_addc872,33687
+#  define psnip_builtin_addcl(psnip_builtin_addcl873,33762
+#  define psnip_builtin_addcll(psnip_builtin_addcll874,33838
+#  define psnip_builtin_addc8(psnip_builtin_addc8875,33915
+#  define psnip_builtin_addc16(psnip_builtin_addc16876,34012
+#  define psnip_builtin_addc32(psnip_builtin_addc32877,34110
+#  define psnip_builtin_addc64(psnip_builtin_addc64878,34208
+#  define psnip_builtin_addc8(psnip_builtin_addc8895,35108
+#  define psnip_builtin_addc16(psnip_builtin_addc16899,35254
+#  define psnip_builtin_addc32(psnip_builtin_addc32903,35402
+#  define psnip_builtin_addc64(psnip_builtin_addc64907,35550
+#define PSNIP_BUILTIN__SUBC_DEFINE_PORTABLE(PSNIP_BUILTIN__SUBC_DEFINE_PORTABLE912,35690
+#  define psnip_builtin_subcb(psnip_builtin_subcb926,36080
+#  define psnip_builtin_subcs(psnip_builtin_subcs927,36156
+#  define psnip_builtin_subc(psnip_builtin_subc928,36232
+#  define psnip_builtin_subcl(psnip_builtin_subcl929,36307
+#  define psnip_builtin_subcll(psnip_builtin_subcll930,36383
+#  define psnip_builtin_subc8(psnip_builtin_subc8931,36460
+#  define psnip_builtin_subc16(psnip_builtin_subc16932,36557
+#  define psnip_builtin_subc32(psnip_builtin_subc32933,36655
+#  define psnip_builtin_subc64(psnip_builtin_subc64934,36753
+#  define psnip_builtin_subc8(psnip_builtin_subc8951,37653
+#  define psnip_builtin_subc16(psnip_builtin_subc16955,37799
+#  define psnip_builtin_subc32(psnip_builtin_subc32959,37947
+#  define psnip_builtin_subc64(psnip_builtin_subc64963,38095
+#  define psnip_builtin_bswap16(psnip_builtin_bswap16969,38296
+#  define psnip_builtin_bswap32(psnip_builtin_bswap32988,38880
+#  define psnip_builtin_bswap64(psnip_builtin_bswap64989,38937
+#define PSNIP_BUILTIN__BITREVERSE_DEFINE_PORTABLE(PSNIP_BUILTIN__BITREVERSE_DEFINE_PORTABLE1027,40243
+#  define psnip_builtin_bitreverse8(psnip_builtin_bitreverse81040,40876
+#  define psnip_builtin_bitreverse16(psnip_builtin_bitreverse161041,40942
+#  define psnip_builtin_bitreverse32(psnip_builtin_bitreverse321042,41009
+#  define psnip_builtin_bitreverse64(psnip_builtin_bitreverse641043,41076
+#define PSNIP_BUILTIN_ROTL_DEFINE_PORTABLE(PSNIP_BUILTIN_ROTL_DEFINE_PORTABLE1073,42093
+#  define psnip_intrin_rotl8(psnip_intrin_rotl81083,42600
+#  define psnip_intrin_rotl16(psnip_intrin_rotl161084,42665
+#  define psnip_intrin_rotl(psnip_intrin_rotl1112,43943
+#  define psnip_intrin_rotl64(psnip_intrin_rotl641129,44567
+#define PSNIP_BUILTIN_ROTR_DEFINE_PORTABLE(PSNIP_BUILTIN_ROTR_DEFINE_PORTABLE1149,45273
+#  define psnip_intrin_rotr8(psnip_intrin_rotr81159,45780
+#  define psnip_intrin_rotr16(psnip_intrin_rotr161160,45845
+#  define psnip_intrin_rotr(psnip_intrin_rotr1188,47123
+#  define psnip_intrin_rotr64(psnip_intrin_rotr641207,47864
+PSNIP_BUILTIN__FFS_DEFINE_PORTABLE(ffs, int)PSNIP_BUILTIN__FFS_DEFINE_PORTABLE417,16546
+#  define psnip_intrin_BitScanForward64(psnip_intrin_BitScanForward641249,49510
+unsigned char psnip_intrin_BitScanForward64(unsigned long* Index, psnip_uint64_t Mask) {psnip_intrin_BitScanForward641252,49627
+#    define _BitScanForward64(_BitScanForward641257,49861
+unsigned char psnip_intrin_BitScanReverse(unsigned long* Index, psnip_uint32_t Mask) {psnip_intrin_BitScanReverse1266,50119
+unsigned char psnip_intrin_BitScanReverse(unsigned long* Index, psnip_uint32_t Mask) {psnip_intrin_BitScanReverse1272,50328
+#    define _BitScanReverse(_BitScanReverse1277,50596
+#  define psnip_intrin_BitScanReverse64(psnip_intrin_BitScanReverse641283,50842
+unsigned char psnip_intrin_BitScanReverse64(unsigned long* Index, psnip_uint64_t Mask) {psnip_intrin_BitScanReverse641286,50959
+#    define _BitScanReverse64(_BitScanReverse641291,51229
+#  define psnip_intrin_bittest(psnip_intrin_bittest1299,51440
+#  define psnip_intrin_bittest(psnip_intrin_bittest1305,51606
+#    define _bittest(_bittest1307,51711
+#  define psnip_intrin_bittest64(psnip_intrin_bittest641313,51915
+#  define psnip_intrin_bittest64(psnip_intrin_bittest641315,51979
+#    define _bittest64(_bittest641317,52086
+#define PSNIP_BUILTIN__BITTESTANDCOMPLEMENT_DEFINE_PORTABLE(PSNIP_BUILTIN__BITTESTANDCOMPLEMENT_DEFINE_PORTABLE1323,52199
+#  define psnip_intrin_bittestandcomplement(psnip_intrin_bittestandcomplement1333,52576
+#    define _bittestandcomplement(_bittestandcomplement1341,52920
+#  define psnip_intrin_bittestandcomplement64(psnip_intrin_bittestandcomplement641346,53109
+#define PSNIP_BUILTIN__BITTESTANDRESET_DEFINE_PORTABLE(PSNIP_BUILTIN__BITTESTANDRESET_DEFINE_PORTABLE1356,53486
+#  define psnip_intrin_bittestandreset(psnip_intrin_bittestandreset1366,53851
+#  define psnip_intrin_bittestandreset64(psnip_intrin_bittestandreset641380,54409
+#define PSNIP_BUILTIN__BITTESTANDSET_DEFINE_PORTABLE(PSNIP_BUILTIN__BITTESTANDSET_DEFINE_PORTABLE1390,54754
+#  define psnip_intrin_bittestandset(psnip_intrin_bittestandset1400,55110
+#  define psnip_intrin_bittestandset64(psnip_intrin_bittestandset641414,55631
+#  define psnip_intrin_shiftleft128(psnip_intrin_shiftleft1281425,56042
+#  define psnip_intrin_shiftright128(psnip_intrin_shiftright1281451,57017
+#  define psnip_intrin_byteswap_ushort(psnip_intrin_byteswap_ushort1484,58031
+#  define psnip_intrin_byteswap_ulong(psnip_intrin_byteswap_ulong1486,58132
+#  define psnip_intrin_byteswap_uint64(psnip_intrin_byteswap_uint641488,58233
+
+include/stb_ds.h,14144
+#define _CRT_SECURE_NO_WARNINGS_CRT_SECURE_NO_WARNINGS388,14168
+#define INCLUDE_STB_DS_HINCLUDE_STB_DS_H392,14237
+#define arrlen arrlen398,14339
+#define arrlenu arrlenu399,14373
+#define arrput arrput400,14408
+#define arrpush arrpush401,14442
+#define arrpop arrpop402,14476
+#define arrfree arrfree403,14510
+#define arraddn arraddn404,14545
+#define arraddnptr arraddnptr405,14629
+#define arraddnindex arraddnindex406,14667
+#define arrsetlen arrsetlen407,14708
+#define arrlast arrlast408,14745
+#define arrins arrins409,14780
+#define arrinsn arrinsn410,14814
+#define arrdel arrdel411,14849
+#define arrdeln arrdeln412,14883
+#define arrdelswap arrdelswap413,14918
+#define arrcap arrcap414,14956
+#define arrsetcap arrsetcap415,14990
+#define hmput hmput417,15029
+#define hmputs hmputs418,15062
+#define hmget hmget419,15096
+#define hmget_ts hmget_ts420,15129
+#define hmgets hmgets421,15165
+#define hmgetp hmgetp422,15199
+#define hmgetp_ts hmgetp_ts423,15233
+#define hmgetp_null hmgetp_null424,15270
+#define hmgeti hmgeti425,15309
+#define hmgeti_ts hmgeti_ts426,15343
+#define hmdel hmdel427,15380
+#define hmlen hmlen428,15413
+#define hmlenu hmlenu429,15446
+#define hmfree hmfree430,15480
+#define hmdefault hmdefault431,15514
+#define hmdefaults hmdefaults432,15551
+#define shput shput434,15591
+#define shputi shputi435,15624
+#define shputs shputs436,15658
+#define shget shget437,15692
+#define shgeti shgeti438,15725
+#define shgets shgets439,15759
+#define shgetp shgetp440,15793
+#define shgetp_null shgetp_null441,15827
+#define shdel shdel442,15866
+#define shlen shlen443,15899
+#define shlenu shlenu444,15932
+#define shfree shfree445,15966
+#define shdefault shdefault446,16000
+#define shdefaults shdefaults447,16037
+#define sh_new_arena sh_new_arena448,16075
+#define sh_new_strdup sh_new_strdup449,16117
+#define stralloc stralloc451,16162
+#define strreset strreset452,16198
+#define STBDS_REALLOC(STBDS_REALLOC460,16501
+#define STBDS_FREE(STBDS_FREE461,16544
+#define STBDS_NOTUSED(STBDS_NOTUSED465,16609
+#define STBDS_NOTUSED(STBDS_NOTUSED467,16653
+	typedef struct stbds_string_arena stbds_string_arena;stbds_string_arena482,17251
+#define STBDS_HAS_TYPEOFSTBDS_HAS_TYPEOF509,18426
+#define STBDS_HAS_LITERAL_ARRAYSTBDS_HAS_LITERAL_ARRAY517,18653
+#define STBDS_ADDRESSOF(STBDS_ADDRESSOF524,18872
+#define STBDS_ADDRESSOF(STBDS_ADDRESSOF526,19002
+#define STBDS_ADDRESSOF(STBDS_ADDRESSOF529,19136
+#define STBDS_OFFSETOF(STBDS_OFFSETOF532,19200
+#define stbds_header(stbds_header534,19289
+#define stbds_temp(stbds_temp535,19348
+#define stbds_temp_key(stbds_temp_key536,19396
+#define stbds_arrsetcap(stbds_arrsetcap538,19466
+#define stbds_arrsetlen(stbds_arrsetlen539,19521
+#define stbds_arrcap(stbds_arrcap540,19679
+#define stbds_arrlen(stbds_arrlen541,19749
+#define stbds_arrlenu(stbds_arrlenu542,19829
+#define stbds_arrput(stbds_arrput543,19909
+#define stbds_arrpush stbds_arrpush544,20005
+#define stbds_arrpop(stbds_arrpop545,20062
+#define stbds_arraddn(stbds_arraddn546,20152
+#define stbds_arraddnptr(stbds_arraddnptr547,20271
+#define stbds_arraddnindex(stbds_arraddnindex548,20410
+#define stbds_arraddnoff stbds_arraddnoff549,20555
+#define stbds_arrlast(stbds_arrlast550,20606
+#define stbds_arrfree(stbds_arrfree551,20671
+#define stbds_arrdel(stbds_arrdel552,20773
+#define stbds_arrdeln(stbds_arrdeln553,20826
+#define stbds_arrdelswap(stbds_arrdelswap554,20973
+#define stbds_arrinsn(stbds_arrinsn555,21063
+#define stbds_arrins(stbds_arrins556,21202
+#define stbds_arrmaybegrow(stbds_arrmaybegrow558,21275
+#define stbds_arrgrow(stbds_arrgrow561,21415
+#define stbds_hmput(stbds_hmput563,21508
+#define stbds_hmputs(stbds_hmputs568,21734
+#define stbds_hmgeti(stbds_hmgeti572,21893
+#define stbds_hmgeti_ts(stbds_hmgeti_ts576,22071
+#define stbds_hmgetp(stbds_hmgetp580,22258
+#define stbds_hmgetp_ts(stbds_hmgetp_ts583,22343
+#define stbds_hmdel(stbds_hmdel586,22432
+#define stbds_hmdefault(stbds_hmdefault589,22637
+#define stbds_hmdefaults(stbds_hmdefaults592,22748
+#define stbds_hmfree(stbds_hmfree595,22854
+#define stbds_hmgets(stbds_hmgets598,22967
+#define stbds_hmget(stbds_hmget599,23019
+#define stbds_hmget_ts(stbds_hmget_ts600,23077
+#define stbds_hmlen(stbds_hmlen601,23149
+#define stbds_hmlenu(stbds_hmlenu602,23234
+#define stbds_hmgetp_null(stbds_hmgetp_null603,23319
+#define stbds_shput(stbds_shput605,23413
+#define stbds_shputi(stbds_shputi609,23586
+#define stbds_shputs(stbds_shputs613,23779
+#define stbds_pshput(stbds_pshput618,24098
+#define stbds_shgeti(stbds_shgeti622,24273
+#define stbds_pshgeti(stbds_pshgeti626,24424
+#define stbds_shgetp(stbds_shgetp630,24586
+#define stbds_pshget(stbds_pshget633,24671
+#define stbds_shdel(stbds_shdel636,24756
+#define stbds_pshdel(stbds_pshdel638,24932
+#define stbds_sh_new_arena(stbds_sh_new_arena641,25122
+#define stbds_sh_new_strdup(stbds_sh_new_strdup643,25223
+#define stbds_shdefault(stbds_shdefault646,25327
+#define stbds_shdefaults(stbds_shdefaults647,25380
+#define stbds_shfree stbds_shfree649,25436
+#define stbds_shlenu stbds_shlenu650,25477
+#define stbds_shgets(stbds_shgets652,25520
+#define stbds_shget(stbds_shget653,25569
+#define stbds_shgetp_null(stbds_shgetp_null654,25624
+#define stbds_shlen stbds_shlen655,25716
+{__anonaf2b8c4d0108658,25774
+	size_t      length;length659,25777
+	size_t      capacity;capacity660,25799
+	void      * hash_table;hash_table661,25823
+	ptrdiff_t   temp;temp662,25849
+} stbds_array_header;stbds_array_header663,25869
+typedef struct stbds_string_blockstbds_string_block665,25894
+	struct stbds_string_block *next;next667,25932
+	char storage[8];storage668,25967
+} stbds_string_block;stbds_string_block669,25986
+struct stbds_string_arenastbds_string_arena671,26011
+	stbds_string_block *storage;storage673,26041
+	size_t remaining;remaining674,26072
+	unsigned char block;block675,26092
+	unsigned char mode;  // this isn't used by the string arena itselfmode676,26115
+#define STBDS_HM_BINARY STBDS_HM_BINARY679,26190
+#define STBDS_HM_STRING STBDS_HM_STRING680,26225
+{__anonaf2b8c4d0203683,26268
+	STBDS_SH_NONE,STBDS_SH_NONE684,26271
+	STBDS_SH_DEFAULT,STBDS_SH_DEFAULT685,26288
+	STBDS_SH_STRDUP,STBDS_SH_STRDUP686,26308
+	STBDS_SH_ARENASTBDS_SH_ARENA687,26327
+template<class T> static T * stbds_arrgrowf_wrapper(T *a, size_t elemsize, size_t addlen, size_tstbds_arrgrowf_wrapper693,26501
+template<class T> static T * stbds_hmget_key_wrapper(T *a, size_t elemsize, void *key, size_t kestbds_hmget_key_wrapper696,26680
+template<class T> static T * stbds_hmget_key_ts_wrapper(T *a, size_t elemsize, void *key, size_tstbds_hmget_key_ts_wrapper699,26869
+template<class T> static T * stbds_hmput_default_wrapper(T *a, size_t elemsize) {stbds_hmput_default_wrapper702,27087
+template<class T> static T * stbds_hmput_key_wrapper(T *a, size_t elemsize, void *key, size_t kestbds_hmput_key_wrapper705,27228
+template<class T> static T * stbds_hmdel_key_wrapper(T *a, size_t elemsize, void *key, size_t kestbds_hmdel_key_wrapper708,27417
+template<class T> static T * stbds_shmode_func_wrapper(T *, size_t elemsize, int mode) {stbds_shmode_func_wrapper711,27634
+#define stbds_arrgrowf_wrapper stbds_arrgrowf_wrapper715,27782
+#define stbds_hmget_key_wrapper stbds_hmget_key_wrapper716,27840
+#define stbds_hmget_key_ts_wrapper stbds_hmget_key_ts_wrapper717,27899
+#define stbds_hmput_default_wrapper stbds_hmput_default_wrapper718,27961
+#define stbds_hmput_key_wrapper stbds_hmput_key_wrapper719,28024
+#define stbds_hmdel_key_wrapper stbds_hmdel_key_wrapper720,28083
+#define stbds_shmode_func_wrapper(stbds_shmode_func_wrapper721,28142
+#define STBDS_ASSERT_WAS_UNDEFINEDSTBDS_ASSERT_WAS_UNDEFINED737,28457
+#define STBDS_ASSERT(STBDS_ASSERT738,28493
+#define STBDS_STATS(STBDS_STATS742,28566
+size_t stbds_array_grow;stbds_array_grow743,28594
+size_t stbds_hash_grow;stbds_hash_grow744,28620
+size_t stbds_hash_shrink;stbds_hash_shrink745,28645
+size_t stbds_hash_rebuild;stbds_hash_rebuild746,28672
+size_t stbds_hash_probes;stbds_hash_probes747,28700
+size_t stbds_hash_alloc;stbds_hash_alloc748,28727
+size_t stbds_rehash_probes;stbds_rehash_probes749,28753
+size_t stbds_rehash_items;stbds_rehash_items750,28782
+#define STBDS_STATS(STBDS_STATS752,28817
+void *stbds_arrgrowf(void *a, size_t elemsize, size_t addlen, size_t min_cap)stbds_arrgrowf762,28937
+void stbds_arrfreef(void *a)stbds_arrfreef800,30049
+#define STBDS_BUCKET_LENGTH STBDS_BUCKET_LENGTH810,30209
+#define STBDS_BUCKET_LENGTH STBDS_BUCKET_LENGTH812,30252
+#define STBDS_BUCKET_SHIFT STBDS_BUCKET_SHIFT815,30298
+#define STBDS_BUCKET_MASK STBDS_BUCKET_MASK816,30366
+#define STBDS_CACHE_LINE_SIZE STBDS_CACHE_LINE_SIZE817,30423
+#define STBDS_ALIGN_FWD(STBDS_ALIGN_FWD819,30461
+{__anonaf2b8c4d0308822,30540
+	size_t    hash [STBDS_BUCKET_LENGTH];hash823,30543
+	ptrdiff_t index[STBDS_BUCKET_LENGTH];index824,30583
+} stbds_hash_bucket; // in 32-bit, this is one 64-byte cache line; in 64-bit, each array is one stbds_hash_bucket825,30623
+{__anonaf2b8c4d0408828,30757
+	char * temp_key; // this MUST be the first field of the hash tabletemp_key829,30760
+	size_t slot_count;slot_count830,30829
+	size_t used_count;used_count831,30850
+	size_t used_count_threshold;used_count_threshold832,30871
+	size_t used_count_shrink_threshold;used_count_shrink_threshold833,30902
+	size_t tombstone_count;tombstone_count834,30940
+	size_t tombstone_count_threshold;tombstone_count_threshold835,30966
+	size_t seed;seed836,31002
+	size_t slot_count_log2;slot_count_log2837,31017
+	stbds_string_arena string;string838,31043
+	stbds_hash_bucket *storage; // not a separate allocation, just 64-byte aligned storage after thstorage839,31072
+} stbds_hash_index;stbds_hash_index840,31179
+#define STBDS_INDEX_EMPTY STBDS_INDEX_EMPTY842,31202
+#define STBDS_INDEX_DELETED STBDS_INDEX_DELETED843,31235
+#define STBDS_INDEX_IN_USE(STBDS_INDEX_IN_USE844,31268
+#define STBDS_HASH_EMPTY STBDS_HASH_EMPTY846,31313
+#define STBDS_HASH_DELETED STBDS_HASH_DELETED847,31346
+static size_t stbds_hash_seed=0x31415926;stbds_hash_seed849,31381
+void stbds_rand_seed(size_t seed)stbds_rand_seed851,31426
+#define stbds_load_32_or_64(stbds_load_32_or_64856,31495
+#define STBDS_SIZE_T_BITS STBDS_SIZE_T_BITS861,31824
+static size_t stbds_probe_position(size_t hash, size_t slot_count, size_t slot_log2)stbds_probe_position863,31887
+static size_t stbds_log2(size_t slot_count)stbds_log2874,32141
+static stbds_hash_index *stbds_make_hash_index(size_t slot_count, stbds_hash_index *ot)stbds_make_hash_index884,32280
+#define STBDS_ROTATE_LEFT(STBDS_ROTATE_LEFT1013,38018
+#define STBDS_ROTATE_RIGHT(STBDS_ROTATE_RIGHT1014,38111
+size_t stbds_hash_string(char *str, size_t seed)stbds_hash_string1016,38206
+#define STBDS_SIPHASH_C_ROUNDS STBDS_SIPHASH_C_ROUNDS1034,38712
+#define STBDS_SIPHASH_D_ROUNDS STBDS_SIPHASH_D_ROUNDS1035,38746
+typedef int STBDS_SIPHASH_2_4_can_only_be_used_in_64_bit_builds[sizeof(size_t) == 8 ? 1 : -1];STBDS_SIPHASH_2_4_can_only_be_used_in_64_bit_builds1036,38780
+#define STBDS_SIPHASH_C_ROUNDS STBDS_SIPHASH_C_ROUNDS1040,38918
+#define STBDS_SIPHASH_D_ROUNDS STBDS_SIPHASH_D_ROUNDS1043,38992
+static size_t stbds_siphash_bytes(void *p, size_t len, size_t seed)stbds_siphash_bytes1051,39188
+#define STBDS_SIPROUND(STBDS_SIPROUND1073,40124
+size_t stbds_hash_bytes(void *p, size_t len, size_t seed)stbds_hash_bytes1116,41840
+static int stbds_is_key_equal(void *a, size_t elemsize, void *key, size_t keysize, size_t keyoffstbds_is_key_equal1203,45194
+#define STBDS_HASH_TO_ARR(STBDS_HASH_TO_ARR1211,45520
+#define STBDS_ARR_TO_HASH(STBDS_ARR_TO_HASH1212,45586
+#define stbds_hash_table(stbds_hash_table1214,45654
+void stbds_hmfree_func(void *a, size_t elemsize)stbds_hmfree_func1216,45737
+static ptrdiff_t stbds_hm_find_slot(void *a, size_t elemsize, void *key, size_t keysize, size_t stbds_hm_find_slot1232,46227
+void * stbds_hmget_key_ts(void *a, size_t elemsize, void *key, size_t keysize, ptrdiff_t *temp, stbds_hmget_key_ts1281,47937
+void * stbds_hmget_key(void *a, size_t elemsize, void *key, size_t keysize, int mode)stbds_hmget_key1312,48914
+void * stbds_hmput_default(void *a, size_t elemsize)stbds_hmput_default1320,49163
+void *stbds_hmput_key(void *a, size_t elemsize, void *key, size_t keysize, int mode)stbds_hmput_key1337,49688
+void * stbds_shmode_func(size_t elemsize, int mode)stbds_shmode_func1461,54130
+void * stbds_hmdel_key(void *a, size_t elemsize, void *key, size_t keysize, size_t keyoffset, instbds_hmdel_key1472,54506
+static char *stbds_strdup(char *str)stbds_strdup1540,57193
+#define STBDS_STRING_ARENA_BLOCKSIZE_MIN STBDS_STRING_ARENA_BLOCKSIZE_MIN1551,57530
+#define STBDS_STRING_ARENA_BLOCKSIZE_MAX STBDS_STRING_ARENA_BLOCKSIZE_MAX1554,57628
+char *stbds_stralloc(stbds_string_arena *a, char *str)stbds_stralloc1557,57690
+void stbds_strreset(stbds_string_arena *a)stbds_strreset1605,59386
+#define STBDS_ASSERT STBDS_ASSERT1630,59828
+typedef struct { int key,b,c,d; } stbds_struct;__anonaf2b8c4d05081634,59888
+typedef struct { int key,b,c,d; } stbds_struct;key1634,59888
+typedef struct { int key,b,c,d; } stbds_struct;b1634,59888
+typedef struct { int key,b,c,d; } stbds_struct;c1634,59888
+typedef struct { int key,b,c,d; } stbds_struct;d1634,59888
+typedef struct { int key,b,c,d; } stbds_struct;stbds_struct1634,59888
+typedef struct { int key[2],b,c,d; } stbds_struct2;__anonaf2b8c4d06081635,59937
+typedef struct { int key[2],b,c,d; } stbds_struct2;key1635,59937
+typedef struct { int key[2],b,c,d; } stbds_struct2;b1635,59937
+typedef struct { int key[2],b,c,d; } stbds_struct2;c1635,59937
+typedef struct { int key[2],b,c,d; } stbds_struct2;d1635,59937
+typedef struct { int key[2],b,c,d; } stbds_struct2;stbds_struct21635,59937
+static char buffer[256];buffer1637,59992
+char *strkey(int n)strkey1638,60018
+void stbds_unit_tests(void)stbds_unit_tests1648,60221
+
+LICENSE,0
+
+project.4coder,0
+
+README.md,28
+# ApocalypseApocalypse1,0
+
+src/Basic.h,893
+#define _BASIC_H_BASIC_H5,62
+#define STB_DS_IMPLEMENTATIONSTB_DS_IMPLEMENTATION12,155
+typedef uint8_t u8;u816,211
+typedef uint16_t u16;u1617,232
+typedef uint32_t u32;u3218,255
+typedef uint64_t u64;u6419,278
+typedef int8_t i8;i821,303
+typedef int16_t i16;i1622,323
+typedef int32_t i32;i3223,345
+typedef int64_t i64;i6424,367
+typedef wchar_t wchar;wchar26,391
+typedef u32 b32;b3228,417
+typedef float f32;f3229,435
+typedef double f64;f6430,455
+#define true true32,478
+#define false false33,494
+typedef struct _entire_file_entire_file35,513
+	void *data;data37,545
+	u64 size;size38,559
+} entire_file;entire_file39,571
+#define ASM_FUNC(ASM_FUNC41,589
+#define _KB(_KB43,642
+#define _MB(_MB44,668
+#define _GB(_GB45,694
+#define KB(KB47,722
+#define MB(MB48,749
+#define GB(GB49,776
+#define Assert(Assert52,807
+#define ADD_LOGGER ADD_LOGGER53,873
+
+src/Lexer.c,1043
+static u8 *at_buffer;at_buffer5,63
+static str_hash_table *KeywordTable;KeywordTable6,86
+static str_hash_table *TypeTable;TypeTable7,124
+static Token_Iden *token_buffer;token_buffer8,159
+static u64 last_token;last_token9,193
+static u8 **identifier_buffer;identifier_buffer10,217
+static u64 current_line;current_line11,249
+#define KEYWORD_ERROR KEYWORD_ERROR13,277
+initialize_compiler()initialize_compiler16,314
+look_up_identifier_for_type(u8 *type_str)look_up_identifier_for_type68,2276
+get_type_from_id(u64 identifier_index)get_type_from_id74,2384
+get_prev_token() { return token_buffer[last_token - 1]; }get_prev_token80,2505
+get_next_token() { return token_buffer[last_token++]; }get_next_token83,2578
+peek_next_token() { return token_buffer[last_token]; }peek_next_token86,2649
+peek_ahead(int amount) { return token_buffer[last_token + amount]; }peek_ahead89,2719
+get_identifier(u64 index)get_identifier92,2797
+lex_file(char *path)lex_file98,2881
+static Token_Iden get_token(char *file)get_token146,4121
+
+src/Lexer.h,2657
+#define _LEXER_H_LEXER_H4,61
+typedef enum _Token_Token6,81
+	tok_minus = '-',tok_minus8,105
+	tok_plus = '+',tok_plus9,124
+	tok_not = '!',tok_not10,142
+	tok_star = '*',tok_star11,159
+	tok_eof = -1,tok_eof13,179
+	tok_func = -2,tok_func16,218
+	tok_extern = -3,tok_extern17,235
+	tok_arrow = -4,tok_arrow18,254
+	tok_struct = -5,tok_struct19,272
+	tok_cast = -6, // cast(type)tok_cast20,291
+	tok_if = -7,   // iftok_if21,322
+	tok_for = -8,  // fortok_for22,345
+	tok_identifier = -9,tok_identifier25,384
+	tok_const_str = -10,tok_const_str26,407
+	tok_number = -11,tok_number27,430
+	tok_logical_or = -12,	 // ||tok_logical_or30,471
+	tok_logical_is = -13,	 // ==tok_logical_is31,502
+	tok_logical_isnot = -14, // !=tok_logical_isnot32,533
+	tok_logical_and = -15,	 // &&tok_logical_and33,566
+	tok_logical_lequal = -16,tok_logical_lequal34,598
+	tok_logical_gequal = -17,tok_logical_gequal35,626
+	tok_bits_lshift = -18, // <<tok_bits_lshift38,666
+	tok_bits_rshift = -19, // >>tok_bits_rshift39,697
+	tok_bits_or = '|',tok_bits_or40,728
+	tok_bits_xor = '^',tok_bits_xor41,749
+	tok_bits_not = '~',tok_bits_not42,771
+	tok_bits_and = '&',tok_bits_and43,793
+	tok_plusplus = -20,	  // ++tok_plusplus46,822
+	tok_minusminus = -21, // --tok_minusminus47,852
+	tok_const = -22,  // ::tok_const50,944
+	tok_switch = -23, // switch statementtok_switch51,970
+	tok_case = -24,	  // case in switch statementtok_case52,1010
+	tok_as = -25,	  // as, when importing librariestok_as53,1058
+	tok_import = -26, // importtok_import56,1152
+	tok_run = -27,	  // run func at compile timetok_run57,1182
+	tok_must = -28,	  // must handle return value of functiontok_must58,1229
+	tok_any = -29,	  // must handle all possible switch statement values (will hold off on that onetok_any59,1289
+	tok_plus_equals = -30,tok_plus_equals61,1390
+	tok_minus_equals = -31,tok_minus_equals62,1415
+	tok_mult_equals = -32,tok_mult_equals63,1441
+	tok_div_equals = -33,tok_div_equals64,1466
+	tok_mod_equals = -34,tok_mod_equals65,1490
+	tok_and_equals = -35,tok_and_equals66,1514
+	tok_xor_equals = -36,tok_xor_equals67,1538
+	tok_or_equals = -37,tok_or_equals68,1562
+	tok_lshift_equals = -38,tok_lshift_equals69,1585
+	tok_rshift_equals = -39,tok_rshift_equals70,1612
+Token;Token73,1644
+typedef struct _str_hash_table_str_hash_table75,1654
+	u8 *key;key77,1689
+	i64 value;value78,1700
+} str_hash_table;str_hash_table79,1713
+typedef struct _token_token81,1734
+	u64 identifier_index;identifier_index83,1760
+	Token type;type84,1784
+	u64 line;line85,1798
+	char *file;file86,1810
+} Token_Iden;Token_Iden87,1824
+
+src/Log.c,201
+static const char * const LevelLabels[] = {LevelLabels4,41
+static char LogFile[260];LogFile8,154
+InitializeLogger()InitializeLogger11,189
+Log(log_level Level, const char *Format, ...)Log19,348
+
+src/Log.h,435
+#define _LOG_H_LOG_H4,58
+typedef enum _log_level_log_level6,76
+	LOG_FATAL,LOG_FATAL8,104
+	LOG_ERROR,LOG_ERROR9,117
+	LOG_WARN,LOG_WARN10,130
+	LOG_DEBUG,LOG_DEBUG11,142
+	LOG_INFOLOG_INFO12,155
+} log_level;log_level13,166
+#define LG_FATAL(LG_FATAL19,265
+#define LG_ERROR(LG_ERROR20,332
+#define LG_WARN(LG_WARN21,399
+#define LG_INFO(LG_INFO22,464
+#define LG_DEBUG(LG_DEBUG25,556
+#define LG_DEBUG(LG_DEBUG27,630
+
+src/Main.c,332
+static b32 will_compile;will_compile25,395
+void raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file, u64 line)raise_token_syntax_error27,423
+void raise_parsing_unexpected_token(const char *expected_tok, Token_Iden token)raise_parsing_unexpected_token37,737
+int main(int argc, char *argv[])main49,1102
+
+src/Memory.c,674
+typedef struct _ap_memory_ap_memory4,55
+	u16 ChunkIndex;ChunkIndex6,85
+	void *Start;Start7,103
+	void *End;End8,118
+	void *Current;Current9,131
+	u64 ChunkSize;ChunkSize10,148
+	u64 MaxSize;MaxSize11,165
+} ap_memory;ap_memory12,180
+static ap_memory MemoryAllocators[2];MemoryAllocators17,202
+#define PERM_SIZE PERM_SIZE20,245
+#define COMP_SIZE COMP_SIZE21,270
+#define COMP_CHUNK COMP_CHUNK23,297
+#define PERM_CHUNK PERM_CHUNK24,325
+InitAPMem(ap_memory *Memory, u64 Size, u64 ChunkSize)InitAPMem28,363
+InitializeMemory()InitializeMemory42,708
+AllocateMemory(u64 Size, i8 Index)AllocateMemory49,878
+ResetCompileMemory()ResetCompileMemory68,1739
+
+src/Memory.h,259
+#define _MEMORY_H_MEMORY_H4,61
+enum AllocIndexAllocIndex7,102
+	PERM_INDEX = 0,PERM_INDEX9,122
+	COMP_INDEX = 1,COMP_INDEX10,140
+#define AllocatePermanentMemory(AllocatePermanentMemory23,273
+#define AllocateCompileMemory(AllocateCompileMemory24,345
+
+src/Parser.c,2015
+static b32 reached_eof;reached_eof3,23
+static Token_Iden last_read_token;last_read_token4,48
+static const char *expected;expected5,84
+static b32 is_top_level = true;is_top_level6,114
+#define parse_expect(parse_expect8,149
+#define tok_expect(tok_expect11,229
+#define tok_not_expect(tok_not_expect18,625
+alloc_node()alloc_node27,1029
+ast_unary_expr(Token_Iden token, Ast_Node *expr)ast_unary_expr35,1181
+ast_identifier(Token_Iden token)ast_identifier45,1421
+ast_selector(Ast_Node *identifier)ast_selector57,1692
+node_to_ptr(Ast_Node node)node_to_ptr66,1874
+void parse()parse73,2005
+b32 test_and_advance(i16 token)test_and_advance89,2319
+parse_file_level_statement()parse_file_level_statement95,2413
+parse_statement()parse_statement123,2905
+u64 get_variable_name()get_variable_name177,3926
+delimited(char start, char stop, char seperator, Ast_Node *(*parser)(Token_Iden *, int))delimited189,4175
+parse_declaration_right()parse_declaration_right235,5299
+get_associativity(Token operator)get_associativity261,5890
+get_precedence(Token operator)get_precedence284,6302
+parse_identifier(Token_Iden name_token)parse_identifier351,7215
+is_literal(Token_Iden token)is_literal357,7284
+is_func_call(Token_Iden token)is_func_call365,7453
+parse_func_call(Token_Iden identifier)parse_func_call373,7603
+parse_atom_expression()parse_atom_expression396,8110
+parse_unary_expression()parse_unary_expression429,8833
+parse_binary_expression(Token stop_at, int min_prec)parse_binary_expression468,9600
+parse_expression(Token stop_at)parse_expression496,10252
+parse_type(int *pointer_count)parse_type504,10411
+parse_declaration_left(Token_Iden identifier)parse_declaration_left535,11111
+parse_declaration_left_from_array(Token_Iden *tokens, int count)parse_declaration_left_from_array556,11668
+parse_func()parse_func621,13178
+i32 get_operator_precedence(char op, Token_Iden token)get_operator_precedence692,14632
+void parser_eat(Token expected_token)parser_eat843,18046
+
+src/Parser.h,4100
+#define _PARSER_H_PARSER_H4,62
+typedef struct _abstract_syntax_tree Ast_Node;Ast_Node9,143
+typedef enum _ast_type_ast_type11,193
+	type_notype = 0,type_notype13,220
+	type_selector    = -48,type_selector15,242
+	type_identifier  = -47,type_identifier16,268
+	type_assignment  = -46,type_assignment17,294
+	type_func        = -45,type_func18,320
+	type_func_call   = -44,type_func_call19,346
+	type_for         = -43,type_for20,372
+	type_if          = -42,type_if21,398
+	type_expression  = -41,type_expression22,424
+	type_const       = -40,type_const23,450
+	type_atom        = -39,type_atom24,476
+	type_var         = -38,type_var25,502
+	type_return      = -37,type_return26,528
+	type_unary_expr  = -36,type_unary_expr28,556
+	type_binary_expr = -35,type_binary_expr29,582
+	type_add         = '+',type_add31,611
+	type_subtract    = '-',type_subtract32,637
+	type_multiply    = '*',type_multiply33,663
+	type_divide      = '/',type_divide34,689
+	type_root        = -100type_root36,718
+} Ast_Type;Ast_Type37,744
+typedef enum _var_type_var_type39,759
+	byte1  = 0x001,byte141,786
+	byte2  = 0x002,byte242,804
+	byte4  = 0x004,byte443,822
+	byte8  = 0x008,byte844,840
+	ubyte  = 0x010,ubyte45,858
+	ubyte2 = 0x020,ubyte246,876
+	ubyte4 = 0x040,ubyte447,894
+	ubyte8 = 0x080,ubyte848,912
+	real32 = 0x100,real3249,930
+	real64 = 0x200,real6450,948
+	empty  = 0x400 // voidempty51,966
+} Var_Representation;Var_Representation52,991
+typedef struct _type_and_token_type_and_token55,1018
+	Ast_Type type;type57,1053
+	Token_Iden iden_index;iden_index58,1070
+} Type_And_Token;Type_And_Token59,1095
+typedef struct _ast_node_array_ast_node_array61,1116
+	Ast_Node **nodes;nodes63,1151
+	int count;count64,1171
+} Ast_Node_Array;Ast_Node_Array65,1184
+typedef struct _full_variable_type_full_variable_type67,1205
+	Var_Representation representation;representation69,1244
+	b32 is_const;is_const70,1281
+	int pointer_count;pointer_count71,1297
+} Var_Type;Var_Type72,1318
+typedef struct _ast_atom_ast_atom74,1333
+	u64 identifier_index;identifier_index76,1362
+} Ast_Atom;Ast_Atom77,1386
+typedef struct _ast_variable_ast_variable79,1401
+	Var_Type type;type81,1434
+	u64 identifier_index;identifier_index82,1451
+} Ast_Variable;Ast_Variable83,1475
+typedef struct _ast_func_ast_func85,1494
+	Var_Type type;type87,1523
+	u64 identifier_index;identifier_index88,1540
+	Ast_Node **arguments; // Simple DArrayarguments89,1564
+} Ast_Func;Ast_Func90,1605
+typedef struct _ast_unary_expr_ast_unary_expr92,1620
+	Ast_Node *expression;expression95,1673
+} Ast_Unary_Expr;Ast_Unary_Expr96,1697
+typedef struct _ast_assignment_ast_assignment98,1718
+	Ast_Variable variable;variable100,1753
+	Ast_Node *expression;expression101,1778
+} Ast_Assignment;Ast_Assignment102,1802
+typedef struct _ast_call_ast_call104,1823
+	u64 identifier_index;identifier_index106,1852
+	Ast_Node **arguments; // Simple DArray of expressionsarguments107,1876
+} Ast_Call;Ast_Call108,1932
+{__anonbdd73f9f0103111,1961
+	left_to_right,left_to_right112,1964
+	right_to_leftright_to_left113,1981
+} Assoc;Assoc114,1997
+{__anonbdd73f9f0208117,2025
+	int precedence;precedence118,2028
+	Assoc associativity;associativity119,2046
+} Operator_Desc;Operator_Desc120,2069
+{__anonbdd73f9f0308123,2106
+	Token_Iden token;token124,2109
+} Ast_Identifier;Ast_Identifier125,2129
+{__anonbdd73f9f0408128,2166
+	Ast_Node *selected;selected129,2169
+} Ast_Selector;Ast_Selector130,2191
+struct _abstract_syntax_tree_abstract_syntax_tree132,2210
+	Ast_Type type;type134,2243
+	{__anonbdd73f9f050a136,2268
+		Ast_Func function;function137,2272
+		Ast_Node *condition;condition138,2294
+		Ast_Unary_Expr unary_expr;unary_expr139,2318
+		Ast_Assignment assignment;assignment140,2348
+		Ast_Variable variable;variable141,2378
+		Ast_Call func_call;func_call142,2404
+		Ast_Atom atom;atom143,2427
+		Ast_Identifier identifier;identifier144,2445
+		Ast_Selector selector;selector145,2475
+	Ast_Node *left;left147,2506
+	Ast_Node *right;right148,2524
+
+src/platform/platform.h,736
+#define PLATFORM_HPLATFORM_H4,62
+typedef struct _platform_config_platform_config8,122
+	u16 Width;Width10,158
+	u16 Height;Height11,171
+	u32 WindowPosX;WindowPosX12,185
+	u32 WindowPosY;WindowPosY13,203
+	const char *Name;Name14,221
+} platform_config;platform_config15,241
+typedef void *platform_thread;platform_thread18,300
+typedef void *platform_state;platform_state19,332
+typedef struct _file_info_file_info21,365
+	i8 Path[260];Path23,395
+	i16 PathSize;PathSize24,411
+	i8 Extension[260];Extension25,427
+	i16 ExtensionSize;ExtensionSize26,448
+	b32 isValid;isValid27,469
+} file_info;file_info28,484
+typedef struct _Quad_Quad30,500
+	u16 Width;Width32,525
+	u16 Height;Height33,538
+} Quad;Quad34,552
+
+src/platform/Win32Platform.c,1556
+static HINSTANCE Instance;Instance7,81
+static HWND Window;Window8,109
+static RAWINPUT *RawInputMemory;RawInputMemory9,130
+PlatformGetAbsolutePath(char *Out)PlatformGetAbsolutePath21,295
+PlatformMessageBox(const char *Caption, const char *Text)PlatformMessageBox43,786
+PlatformWriteFile(void *Data, i32 BytesToWrite, const char *Path, b32 Overwrite)PlatformWriteFile49,903
+PlatformCreateThread(void *Func, void *Args)PlatformCreateThread95,1978
+PlatformWaitForThread(platform_thread Thread)PlatformWaitForThread101,2109
+PlatformIsThreadOver(platform_thread Thread)PlatformIsThreadOver107,2210
+PlatformOutputString(char *String, log_level Level)PlatformOutputString114,2353
+PlatformQuit()PlatformQuit137,3016
+PlatformSetWindowSize(Quad NewSize)PlatformSetWindowSize143,3068
+PlatformExit(i32 ExitCode)PlatformExit153,3285
+PlatformInitialize()PlatformInitialize159,3352
+PlatformGetState()PlatformGetState166,3436
+static i32 ShortcutTimer;ShortcutTimer171,3497
+PlatformHandleMessages()PlatformHandleMessages174,3531
+PlatformReserveMemory(u64 Size)PlatformReserveMemory197,3891
+PlatformAllocateReserved(void *Address, u64 Size)PlatformAllocateReserved203,4002
+PlatformAllocateChunk(u64 Size)PlatformAllocateChunk209,4128
+PlatformFreeChunk(void *Chunk)PlatformFreeChunk215,4250
+PlatformGetFileSize(char *Path)PlatformGetFileSize221,4333
+PlatformReadEntireFile(void *Data, u64 *Size, char *Path)PlatformReadEntireFile237,4634
+WindowProc(HWND ThisWindow, UINT Message, WPARAM wParam, LPARAM lParam)WindowProc273,5398
+
+src/SimpleDArray.c,207
+_ISimpleDArrayCreate(size_t TypeSize)_ISimpleDArrayCreate6,36
+_ISimpleDArrayPush(void **Array, void *Item)_ISimpleDArrayPush20,458
+_ISimpleDArraySkip(void **Array, int Amount)_ISimpleDArraySkip49,1414
+
+src/SimpleDArray.h,424
+#define _SIMPLE_D_ARRAY_H_SIMPLE_D_ARRAY_H4,63
+{__anon670bc0df01088,125
+	u64 Count;Count9,127
+	u64 CurrentlyAllocated;CurrentlyAllocated10,139
+	u64 CurrentlyUsed;CurrentlyUsed11,164
+	size_t TypeSize;TypeSize12,184
+} DArray_Header;DArray_Header13,202
+#define SDHeader(SDHeader24,371
+#define SDCreate(SDCreate25,460
+#define SDCount(SDCount26,526
+#define SDPush(SDPush27,572
+#define SDFree(SDFree28,655
+
+src/Stack.h,664
+#define _STACK_H_STACK_H4,54
+#define STACK_DEFAULT_VALUE STACK_DEFAULT_VALUE9,118
+typedef struct _stack_stack12,187
+	void *d_array_ptr;d_array_ptr14,211
+	i32 top;top15,231
+	i32 default_value;default_value16,241
+} _internal_stack;_internal_stack17,261
+#define STACK_INFO_SIZE STACK_INFO_SIZE19,298
+#define stack_header(stack_header22,348
+#define stack_allocate(stack_allocate24,424
+#define stack_set_default_value(stack_set_default_value30,767
+#define is_stack_empty(is_stack_empty32,850
+#define stack_push(stack_push34,904
+#define stack_pop(stack_pop36,1000
+#define stack_peek(stack_peek38,1115
+#define stack_free(stack_free40,1229
+
+src/stdlib/std.c,1494
+#define V_WRITE_BUFFER_SIZE V_WRITE_BUFFER_SIZE6,124
+vstd_pow(f64 a, f64 b)vstd_pow9,165
+vstd_strcat_multiple(char *output, int amount, ...)vstd_strcat_multiple32,364
+vstd_stepout_dir(char *path)vstd_stepout_dir46,581
+vstd_str_to_double(char *str)vstd_str_to_double61,821
+is_special_char(char c)is_special_char89,1288
+is_alnum(char c)is_alnum95,1446
+is_alpha(char c)is_alpha101,1526
+is_non_special_char(char c)is_non_special_char107,1627
+is_whitespace(char c)is_whitespace113,1697
+is_number(char c)is_number119,1813
+int strcount(char *str, char c, char exclude_next)strcount124,1873
+void vstd_strcat(char *dst, const char *src)vstd_strcat145,2211
+void _vstd_IntToStr(int num, char* arr_to_fill)_vstd_IntToStr157,2373
+_vstd_U64ToStr(i64 num, char *arr_to_fill)_vstd_U64ToStr188,2960
+_vstd_FloatToStr(float num, char *arr_to_fill)_vstd_FloatToStr219,3554
+vstd_strchr(char* str, char chr)vstd_strchr243,4140
+vstd_str_ends_with(char *str, char *end)vstd_str_ends_with275,4989
+vstd_strcmp(char *str1, char *str2)vstd_strcmp284,5184
+vstd_strlen(char *str)vstd_strlen297,5356
+FormatString(char *Buffer, const char *Format, i32 FormatSize, va_list args)FormatString331,6053
+void _vstd_Printf(int FormatSize, const char* Format, ...)_vstd_Printf426,8295
+void _vstd_sPrintf(int FormatSize, char *Buffer, const char* Format, ...)_vstd_sPrintf438,8607
+vstd_vsnsprintf(char *Buffer, size_t FormatSize, const char *Format, va_list Args)vstd_vsnsprintf450,8830
+
+src/stdlib/std.h,201
+#define vstd_printf(vstd_printf9,46
+#define vstd_sprintf(vstd_sprintf10,125
+struct vstdRect vstdRect12,220
+    int x1;x114,241
+    int y1;y115,254
+    int x2;x216,267
+    int y2;y217,280
+
+Syntax.txt,0
+
+TAGS,0
+
+Test.apoc,0
+
+TODO.txt,0

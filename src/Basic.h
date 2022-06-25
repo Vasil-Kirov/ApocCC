@@ -1,3 +1,4 @@
+
 /* date = January 19th 2022 9:04 pm */
 
 #ifndef _BASIC_H
@@ -8,8 +9,10 @@
 // TODO(Vasko): Add logger
 #include <stdio.h>
 
+#ifndef __cplusplus
 #define STB_DS_IMPLEMENTATION
 #include <stb_ds.h>
+#endif
 
 
 typedef uint8_t u8;
@@ -51,10 +54,12 @@ typedef struct _entire_file
 #define Assert(expression) if(!(expression)) { *(char *)0 = 0; }
 #define ADD_LOGGER Assert(false)
 
-void
-raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file, u64 line);
-
 #include <Lexer.h>
+
+
+void
+raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file, u64 line, u64 column);
+
 void
 raise_parsing_unexpected_token(const char *expected_tok, Token_Iden token);
 

@@ -1,4 +1,7 @@
 #include <Lexer.h>
+#include <Basic.h>
+#include <Parser.h>
+
 static u8 *at_buffer;
 static str_hash_table *KeywordTable;
 static str_hash_table *TypeTable;
@@ -6,8 +9,41 @@ static Token_Iden *token_buffer;
 static u64 last_token;
 static u8 **identifier_buffer;
 static u64 current_line;
+static u64 current_column;
 
+#define KEYWORD_ERROR 32767
 
+void
+advance_buffer(u8 **buffer)
+{
+	if(**buffer != '\0')
+		{
+	if(**buffer == '\n')
+		{
+			current_line++;
+			current_column = 0;
+		}
+	else
+		current_column++;
+	(*buffer)++;
+		}
+}
+
+void
+rewind_buffer_to(u8 **buffer, u8 *to)
+{
+	while(*buffer != to)
+		{
+			char c = **buffer;
+			if(c == '\n')
+				{
+					current_line--;
+					current_column = 1;
+				}
+			current_column--;
+			(*buffer)--;
+		}
+}
 
 void
 initialize_compiler()
@@ -15,7 +51,6 @@ initialize_compiler()
 	// NOTE(Vasko): Add keywords to string hash table
 	shput(KeywordTable, "func", tok_func);
 	shput(KeywordTable, "extern", tok_extern);
-	shput(KeywordTable, "->", tok_arrow);
 	shput(KeywordTable, "struct", tok_struct);
 	shput(KeywordTable, "import", tok_import);
 	shput(KeywordTable, "cast", tok_cast);
@@ -24,7 +59,31 @@ initialize_compiler()
 	shput(KeywordTable, "switch", tok_switch);
 	shput(KeywordTable, "case", tok_case);
 	shput(KeywordTable, "as", tok_as);
+	shput(KeywordTable, "break", tok_break);
 	
+	shput(KeywordTable, "->", tok_arrow);
+	shput(KeywordTable, "--", tok_minusminus);
+	shput(KeywordTable, "++", tok_plusplus);
+	shput(KeywordTable, "||", tok_logical_or);
+	shput(KeywordTable, "==", tok_logical_is);
+	shput(KeywordTable, "!=", tok_logical_isnot);
+	shput(KeywordTable, "&&", tok_logical_and);
+	shput(KeywordTable, "::", tok_const);
+	shput(KeywordTable, "<<", tok_bits_lshift);
+	shput(KeywordTable, ">>", tok_bits_rshift);
+	shput(KeywordTable, ">=", tok_logical_gequal);
+	shput(KeywordTable, "<=", tok_logical_lequal);
+	shput(KeywordTable, "+=", tok_plus_equals);
+	shput(KeywordTable, "-=", tok_minus_equals);
+	shput(KeywordTable, "*=", tok_mult_equals);
+	shput(KeywordTable, "/=", tok_div_equals);
+	shput(KeywordTable, "%=", tok_mod_equals);
+	shput(KeywordTable, "&=", tok_and_equals);
+	shput(KeywordTable, "^=", tok_xor_equals);
+	shput(KeywordTable, "|=", tok_or_equals);
+	shput(KeywordTable, "<<=", tok_lshift_equals);
+	shput(KeywordTable, ">>=", tok_rshift_equals);
+
 	// NOTE(Vasko): Add basic types to string hash table
 	shput(TypeTable, "i8",  byte1);
 	shput(TypeTable, "i16", byte2);
@@ -39,17 +98,40 @@ initialize_compiler()
 	shput(TypeTable, "void", empty);
 }
 
-Var_Type
+Var_Representation
 look_up_identifier_for_type(u8 *type_str)
 {
 	return shget(TypeTable, type_str);
 }
+
+Var_Representation
+get_type_from_id(u64 identifier_index)
+{
+	return shget(TypeTable, get_identifier(identifier_index));
+}
+
+Token_Iden
+get_prev_token() { return token_buffer[last_token - 1]; }
 
 Token_Iden
 get_next_token() { return token_buffer[last_token++]; }
 
 Token_Iden
 peek_next_token() { return token_buffer[last_token]; }
+
+Token_Iden
+peek_ahead(int amount) { return token_buffer[last_token + amount]; }
+
+Token_Iden
+get_next_expecting(Token type, const char *error_msg)
+{
+	Token_Iden token = token_buffer[last_token++];
+	if(token.type != type)
+		{
+			raise_parsing_unexpected_token(error_msg, token);
+		}
+	return token;
+}
 
 u8 *
 get_identifier(u64 index)
@@ -58,7 +140,7 @@ get_identifier(u64 index)
 }
 
 static void
-compile_file(char *path)
+lex_file(char *path)
 {
 	if(token_buffer) 
 	{
@@ -81,24 +163,24 @@ compile_file(char *path)
 		LG_FATAL("Couldn't find input file %s", path);
 	}
 	at_buffer = file_buffer.data;
-	
-	shdefault(KeywordTable, INT16_MAX);
+
+	shdefault(KeywordTable, KEYWORD_ERROR);
 	shdefault(TypeTable, 0);
 	current_line = 1;
 	
 	while(at_buffer - (u8 *)file_buffer.data < (i64)file_buffer.size)
 	{
 		Token_Iden to_put = get_token(path);
-		if(to_put.token != ' ')
+		if(to_put.type != ' ' && to_put.type != '\0')
 			arrput(token_buffer, to_put);
 	}
 	
-	Token_Iden eof_token = {.token = tok_eof, .identifier_index = 0};
+	Token_Iden eof_token = {.type = tok_eof, .identifier_index = 0};
 	arrput(token_buffer, eof_token);
 	
 	for(i32 index = 0; index < arrlen(token_buffer); ++index)
 	{
-		if(token_buffer[index].token == tok_identifier)
+		if(token_buffer[index].type == tok_identifier)
 		{
 			LG_INFO("Identifier %s", identifier_buffer[token_buffer[index].identifier_index]);
 		}
@@ -110,10 +192,7 @@ static Token_Iden get_token(char *file)
 {
 	while(is_whitespace(*at_buffer))
 	{
-		if(*at_buffer == '\n')
-			current_line++;
-		
-		at_buffer++;
+	    advance_buffer(&at_buffer);
 	}
 	
 	char last_char = *at_buffer;
@@ -121,9 +200,11 @@ static Token_Iden get_token(char *file)
 	
 	if(is_alpha(last_char))
 	{
+	    u64 start_col = current_column;
+		u64 start_line = current_line;
 		while(is_alnum(*at_buffer) || is_non_special_char(*at_buffer))
 		{
-			at_buffer++;
+		    advance_buffer(&at_buffer);
 		}
 		
 		u64 identifier_size = at_buffer - string_start;
@@ -134,7 +215,7 @@ static Token_Iden get_token(char *file)
 		
 		
 		i16 token = shget(KeywordTable, name);
-		if(token == INT16_MAX)
+		if (token == KEYWORD_ERROR)
 		{
 			u8 *identifier = AllocateCompileMemory(identifier_size+1);
 			memcpy(identifier, string_start, identifier_size);
@@ -144,20 +225,25 @@ static Token_Iden get_token(char *file)
 			u64 index = arrlen(identifier_buffer);
 			arrput(identifier_buffer, identifier);
 			
-			return (Token_Iden){.token = token, .identifier_index = index, .line = current_line, .file = file};
+			return (Token_Iden){.type = token, .identifier_index = index, .line = start_line,
+								.column = start_col, .file = file};
 		}
-		return (Token_Iden){.token = token, .identifier_index = 0, .line = current_line, .file = file};
+		return (Token_Iden){.type = token, .identifier_index = 0, .line = start_line,
+							.column = start_col, .file = file};
 	}
 	else if(is_number(last_char))
 	{
+		u64 start_col = current_column;
+		u64 start_line = current_line;
 		b32 found_dot = false;
 		do {
-			at_buffer++;
+			advance_buffer(&at_buffer);
 			if(*at_buffer == '.')
 			{
 				if(found_dot)
 				{
-					raise_token_syntax_error("Number has an extra dot", &at_buffer, file, current_line);
+					raise_token_syntax_error("Number has an extra dot", &at_buffer, file, start_line,
+											 start_col);
 					return get_token(file);
 				}
 				found_dot = true;
@@ -172,121 +258,52 @@ static Token_Iden get_token(char *file)
 		u64 index = arrlen(identifier_buffer);
 		arrput(identifier_buffer, number_string);
 		
-		return (Token_Iden){.token = tok_number, .identifier_index = index, .line = current_line, .file = file};
+		return (Token_Iden){.type = tok_number, .identifier_index = index, .line = start_line,
+							.column = start_col, .file = file};
 	}
 	else
 	{
-		i16 token = check_for_char_combination((char **)&at_buffer);
-		if(token != ' ')
-			at_buffer++;
-		else
-			return get_token(file);
-		
-		return (Token_Iden){.token = token, .identifier_index = 0, .line = current_line, .file = file};
-	}
-}
-
-#define next_char(buf) *(buf+1)
-
-i16
-check_for_char_combination(char **buf)
-{
-	char *at = *buf;
-	char first = *at;
-	switch(first)
-	{
-		case '-':
+		u64 start_col = current_column;
+		u64 start_line = current_line;
+		while(!is_whitespace(*at_buffer) && !is_alnum(*at_buffer))
 		{
-			if(next_char(at) == '>')
-			{
-				(*buf)++;
-				return tok_arrow;
-			}
-			else return '-';
-			
-		}break;
-		
-		case '|':
-		{
-			if(next_char(at) == '|')
-			{
-				(*buf)++;
-				return tok_logical_or;
-			}
-			else return '|';
-		}break;
-		
-		case '=':
-		{
-			if(next_char(at) == '=')
-			{
-				(*buf)++;
-				return tok_logical_is;
-			}
-			else return '=';
+			if(*at_buffer == 0) return (Token_Iden){};
+		    advance_buffer(&at_buffer);
 		}
-		case '!':
+		if(at_buffer - string_start == 1)
 		{
-			if(next_char(at) == '=')
-			{
-				(*buf)++;
-				return tok_logical_isnot;
-			}
-			else return '!';
-		}break;
-		case '&':
-		{
-			if(next_char(at) == '&')
-			{
-				(*buf)++;
-				return tok_logical_and;
-			}
-			else return '&';
-		}break;
-		case '<':
-		{
-			if(next_char(at) == '<')
-			{
-				(*buf)++;
-				return tok_binary_lshift;
-			}
-			else return '<';
-		}break;
-		case '>':
-		{
-			if(next_char(at) == '>')
-			{
-				(*buf)++;
-				return tok_binary_rshift;
-			}
-			else return '>';
-		}break;
+			Token_Iden result = {.type = string_start[0], .line = start_line,
+								 .column = start_col, .file = file};
+			return result;
+		}
 		
-		case '/':
+		if(string_start[0] == '/' && string_start[1] == '/')
 		{
-			if(next_char(at) == '/')
-			{
-				while (**buf != '\n') (*buf)++;
-				(**buf)++;
-				current_line++;
-				return ' ';
-			}
-			else return '/';
-		}break;
+			while(*at_buffer != '\n')
+				advance_buffer(&at_buffer);
+		    advance_buffer(&at_buffer);
+			return get_token(file);
+		}
+
+		u64 identifier_size = at_buffer - string_start;
+
+		char symbol[identifier_size + 1];
+		memcpy(symbol, string_start, identifier_size);
+		symbol[identifier_size] = '\0';
+
+		Token_Iden result = {};
+		result.type = shget(KeywordTable, symbol);
+		result.line = start_line;
+		result.column = start_col;
+		result.file = file;
 		
-		case ':':
+		if (result.type == KEYWORD_ERROR)
 		{
-			if(next_char(at) == ':')
-			{
-				(*buf)++;
-				return tok_const;
-			}
-			else return ':';
-		}break;
-		
-		default: 
-		{
-			return first;
-		}break;
+		    rewind_buffer_to(&at_buffer, string_start + 1);
+			result.type = string_start[0];
+		    return result;
+		}
+
+		return result;
 	}
 }

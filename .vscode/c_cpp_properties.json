@@ -1,0 +1,52 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${default}",
+                "${workspaceFolder}/engine/src/**",
+                "/usr/include",
+                "/usr/local/include"
+            ],
+            "defines": [
+                "VIPOC_DEBUG",
+                "VIPOC_EXPORT",
+                "VIPOC_LINUX",
+                "__AVX__",
+                "__AVX2__"
+            ],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "clang-x64"
+        },
+        {
+            "name": "Win32",
+            "includePath": [
+                "${default}",
+                "${workspaceFolder}",
+                "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.19041.0\\um\\",
+                "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.19041.0\\winrt\\wrl",
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/include"
+            ],
+            "defines": [
+                "VIPOC_DEBUG",
+                "VIPOC_EXPORT",
+                "VIPOC_WIN32",
+                "__AVX__",
+                "__SSE4_2__",
+                "RLD_EXPORTS"
+            ],
+            "windowsSdkVersion": "10.0.19041.0",
+            "compilerPath": "C:\\Program Files\\LLVM\\bin\\clang.exe",
+            "cStandard": "c11",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "windows-clang-x64",
+            "compilerArgs": [
+                "/Zc:preprocessor-"
+            ]
+        }
+    ],
+    "version": 4
+}

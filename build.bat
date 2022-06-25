@@ -18,7 +18,7 @@ SET CompilerFlags=%CompilerFlags% -nologo -msse3 -mavx
 SET Includes=-I ..\src -I ..\include
 
 PUSHD bin
-clang-cl.exe %CompilerFlags% %Includes% ..\src\Main.c /link %LinkerFlags%
+clang-cl.exe %CompilerFlags% %Includes% ..\src\Main.c ..\src\Code-Gen.cpp /link %LinkerFlags%
 POPD
 
 

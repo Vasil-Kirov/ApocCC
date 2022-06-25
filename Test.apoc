@@ -1,11 +1,11 @@
 
 // This is a comment
 
-func get_10(string:* i8) -> void
-{
-	var: i32 = 10;
-	-> var;
-}
+// func get_10(string: *i8) -> void
+// {
+//	var: i32 = 10;
+//	-> var;
+// }
 
 struct Two_Nums
 {
@@ -14,9 +14,17 @@ struct Two_Nums
 }
 // no ; after struct declaration
 
-func main(arg_count: i32, args:* i8) -> i32
+func main(arg_count: i32, args: *i8) -> i32
 {
-	nums: Two_Nums = Two_Nums { 9, get_10("irrelevant") };
-	
+	type := Two_Nums {10, 30};
+	if arg_count > 2
+	{
+		nums := 10 + -type.num1;
+		random_val :: 30;
+		random_int :i32: 40;
+		other_val:* i32 = 100000;
+		final_val:** i32;
+	   //nums: Two_Nums = Two_Nums { 9, get_10("irrelevant") };
+	}
 	-> nums;
 }
