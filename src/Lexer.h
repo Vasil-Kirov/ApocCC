@@ -112,6 +112,14 @@ Token_Iden peek_next_token();
 Token_Iden peek_ahead(int amount);
 Token_Iden get_next_expecting(Token type, const char *error_msg);
 
+u8 *token_to_str(Token token);
+#include <Parser.h>
+u8 *type_to_str(Ast_Type type);
+
+u64 get_line_tracker();
+
+u8 *get_file_name();
+
 #ifdef __cplusplus
 }
 #endif

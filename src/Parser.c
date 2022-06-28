@@ -1,26 +1,27 @@
 #include <Parser.h>
+#include <Analyzer.h>
 
 static b32 reached_eof;
 static Token_Iden last_read_token;
 static const char *expected;
 static b32 is_top_level = true;
 
-#define parse_expect(func, str)			\
-	func();					\
+#define parse_expect(func, str) \
+	func();                     \
 	expected = str
-#define tok_expect(token_id, exp_tok, expect)				  \
-	{								  \
-		if (token_id.type != exp_tok)				  \
-		{							  \
+#define tok_expect(token_id, exp_tok, expect)                 \
+	{                                                         \
+		if (token_id.type != exp_tok)                         \
+		{                                                     \
 			raise_parsing_unexpected_token(expect, token_id); \
-		}							  \
+		}                                                     \
 	}
-#define tok_not_expect(token_id, nexp_tok, expect)			 \
-	{								 \
-		if (token_id.type == nexp_tok)				 \
-		{							 \
+#define tok_not_expect(token_id, nexp_tok, expect)           \
+	{                                                        \
+		if (token_id.type == nexp_tok)                       \
+		{                                                    \
 			raise_parsing_unexpected_token(expect, token_id) \
-		}					                 \
+		}                                                    \
 	}
 
 Ast_Node *
@@ -54,6 +55,16 @@ ast_identifier(Token_Iden token)
 	return result; 
 }
 
+Ast_Identifier
+pure_identifier(Token_Iden token)
+{
+	Ast_Identifier result = {
+		.token = token,
+		.name = get_identifier(token.identifier_index),
+	};
+	return result;
+}
+
 Ast_Node *
 ast_variable(Var_Type type, Ast_Identifier identifier)
 {
@@ -65,25 +76,29 @@ ast_variable(Var_Type type, Ast_Identifier identifier)
 }
 
 Ast_Node *
-ast_assignment_from_decl(Ast_Variable variable, Ast_Node *expression)
+ast_assignment_from_decl(Ast_Variable variable, Ast_Node *expression, Token_Iden ident_token)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_assignment;
 	result->assignment.is_declaration = true;
 	result->assignment.variable = variable;
 	result->assignment.expression = expression;
-	result->assignment.identifier = variable.identifier;
+	result->assignment.token = ident_token;
 	return result;
 }
 
 Ast_Node *
-ast_assignment(Token_Iden identifier_token, Ast_Node *expression)
+ast_assignment(Token_Iden identifier_token, Ast_Node *expression, Token_Iden ident_token)
 {
 	Ast_Node *result = alloc_node();
+	Var_Type unknown = {.is_const = false, .is_primitive = true, .pointer_count = 0, .prim_repr = invalid_type};
+
 	result->type = type_assignment;
 	result->assignment.is_declaration = false;
-	result->assignment.identifier = ast_identifier(identifier_token)->identifier;
 	result->assignment.expression = expression;
+	result->assignment.token = ident_token;
+	result->assignment.variable.identifier = pure_identifier(identifier_token);
+	result->assignment.variable.type = unknown;
 	return result;
 }
 
@@ -114,18 +129,25 @@ node_to_ptr(Ast_Node node)
 	return result;
 }
 
-void parse()
+Ast_Node *
+parse()
 {
 	Ast_Node *root = alloc_node();
 	root->type = type_root;
 	// NOTE(Vasko): nothing special about root, it doesn't contain data
 
+	Token_Iden info_tok = peek_next_token();
+	Scope_Info scope_info = {.file = info_tok.file, .start_line = info_tok.line};
+	push_scope(scope_info);
 	root = parse_file_level_statement();
 	if(!reached_eof)
 	{
 		raise_parsing_unexpected_token("end of file", last_read_token);
 	}
-	LG_WARN("WE DID IT!!!");
+	pop_scope((Token_Iden){.file = info_tok.file, .column = 1, .line = get_line_tracker()});
+	if(is_scope_stack_empty())
+		raise_semantic_error("not all scopes closed by eof", (Token_Iden){.file = info_tok.file, .column = 1, .line = get_line_tracker()});
+	return root;
 }
 
 b32 test_and_advance(i16 token)
@@ -169,6 +191,22 @@ parse_file_level_statement()
 }
 
 Ast_Node *
+parse_body(Token_Iden scope_tok, b32 is_func)
+{
+	Ast_Node *result = alloc_node();
+	result->type = type_scope_start;
+	result->scope_desc.token = scope_tok;
+	Scope_Info new_scope = {.file = scope_tok.file, .start_line = scope_tok.line};
+	push_scope(new_scope);
+	result->right = parse_statement();
+	if(is_func)
+		result->left = parse_file_level_statement();
+	else
+		result->left = parse_statement();
+	return result;
+}
+
+Ast_Node *
 parse_statement()
 {
 	Ast_Node *result = alloc_node();
@@ -182,24 +220,19 @@ parse_statement()
 	}break;
 	case '{':
 	{
-		// TODO(Vasko): this
-	PARSE_BODY:
-		result->right = parse_statement();
-		result->left = parse_statement();
+		return parse_body(starting_token, false);
 	} break;
 	case tok_if:
 	{
 		result->type = type_if;
 		result->condition = parse_expression('{');
-
-		goto PARSE_BODY;
+		result->left = parse_body(starting_token, false);
 	} break;
 	case tok_for:
 	{
 		result->type = type_for;
 		result->condition = parse_expression('{');
-
-		goto PARSE_BODY;
+		result->left= parse_body(starting_token, false);
 	} break;
 	case tok_identifier:
 	{
@@ -231,7 +264,10 @@ parse_statement()
 	}
 	case '}':
 	{
-		return NULL;
+		pop_scope(starting_token);
+		result->type = type_scope_end;
+		result->scope_desc.token = starting_token;
+		return result;
 	} break;
 	default:
 	{
@@ -421,37 +457,31 @@ parse_identifier(Token_Iden name_token)
 	Ast_Node *result = NULL;
 	Token_Iden col_or_eq = get_next_token();
 	b32 is_declaration = false;
+	b32 is_const = false;
 	b32 has_expression = false;
 	if(col_or_eq.type == ':')
 	{
 		is_declaration = true;
-		b32 is_const = false;
-		Var_Representation type_repr;
-		int pointer_count = 0;
-
 		Var_Type type = {};
 			
 		Token_Iden type_tok = peek_next_token();
 		if(type_tok.type == '=')
 		{
 			get_next_token();
-			type_repr = detect;
+			type.is_primitive = true;
+			type.prim_repr = detect;
 			has_expression = true;
+
 		}
 		else if(type_tok.type == tok_identifier || type_tok.type == tok_star)
 		{
-			type_repr = parse_type(&pointer_count);
+			type = parse_type();
 			if(peek_next_token().type == ':')
 			{
 				is_const = true;
 				has_expression = true;
 			}
 			col_or_eq = get_next_token();
-			if(col_or_eq.type != '=')
-			{
-				// Note(Vasko): Cheap hack
-				is_declaration = false;
-			}
 		}
 		else
 		{
@@ -460,34 +490,34 @@ parse_identifier(Token_Iden name_token)
 			// Note(Vasko): Unreachable
 			return NULL;
 		}
-			
-		type.representation = type_repr;
-		type.pointer_count = pointer_count;
-		type.is_const = is_const;
-		if(type.representation == invalid_type)
+		
+		if(type_is_invalid(type))
 		{
 			raise_parsing_unexpected_token("valid type after ':'", type_tok);
 		}
+		type.is_const = is_const;
 		result = ast_variable(type, ast_identifier(name_token)->identifier);
 	}
 	else if(col_or_eq.type == tok_const)
 	{
-		Var_Type type = {.representation = detect, .pointer_count = 0, .is_const = true};
+		Var_Type type = {.prim_repr = detect, .pointer_count = 0, .is_const = true};
 		result = ast_variable(type, ast_identifier(name_token)->identifier);
 		has_expression = true;
 		is_declaration = true;
 	}
 
-	if(col_or_eq.type == '=' || has_expression)
+	b32 added_symbol = false;
+	if(col_or_eq.type == '=' || (col_or_eq.type == ':' && is_const) || has_expression)
 	{
 		has_expression = true;
 		if(is_declaration)
 		{
-			result = ast_assignment_from_decl(result->variable, parse_expression(';'));
+			result = ast_assignment_from_decl(result->variable, parse_expression(';'), name_token);
+			added_symbol = true;
 		}
 		else
 		{
-			result = ast_assignment(name_token, parse_expression(';'));
+			result = ast_assignment(name_token, parse_expression(';'), name_token);
 		}
 	}
 	else if(col_or_eq.type != ';')
@@ -495,7 +525,7 @@ parse_identifier(Token_Iden name_token)
 		raise_parsing_unexpected_token("one of the following ':', '=', ';' after identifier", col_or_eq);
 	}
 
-	if(is_declaration && !has_expression)
+	if(is_declaration && !has_expression && col_or_eq.type != ';')
 	{
 		parser_eat(';');
 	}
@@ -526,12 +556,32 @@ is_struct_init(Token_Iden token, int check_ahead)
 	return false;
 }
 
+b32
+is_indexing(Token_Iden token, int check_ahead)
+{
+	if(token.type == tok_identifier && peek_ahead(check_ahead).type == '[')
+		return true;
+	return false;
+}
+
+Ast_Node *
+parse_indexing(Token_Iden identifier)
+{
+	parser_eat('[');
+
+	Ast_Node *result = alloc_node();
+	result->type = type_index;
+	result->index.expression = parse_expression(']');
+	result->index.indentifier = pure_identifier(identifier);
+	return result;
+}
+
 Ast_Node *
 parse_func_call(Token_Iden name_token)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_func_call;
-	result->func_call.identifier_index = name_token.identifier_index;
+	result->func_call.identifier = pure_identifier(name_token);
 	result->func_call.arguments = SDCreate(Ast_Node *);
 
 	parser_eat('(');
@@ -547,7 +597,10 @@ parse_func_call(Token_Iden name_token)
 				if(has_multiple_args)
 					raise_parsing_unexpected_token("expression after ','", ahead_token);
 				else
+				{
+					parser_eat(')');
 					break;
+				}
 			}
 			Ast_Node *arg_expression = parse_expression(')');
 			SDPush(result->func_call.arguments, arg_expression);
@@ -605,11 +658,11 @@ parse_struct_initialize()
 }
 
 Ast_Node *
-parse_accesor()
+parse_accesor(Ast_Node *selected)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_selector;
-	result->selector.selected = ast_identifier(get_next_token());
+	result->selector.selected = selected;
 	return result;
 }
 
@@ -622,6 +675,7 @@ parse_atom_expression()
 	{
 		get_next_token();
 		result = parse_func_call(next);
+		result->right = parse_atom_expression();
 	}
 	else if(is_struct_init(next, 1))
 	{
@@ -629,40 +683,52 @@ parse_atom_expression()
 		parser_eat('{');
 		result = parse_struct_initialize();
 	}
+	else if(is_indexing(next, 1))
+	{
+		get_next_token();
+		result = parse_indexing(next);
+		result->right = parse_atom_expression();
+	}
 	else if(next.type == tok_identifier)
 	{
 		get_next_token();
 		result = ast_identifier(next);
+		result->right = parse_atom_expression();
 	}
 	else if (next.type == tok_number)
 	{
 		get_next_token();
 		result = alloc_node();
 		result->type = type_literal;
-		result->atom.identifier = get_identifier(next.identifier_index);
+		result->atom.identifier = pure_identifier(next);
+	}
+	else if(next.type == tok_const_str)
+	{
+		get_next_token();
+		result = alloc_node();
+		result->type = type_const_str;
+		result->atom.identifier = pure_identifier(next);
+		result->right = parse_atom_expression();
 	}
 	else if(next.type == '(')
 	{
 		get_next_token();
-		if(last_read_token.type == tok_identifier)
-		{
-			result = parse_func_call(last_read_token);
-		}
-		else
-		{
-			result = parse_expression(')');
-		}
-	}
-	else if(next.type == '{' && last_read_token.type == tok_identifier)
-	{
-		get_next_token();
-		result = parse_struct_initialize();
+		result = parse_expression(')');
 	}
 	else if(next.type == '.')
 	{
-		get_next_token();
-		result = parse_accesor();
+		parser_eat('.');
+		//next = get_next_expecting(tok_identifier, "identifier after '.'");
+		result = parse_accesor(parse_atom_expression());
 	}
+	else if(next.type == tok_plusplus)
+	{
+		get_next_token();
+		result->type = type_postfix;
+		result->postfix.type = tok_plusplus;
+	}
+
+	// NOTE(Vasko): probably not needed anymore
 	last_read_token = next;
 	return result;
 }
@@ -699,17 +765,10 @@ parse_unary_expression()
 	}
 
 	result = parse_atom_expression();
-	Ast_Node *top = result;
-	if(top == NULL)
-	{
+	if(result == NULL)
 		raise_parsing_unexpected_token("opperand", last_read_token);
-	}
-	while(result != NULL)
-	{
-		result->right = parse_atom_expression();
-		result = result->right;
-	}
-	return top;
+	
+	return result;
 }
 
 
@@ -745,6 +804,14 @@ parse_binary_expression(Token stop_at, int min_prec)
 	return result;
 }
 
+b32
+type_is_invalid(Var_Type type)
+{
+	if(type.is_primitive && type.prim_repr == invalid_type)
+		return true;
+	return false;
+}
+
 Ast_Node *
 parse_expression(Token stop_at)
 {
@@ -753,56 +820,38 @@ parse_expression(Token stop_at)
 	return result;
 }
 
-Var_Representation
-parse_type(int *pointer_count)
+Var_Type
+parse_type()
 {
+	int pointer_count;
 	Token_Iden pointer_or_type = get_next_token();
 	if (pointer_or_type.type == '*')
 	{
-		*pointer_count = 1;
+		pointer_count = 1;
 		Token_Iden type_tok;
 		while ((type_tok = get_next_token()).type == '*')
 		{
-			(*pointer_count)++;
+			pointer_count++;
 		}
-		Var_Representation type = get_type_from_id(type_tok.identifier_index);
-		if (type == 0)
+		Var_Type type = get_type(get_identifier(type_tok.identifier_index));
+		if (type_is_invalid(type))
 		{
 			raise_parsing_unexpected_token("valid type after *", type_tok);
 		}
+		type.pointer_count = pointer_count;
 		return type;
 	}
 	else
 	{
-		*pointer_count = 0;
-		Var_Representation type = get_type_from_id(pointer_or_type.identifier_index);
-		if (type == 0)
+		pointer_count = 0;
+		Var_Type type = get_type(get_identifier(pointer_or_type.identifier_index));
+		if (type_is_invalid(type))
 		{
 			raise_parsing_unexpected_token("valid type", pointer_or_type);
 		}
+		type.pointer_count = pointer_count;
 		return type;
 	}
-}
-
-Ast_Variable
-parse_declaration_left(Token_Iden identifier)
-{
-	parser_eat(':');
-	b32 is_const = false;
-	if (peek_next_token().type == ':')
-	{
-		get_next_token();
-		is_const = true;
-	}
-
-	int pointer = 0;
-	Var_Representation representation = parse_type(&pointer);
-	Ast_Node *result = alloc_node();
-	result->variable.type.representation = representation;
-	result->variable.type.pointer_count = pointer;
-	result->variable.type.is_const = is_const;
-	result->variable.identifier = ast_identifier(identifier)->identifier;
-	return result->variable;
 }
 
 Ast_Node *
@@ -831,7 +880,7 @@ parse_declaration_left_from_array(Token_Iden *tokens, int count)
 	}
 
 	int pointer = 0;
-	Var_Representation type_val = {0};
+	Var_Type type_val = {0};
 	Token_Iden pointer_or_type = tokens[current_tok];
 	if (pointer_or_type.type == '*')
 	{
@@ -840,8 +889,8 @@ parse_declaration_left_from_array(Token_Iden *tokens, int count)
 		{
 			pointer++;
 		}
-		Var_Representation type_val = get_type_from_id(tokens[current_tok].identifier_index);
-		if (type_val == 0)
+		type_val = get_type(get_identifier(tokens[current_tok].identifier_index));
+		if (type_is_invalid(type_val))
 		{
 			raise_parsing_unexpected_token("valid type after *", tokens[current_tok]);
 		}
@@ -849,22 +898,19 @@ parse_declaration_left_from_array(Token_Iden *tokens, int count)
 	else
 	{
 		pointer = 0;
-		Var_Representation type_val = get_type_from_id(pointer_or_type.identifier_index);
-		if (type_val == 0)
+		type_val = get_type(get_identifier(pointer_or_type.identifier_index));
+		if (type_is_invalid(type_val))
 		{
 			raise_parsing_unexpected_token("valid type", pointer_or_type);
 		}
 	}
 
+	type_val.is_const = is_const;
 	return node_to_ptr((Ast_Node){
 			.type = type_var,
 			.variable = {
-				.type = {
-					.representation = type_val,
-					.is_const = is_const,
-					.pointer_count = pointer
-				},
-				.identifier = ast_identifier(tokens[0])->identifier,
+					.type = type_val,
+					.identifier = ast_identifier(tokens[0])->identifier,
 			},
 			.left = NULL,
 			.right = NULL});
@@ -875,6 +921,7 @@ parse_struct()
 {
 	parser_eat(tok_struct);
 	Token_Iden struct_id = get_next_expecting(tok_identifier, "struct name");
+	add_type((ast_struct(ast_identifier(struct_id)->identifier, NULL))->structure);
 	parser_eat('{');
 	Ast_Variable *members = SDCreate(Ast_Variable);
 	Token_Iden curr_tok;
@@ -896,9 +943,7 @@ parse_struct()
 			raise_parsing_unexpected_token("struct member or end of structer '}'", curr_tok);
 		}
 		parser_eat(':');
-		int pointer_count = 0;
-		Var_Representation type_repr = parse_type(&pointer_count);
-		Var_Type type = {.representation = type_repr, .pointer_count = pointer_count, .is_const = false};
+		Var_Type type = parse_type();
 		Ast_Variable member = ast_variable(type, ast_identifier(curr_tok)->identifier)->variable;
 		SDPush(members, member);
 	}
@@ -906,7 +951,10 @@ parse_struct()
 	{
 		raise_parsing_unexpected_token("struct members", curr_tok);
 	}
-	return ast_struct(ast_identifier(struct_id)->identifier, members);
+
+	Ast_Node *result = ast_struct(ast_identifier(struct_id)->identifier, members);
+	update_type(result->structure);
+	return result;
 }
 
 Ast_Node *
@@ -915,71 +963,56 @@ parse_func()
 	parser_eat(tok_func);
 
 	Ast_Func this_func = {0};
-	this_func.identifier = ast_identifier(get_variable())->identifier;
+	Token_Iden func_identifier = get_variable();
+	this_func.identifier = pure_identifier(func_identifier);
 	this_func.arguments = delimited('(', ')', ',', parse_declaration_left_from_array);
 	parser_eat(tok_arrow);
 
 
+	Var_Type func_type = {};
 	if (peek_next_token().type != '{')
 	{
-		int pointer_count = 0;
-
-		this_func.type.representation = parse_type(&pointer_count);
-		this_func.type.pointer_count = pointer_count;
+		func_type = parse_type();
+		this_func.type.prim_repr = func_type.prim_repr;
+		this_func.type.pointer_count = func_type.pointer_count;
 		this_func.type.is_const = false;
-		parser_eat('{');
 	}
 	else
 	{
-		this_func.type.representation = empty;
+		func_type.is_primitive = true;
+		func_type.prim_repr = empty;
+
+		this_func.type.prim_repr = func_type.prim_repr;
 	}
 
-	Ast_Node *result = AllocateCompileMemory(sizeof(Ast_Node));
+	Token_Iden body = get_next_token();
+
+	Ast_Node *result = alloc_node();
 	result->type = type_func;
 	result->function = this_func;
 
-	is_top_level = false;
-	result->right = parse_statement();
+	{
+		Symbol this_symbol = {.token = func_identifier, .node = result, .identifier = this_func.identifier.name, .counter = 0, .type = func_type};
+		add_symbol(this_symbol, &result->function.identifier);
+	}
 
-	is_top_level = true;
-	result->left = parse_file_level_statement();
+	if(body.type == '{')
+	{
+		for(size_t i = 0; i < SDCount(result->function.arguments); ++i)
+		{
+			Ast_Variable arg = result->function.arguments[i]->variable;
+			Symbol arg_symbol = {.token = func_identifier, .node = result->function.arguments[i], .identifier = arg.identifier.name, .counter = 0, .type = arg.type};
+			add_symbol(arg_symbol, &result->function.identifier);
+		}
+		result->left = parse_body(func_identifier, true);
+	}
+	else if(body.type == ';')
+		result->left = parse_file_level_statement();
+	else
+		raise_parsing_unexpected_token("'{' or ';'", body);
 
 	return result;
 }
-/*
-  double
-  evaluate_expression(Ast_Expression *tree)
-  {
-  if(tree->right != 0)
-  {
-  tree->number = evaluate_expression(tree->right);
-  }
-  switch(tree->type)
-  {
-  case type_constant:
-  {
-  return tree->number;
-  }break;
-  case type_add:
-  {
-  tree->number = tree->number + evaluate_expression(tree->left);
-  }break;
-  case type_multiply:
-  {
-  tree->number = tree->number * evaluate_expression(tree->left);
-  }break;
-  case type_divide:
-  {
-  tree->number = tree->number / evaluate_expression(tree->left);
-  }break;
-  default:
-  {
-  LG_FATAL("not implemented");
-  }break;
-  }
-  return tree->number;
-  }
-*/
 
 i32 get_operator_precedence(char op, Token_Iden token)
 {
@@ -1011,134 +1044,11 @@ i32 get_operator_precedence(char op, Token_Iden token)
 	}
 }
 
-// TODO(Vasko): REWRITE
-/*
-  Ast_Expression
-  rpn_to_ast(Type_And_Token *rpn_output, u64 size)
-  {
-
-  Ast_Expression *node_stack;
-  stack_allocate(node_stack, Ast_Expression);
-  stack_set_default_value(node_stack, 0);
-  for(u64 index = 0; index < size; index++)
-  {
-  if(rpn_output[index].type == tok_number)
-  {
-  next_identifier_number = vstd_str_to_double((char *)															 get_identifier(rpn_output[index].iden_index));
-
-  Ast_Expression node = { .type = type_constant, .number = next_identifier_number,
-  .left = NULL, .right = NULL};
-
-  stack_push(node_stack, node);
-  }
-  else
-  {
-  Ast_Expression *node1 = AllocatePermanentMemory(sizeof(Ast_Expression));
-  Ast_Expression *node2 = AllocatePermanentMemory(sizeof(Ast_Expression));
-
-  Ast_Expression tmp1 = stack_pop(node_stack);
-  Ast_Expression tmp2 = stack_pop(node_stack);
-
-  memcpy(node1, &tmp1, sizeof(Ast_Expression));
-  memcpy(node2, &tmp2, sizeof(Ast_Expression));
-  Ast_Expression new_node = { .type = rpn_output[index].type, .left = node1, .right = node2 };
-
-  stack_push(node_stack, new_node);
-  }
-  }
-  arrfree(rpn_output);
-  return stack_pop(node_stack);
-  }
-*/
-/*
-  Ast_Expression
-  tokens_to_ast_expression(Token_Iden *tokens, i16 amount)
-  {
-  Type_And_Token *output_queue = NULL;
-
-  i32 *operator_stack;
-  stack_allocate(operator_stack, i32);
-
-  for(i32 token_index = 0; token_index < amount; ++token_index)
-  {
-  i32 stack_top = stack_peek(operator_stack);
-  if(stack_top == INT32_MIN)
-  {
-  stack_top = -1;
-  }
-  else stack_top = get_operator_precedence(stack_top);
-  if(tokens[token_index].token == tok_number)
-  {
-  type_and_identifier to_put = {.type = (Ast_Type)tok_number, .iden_index = tokens[token_index].identifier_index};
-  arrput(output_queue, to_put);
-  }
-  else if (tokens[token_index].token == tok_identifier)
-  {
-  if(peek_next_token().token == '(')
-  {
-  // function call in expression
-  }
-  else
-  {
-  // variable
-  }
-  }
-  else
-  {
-
-  i32 prec = get_operator_precedence(tokens[token_index].token);
-
-  if (tokens[token_index].token == ')')
-  {
-  i32 op;
-  do
-  {
-  op = stack_pop(operator_stack);
-  if(op != '(')
-  {
-  type_and_identifier to_put = {.type = op, .iden_index = 0};
-  arrput(output_queue, to_put);
-  }
-  } while(op != '(');
-  }
-  else if(prec <= stack_top)
-  {
-  if(stack_top != 2)
-  {
-  type_and_identifier to_put = {.type = stack_pop(operator_stack), .iden_index = 0};
-  arrput(output_queue, to_put);
-  }
-
-  stack_push(operator_stack, tokens[token_index].token);
-  }
-  else
-  {
-  stack_push(operator_stack, tokens[token_index].token);
-  }
-  }
-  }
-
-  i32 op = 0;
-  while(op != INT32_MIN)
-  {
-  op = stack_pop(operator_stack);
-  if(op != INT32_MIN)
-  {
-  type_and_identifier to_put = {.type = op, .iden_index = 0};
-  arrput(output_queue, to_put);
-  }
-  }
-
-  return rpn_to_ast(output_queue, arrlen(output_queue));
-  }
-*/
 void parser_eat(Token expected_token)
 {
 	Token_Iden got_token = get_next_token();
 	if (got_token.type != expected_token)
 	{
-		char str[2] = {0};
-		*(i16 *)str = expected_token;
-		raise_parsing_unexpected_token(str, got_token);
+		raise_parsing_unexpected_token((const char *)token_to_str(expected_token), got_token);
 	}
 }

@@ -14,7 +14,7 @@ typedef enum _log_level
 
 void Log(log_level Level, const char *Format, ...);
 
-void InitializeLogger();
+void initialize_logger();
 
 #define LG_FATAL(Format, ...) Log(LOG_FATAL, Format, __VA_ARGS__)
 #define LG_ERROR(Format, ...) Log(LOG_ERROR, Format, __VA_ARGS__)

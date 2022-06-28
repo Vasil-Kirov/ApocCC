@@ -8,7 +8,7 @@ static const char * const LevelLabels[] = {
 static char LogFile[260];
 
 void
-InitializeLogger()
+initialize_logger()
 {
 	PlatformGetAbsolutePath(LogFile);
 	vstd_strcat(LogFile, "Errors.log");
@@ -40,7 +40,7 @@ Log(log_level Level, const char *Format, ...)
 	
 	if(Level == LOG_FATAL)
 	{
-		PlatformMessageBox("Error", ToPrint);
+//		PlatformMessageBox("Error", ToPrint);
 		PlatformExit(1);
 	}
 }

@@ -17,6 +17,11 @@ struct vstdRect
     int y2;
 };
 
+u64
+str_to_u64(const char *string);
+
+i64
+str_to_i64(const char *string);
 
 size_t
 vstd_strlen(char *str);
@@ -65,7 +70,7 @@ void
 _vstd_IntToStr(int num, char *arr_to_fill);
 
 void
-_vstd_U64ToStr(i64 num, char *arr_to_fill);
+_vstd_U64ToStr(u64 num, char *arr_to_fill);
 
 void
 _vstd_FloatToStr(float num, char *arr_to_fill);

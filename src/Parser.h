@@ -18,19 +18,23 @@ typedef enum
 {
 	type_root         = -100,
 
-	type_struct_init  = -51,
-	type_break        = -50,
-	type_struct       = -49,
-	type_selector     = -48,
-	type_identifier   = -47,
-	type_assignment   = -46,
-	type_func         = -45,
-	type_func_call    = -44,
-	type_for          = -43,
-	type_if           = -42,
-	type_expression   = -41,
-	type_literal      = -40,
-	type_atom         = -39,
+	type_scope_end    = -55,
+	type_scope_start  = -54,
+	type_postfix      = -53,
+	type_index        = -52,
+	type_const_str    = -51,
+	type_struct_init  = -50,
+	type_break        = -49,
+	type_struct       = -48,
+	type_selector     = -47,
+	type_identifier   = -46,
+	type_assignment   = -45,
+	type_func         = -44,
+	type_func_call    = -43,
+	type_for          = -42,
+	type_if           = -41,
+	type_expression   = -40,
+	type_literal      = -39,
 	type_var          = -38,
 	type_return       = -37,
 
@@ -48,20 +52,20 @@ typedef enum
 
 typedef enum
 {
-	invalid_type = 0x000,
+	invalid_type = 0xFFFF,
 	byte1  = 0x001,
 	byte2  = 0x002,
 	byte4  = 0x004,
 	byte8  = 0x008,
-	ubyte  = 0x010,
+	ubyte1 = 0x010,
 	ubyte2 = 0x020,
 	ubyte4 = 0x040,
 	ubyte8 = 0x080,
-	real32 = 0x100,
-	real64 = 0x200,
-	detect = 0x400,
-	empty  = 0x800 // void
-} Var_Representation;
+	real32 = 0x1000,
+	real64 = 0x2000,
+	detect = 0x4000,
+	empty  = 0x8000 // void
+} Var_Size;
 
 
 typedef struct
@@ -76,29 +80,49 @@ typedef struct
 	int count;
 } Ast_Node_Array;
 
-typedef struct
-{
-	Var_Representation representation;
-	b32 is_const;
-	int pointer_count;
-} Var_Type;
-
+typedef struct _Symbol Symbol;
 typedef struct 
 {
 	Token_Iden token;
 	u8 *name;
+	Symbol *symbol_spot;
 } Ast_Identifier;
+
+typedef struct _ast_variable Ast_Variable; 
 
 typedef struct
 {
-    u8 *identifier;
-} Ast_Atom;
+	b32 is_primitive;
+	union
+	{
+		Var_Size prim_repr;
+		struct
+		{
+			Ast_Identifier struct_id;
+			Ast_Variable *maybe_members;
+		};
+	};
+	b32 is_const;
+	int pointer_count;
+} Var_Type;
 
-typedef struct
+typedef struct _ast_variable
 {
 	Var_Type type;
 	Ast_Identifier identifier;
 } Ast_Variable;
+
+typedef struct
+{
+	Ast_Identifier struct_id;
+    Ast_Variable *members; // Note(Vasko): SimpleDArray
+} Ast_Struct;
+
+typedef struct
+{
+    Ast_Identifier identifier;
+} Ast_Atom;
+
 
 typedef struct
 {
@@ -122,17 +146,14 @@ typedef struct
 typedef struct
 {
 	b32 is_declaration;
-	union
-	{
-		Ast_Variable variable;
-		Ast_Identifier identifier;
-	};
-		Ast_Node *expression;
+	Ast_Variable variable;
+	Ast_Node *expression;
+	Token_Iden token;
 } Ast_Assignment;
 
 typedef struct
 {
-	u64 identifier_index;
+	Ast_Identifier identifier;
 	Ast_Node **arguments; // Simple DArray of expressions
 } Ast_Call;
 
@@ -155,14 +176,24 @@ typedef struct
 
 typedef struct
 {
-	Ast_Identifier struct_id;
-    Ast_Variable *members; // Note(Vasko): SimpleDArray
-} Ast_Struct;
+	Ast_Node **expressions; // Note(Vasko): SimpleDArray
+} Ast_Struct_Init;
 
 typedef struct
 {
-	Ast_Node **expressions; // Note(Vasko): SimpleDArray
-} Ast_Struct_Init;
+	Ast_Identifier indentifier;
+	Ast_Node *expression;
+} Ast_Indexing;
+
+typedef struct
+{
+	Token type;
+} Ast_Postfix;
+
+typedef struct
+{
+	Token_Iden token;
+} Scope_Desc;
 
 struct _abstract_syntax_tree
 {
@@ -181,6 +212,9 @@ struct _abstract_syntax_tree
 		Ast_Selector selector;
 		Ast_Struct structure;
 		Ast_Struct_Init struct_init;
+		Ast_Indexing index;
+		Ast_Postfix postfix;
+		Scope_Desc scope_desc;
 	};
 	Ast_Node *left;
 	Ast_Node *right;
@@ -217,10 +251,15 @@ parse_func_call(Token_Iden name_token);
 Ast_Node *
 parse_struct();
 
-Var_Representation
-parse_type(int *pointer_count);
+#include <Analyzer.h>
 
-void
+Var_Type
+parse_type();
+
+b32
+type_is_invalid(Var_Type type);
+
+Ast_Node *
 parse();
 
 Ast_Node *

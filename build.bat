@@ -1,24 +1,37 @@
 @ECHO OFF
+
+SetLocal EnableDelayedExpansion
+
 CLS
 
+goto comment
+
+:comment
 
 IF [%1] == [] (
 	ECHO --- DEBUG ---
-	SET CompilerFlags=/Zi /Od /W3 /DDEBUG /GS
+	
+	SET CompilerFlags=-g -O0 -Wall -DDEBUG
 ) ELSE IF [%1] == [release] (
 	ECHO --- RELEASE ---
-	SET CompilerFlags=/O2 /W4 /DRELEASE /GS-
+
+	SET CompilerFlags=-O3 -Wall -DRELEASE
+) ELSE IF [%1] == [bounds] (
+	ECHO --- BOUNDS ---
+
+	SET CompilerFlags=-O0 -Wall -DDEBUG -fsanitize=address
 ) ELSE (
 	ECHO ERROR: Unkown build type
 	GOTO ERROR
 )
 
-SET LinkerFlags=kernel32.lib user32.lib gdi32.lib
-SET CompilerFlags=%CompilerFlags% -nologo -msse3 -mavx
+
+SET LinkerFlags=-luser32 -lGdi32 -lOpenGL32
+SET CompilerFlags=%CompilerFlags% -ffast-math -mavx
 SET Includes=-I ..\src -I ..\include
 
 PUSHD bin
-clang-cl.exe %CompilerFlags% %Includes% ..\src\Main.c ..\src\Code-Gen.cpp /link %LinkerFlags%
+clang.exe -o apoc.exe %CompilerFlags% %Includes% ..\src\Main.c ..\src\Code-Gen.cpp %LinkerFlags%
 POPD
 
 

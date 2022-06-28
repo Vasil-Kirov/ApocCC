@@ -39,7 +39,7 @@ InitAPMem(ap_memory *Memory, u64 Size, u64 ChunkSize)
 
 
 void
-InitializeMemory()
+initialize_memory()
 {
 	InitAPMem(&MemoryAllocators[PERM_INDEX], PERM_SIZE, PERM_CHUNK);
 	InitAPMem(&MemoryAllocators[COMP_INDEX], COMP_SIZE, PERM_CHUNK);

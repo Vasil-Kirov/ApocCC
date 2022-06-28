@@ -156,7 +156,7 @@ PlatformExit(i32 ExitCode)
 }
 
 void
-PlatformInitialize()
+platform_initialize()
 {
     Instance = GetModuleHandle(0);
 }

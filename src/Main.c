@@ -6,6 +6,7 @@
 #include <Lexer.h>
 #include <Parser.h>
 #include <SimpleDArray.h>
+#include <Analyzer.h>
 
 #include <platform/platform.h>
 
@@ -15,6 +16,7 @@
 #include <Lexer.c>
 #include <Parser.c>
 #include <SimpleDArray.c>
+#include <Analyzer.c>
 
 #ifdef _WIN32
 #include <platform/Win32Platform.c>
@@ -22,14 +24,15 @@
 
 #endif
 
-static b32 will_compile;
+void raise_semantic_error(const char *error_msg, Token_Iden token)
+{
+	LG_FATAL("Semantic error: %s.\nLine: %d\nColumn: %d\nFile: %s", error_msg, token.line, token.column, token.file);
+}
 
 void raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file, u64 line,
 							  u64 column)
 {
-	will_compile = false;
-	LG_FATAL("An error occured while tokenizing:\n%s at line %d, column %d in file: %s", error_msg, line,
-			 column, file);
+	LG_FATAL("%s (%d, %d):\n\tAn error occured while tokenizing: %s", file, line, column, error_msg);
 	/*
 	  while (**at_buffer != ';' && !is_whitespace(**at_buffer))
 	  (*at_buffer)++;	
@@ -38,31 +41,62 @@ void raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file,
 
 void raise_parsing_unexpected_token(const char *expected_tok, Token_Iden token)
 {
-	will_compile = false;
-	LG_ERROR("Found unexpected token at line %d, column %d in file %s. Expected %s",
-			 token.line, token.column, token.file, expected_tok);
-	if (token.type == tok_identifier)
+	if(token.type == tok_identifier)
 	{
-		LG_ERROR("Token: %s", get_identifier(token.identifier_index));
+		LG_ERROR("%s (%d, %d):\n\tFound unexpected token, expected %s", token.file, token.line, token.column, expected_tok);
+		LG_FATAL("Token: %s", get_identifier(token.identifier_index));
 	}
-	LG_FATAL("Exiting...");
+	else
+		LG_FATAL("%s (%d, %d):\n\tFound unexpected token, expected %s", token.file, token.line, token.column, expected_tok);
 }
 
 int main(int argc, char *argv[])
 {
-	InitializeLogger();
-	PlatformInitialize();
-	InitializeMemory();
+	initialize_logger();
+	platform_initialize();
+	initialize_memory();
 	initialize_compiler();
+	initialize_analyzer();
 
-	
-	will_compile = true;
+// NOTE(Vasko): Stack implementation testing
+/*
+	Stack random_stack;
+	random_stack = stack_allocate(int);
+
+	for(int i = 0; i < 10; ++i)
+	{
+		stack_push(random_stack, i);
+		stack_push(random_stack, i);
+	}
+	for(int i = 9; i >= 0; --i)
+	{
+		Assert(stack_pop(random_stack, int) == i);
+		Assert(stack_pop(random_stack, int) == i);
+	}
+
+	for(int i = 0; i < 10; ++i)
+	{
+		stack_push(random_stack, i);
+		stack_pop(random_stack, int);
+		stack_push(random_stack, i);
+	}
+	for(int i = 9; i >= 0; --i)
+	{
+		Assert(stack_pop(random_stack, int) == i);
+	}
+*/
+
+	LG_WARN("Lexing...");
 	lex_file("E:\\C_Projects\\Apocalypse\\Test.apoc");
-	if (!will_compile)
-		return -1;
-	parse();
-	if (!will_compile)
-		return -1;
+	LG_WARN("Done.");
+	
+	LG_WARN("Parsing...");
+	Ast_Node *ast_tree = parse();
+	LG_WARN("Done.");
+	
+	LG_WARN("Performing semantic analysis");
+	analyze(ast_tree);
+	LG_WARN("Done.");
 
 	ResetCompileMemory();
 	return 0;

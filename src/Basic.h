@@ -6,8 +6,7 @@
 
 #include <stdint.h>
 
-// TODO(Vasko): Add logger
-#include <stdio.h>
+
 
 #ifndef __cplusplus
 #define STB_DS_IMPLEMENTATION
@@ -51,11 +50,13 @@ typedef struct _entire_file
 #define GB(b) _GB((i64)b)
 
 
-#define Assert(expression) if(!(expression)) { *(char *)0 = 0; }
+#define Assert(expression) if(!(expression)) { LG_FATAL("%s (%d):\n\tAssertion failed.", __FILE__, __LINE__); }
 #define ADD_LOGGER Assert(false)
 
 #include <Lexer.h>
 
+void
+raise_semantic_error(const char *error_msg, Token_Iden token);
 
 void
 raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file, u64 line, u64 column);

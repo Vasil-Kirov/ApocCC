@@ -185,8 +185,9 @@ void _vstd_IntToStr(int num, char* arr_to_fill)
 }
 
 void
-_vstd_U64ToStr(i64 num, char *arr_to_fill)
+_vstd_U64ToStr(u64 num, char *arr_to_fill)
 {
+
 	if(num == 0)
 	{
 		arr_to_fill[0] = '0';
@@ -200,20 +201,55 @@ _vstd_U64ToStr(i64 num, char *arr_to_fill)
 		CopyToDivide /= 10;
 		num_size++;
 	}
-	if (num < 0)
-	{
-		arr_to_fill[0] = '-';
-		num_size++;
-		num = -num;
-	}
+	Assert(num >= 0);
+
 	arr_to_fill[num_size + 1] = '\0';
 	for (i32 i = num_size; num != 0; --i)
 	{
-        i64 tmp = (i64)(num % 10);
+        u64 tmp = (u64)(num % 10);
 		num /= 10;
 		arr_to_fill[i] = (char)tmp + '0';
 	}
 }
+
+i64
+str_to_i64(const char *string)
+{
+	int negative_mult = 1;
+	i64 result = 0;
+	u8 *scan = (u8 *)string;
+
+	size_t i = 0;
+	if(scan[0] == '-')
+	{
+		negative_mult = -1;
+		i = 1;
+	}
+	for(; scan[i] != 0; ++i)
+	{
+		result = scan[i] - '0';
+		if(scan[i+1] != 0)
+			result *= 10;
+	}
+	return result * negative_mult;
+}
+
+u64
+str_to_u64(const char *string)
+{
+	u64 result = 0;
+	u8 *scan = (u8 *)string;
+
+	Assert(scan[0] != '-')
+	for(size_t i = 0; scan[i] != 0; ++i)
+	{
+		result = scan[i] - '0';
+		if(scan[i+1] != 0)
+			result *= 10;
+	}
+	return result;
+}
+
 
 void
 _vstd_FloatToStr(float num, char *arr_to_fill)

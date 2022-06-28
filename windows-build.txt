@@ -1,0 +1,10 @@
+IF [%1] == [] (
+	ECHO --- DEBUG ---
+	SET CompilerFlags=/Zi /Od /W3 /DDEBUG /GS -fsanitize=address
+) ELSE IF [%1] == [release] (
+	ECHO --- RELEASE ---
+	SET CompilerFlags=/O2 /W4 /DRELEASE /GS-
+) ELSE (
+	ECHO ERROR: Unkown build type
+	GOTO ERROR
+)

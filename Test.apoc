@@ -1,30 +1,41 @@
 
 // This is a comment
 
-// func get_10(string: *i8) -> void
-// {
-//	var: i32 = 10;
-//	-> var;
-// }
+struct String
+{
+	text:* u8;
+	size: u32;
+}
 
 struct Two_Nums
 {
 	num1: i32;
-	num2: i32;
+	num2:* Two_Nums;
 }
+
+func create_str(str:* u8) -> String
+{
+	c := 10;
+	a := a.b.c;
+	len := strlen(str);
+	-> String {str, len};
+}
+
 // no ; after struct declaration
 
 func main(arg_count: i32, args: *i8) -> i32
 {
+	new_str := create_str("words");
+
 	type := Two_Nums {10, 30};
 	if arg_count > 2
 	{
-		nums := 10 + -type.num1;
+		nums := 10 + -type.num2.num1;
 		random_val :: 30;
 		random_int :i32: 40;
 		other_val:* i32 = 100000;
 		final_val:** i32;
-	   //nums: Two_Nums = Two_Nums { 9, get_10("irrelevant") };
+	   //nums: Two_Nums = Two_Nums { 9, get_10("not used") };
 	}
 	-> nums;
 }

@@ -21,7 +21,10 @@ _ISimpleDArrayPush(void **Array, void *Item);
 void
 _ISimpleDArraySkip(void **Array, int Amount);
 
-#define SDHeader(Array) ((DArray_Header *)(( (char *)(Array) ) - sizeof(DArray_Header)))
+void
+_ISimpleDArrayInsert(void **Array, void *Item, int Index);
+
+#define SDHeader(Array) ((DArray_Header *)( ( (char *)(Array) ) - sizeof(DArray_Header)))
 #define SDCreate(Type) (Type *)_ISimpleDArrayCreate(sizeof(Type))
 #define SDCount(Array) SDHeader(Array)->Count
 #define SDPush(Array, Item) _ISimpleDArrayPush((void **)&(Array), (void *)&(Item))

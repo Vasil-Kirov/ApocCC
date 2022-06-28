@@ -11,7 +11,7 @@ enum AllocIndex
 };
 
 void
-InitializeMemory();
+initialize_memory();
 
 void *
 AllocateMemory(u64 Size, i8 Index);

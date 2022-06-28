@@ -71,7 +71,7 @@ void
 PlatformFreeChunk(void *Chunk);
 
 void
-PlatformInitialize();
+platform_initialize();
 
 b32
 PlatformHandleMessages();

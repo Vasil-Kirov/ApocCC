@@ -27,7 +27,10 @@
         "lexer.h": "c",
         "std.h": "c",
         "basic.h": "c",
-        "stb_ds.h": "c"
+        "stb_ds.h": "c",
+        "analyzer.h": "c",
+        "parser.h": "c",
+        "stdarg.h": "c"
     },
     "C_Cpp.vcFormat.newLine.beforeOpenBrace.block": "ignore",
     "C_Cpp.vcFormat.newLine.beforeOpenBrace.function": "newLine",
