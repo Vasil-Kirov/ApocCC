@@ -2,6 +2,7 @@
 #pragma once
 
 #include <Basic.h>
+#include <stdarg.h>
 
 
 

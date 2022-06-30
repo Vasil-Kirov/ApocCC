@@ -4,16 +4,18 @@
             "name": "Linux",
             "includePath": [
                 "${default}",
-                "${workspaceFolder}/engine/src/**",
                 "/usr/include",
-                "/usr/local/include"
+                "/usr/local/include",
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/include"
             ],
             "defines": [
                 "VIPOC_DEBUG",
                 "VIPOC_EXPORT",
                 "VIPOC_LINUX",
                 "__AVX__",
-                "__AVX2__"
+                "__AVX2__",
+                "CM_LINUX"
             ],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c11",

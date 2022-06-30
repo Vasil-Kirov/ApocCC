@@ -30,7 +30,9 @@
         "stb_ds.h": "c",
         "analyzer.h": "c",
         "parser.h": "c",
-        "stdarg.h": "c"
+        "stdarg.h": "c",
+        "log.h": "c",
+        "simpledarray.h": "c"
     },
     "C_Cpp.vcFormat.newLine.beforeOpenBrace.block": "ignore",
     "C_Cpp.vcFormat.newLine.beforeOpenBrace.function": "newLine",

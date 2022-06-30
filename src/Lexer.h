@@ -99,10 +99,10 @@ typedef struct _token
 	char *file;
 } Token_Iden;
 
-Token_Iden get_token(char *file);
+static Token_Iden get_token(char *file);
 
 void initialize_compiler();
-void lex_file(char *path);
+static void lex_file(char *path);
 u8 *get_identifier(u64 index);
 i16 check_for_char_combination(char **buf);
 
@@ -118,7 +118,7 @@ u8 *type_to_str(Ast_Type type);
 
 u64 get_line_tracker();
 
-u8 *get_file_name();
+static u8 *get_file_name();
 
 #ifdef __cplusplus
 }

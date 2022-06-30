@@ -1,3 +1,4 @@
+#include <Basic.h>
 #include <Log.h>
 #include <stdarg.h>
 
@@ -10,9 +11,9 @@ static char LogFile[260];
 void
 initialize_logger()
 {
-	PlatformGetAbsolutePath(LogFile);
+	platform_get_absolute_path(LogFile);
 	vstd_strcat(LogFile, "Errors.log");
-	PlatformWriteFile((void *)"", 0, LogFile, true);
+	platform_write_file((void *)"", 0, LogFile, true);
 }
 
 void
@@ -31,16 +32,16 @@ Log(log_level Level, const char *Format, ...)
 	va_end(Args);
 	
 	vstd_strcat(ToPrint, "\n");
-	PlatformOutputString(ToPrint, Level);
+	platform_output_string(ToPrint, Level);
 	
 	if(Level < LOG_WARN || Level == LOG_DEBUG)
 	{
-		PlatformWriteFile(ToPrint, (i32)vstd_strlen(ToPrint), LogFile, false);
+		platform_write_file(ToPrint, (i32)vstd_strlen(ToPrint), LogFile, false);
 	}
 	
 	if(Level == LOG_FATAL)
 	{
-//		PlatformMessageBox("Error", ToPrint);
-		PlatformExit(1);
+//		platform_message_box("Error", ToPrint);
+		platform_exit(1);
 	}
 }

@@ -12,11 +12,11 @@ typedef struct _platform_config
 	u32 WindowPosX;
 	u32 WindowPosY;
 	const char *Name;
-} platform_config;
+} Platform_Config;
 
 // TODO(Vasko): Implement threading
-typedef void *platform_thread;
-typedef void *platform_state;
+typedef void *Platform_Thread;
+typedef void *Platform_State;
 
 typedef struct _file_info
 {
@@ -34,62 +34,58 @@ typedef struct _Quad
 } Quad;
 
 // Function should take 1 argument of type void pointer
-platform_thread
-PlatformCreateThread(void *Func, void *Args);
+Platform_Thread
+platform_create_thread(void *Func, void *Args);
 
 void
-PlatformWaitForThread(platform_thread Thread);
+platform_wait_for_thread(Platform_Thread Thread);
 
 b32
-PlatformIsThreadOver(platform_thread Thread);
+platform_is_thread_over(Platform_Thread Thread);
 
 void
-PlatformMessageBox(const char *Caption, const char *Text);
+platform_message_box(const char *Caption, const char *Text);
 
 void
-PlatformGetAbsolutePath(char *Out);
+platform_get_absolute_path(char *Out);
 
 void
-PlatformOutputString(char *String, log_level Level);
+platform_output_string(char *String, log_level Level);
 
 void
-PlatformExit(i32 ExitCode);
+platform_exit(i32 ExitCode);
 
 u64
-PlatformGetFileSize(char *Path);
+platform_get_file_size(char *Path);
 
 void *
-PlatformReserveMemory(u64 Size);
+platform_reserve_memory(u64 Size);
 
 void
-PlatformAllocateReserved(void *Address, u64 Size);
+platform_allocate_reserved(void *Address, u64 Size);
 
 void *
-PlatformAllocateChunk(u64 Size);
+platform_allocate_chunk(u64 Size);
 
 void
-PlatformFreeChunk(void *Chunk);
+platform_free_chunk(void *Chunk);
 
 void
 platform_initialize();
 
 b32
-PlatformHandleMessages();
-
-
-void
-PlatformSetWindowSize(Quad NewSize);
+platform_handle_messages();
 
 void
-PlatformQuit();
+platform_set_window_size(Quad NewSize);
 
-platform_state
-PlatformGetState();
-
-b32
-PlatformWriteFile(void *Data, i32 BytesToWrite, const char *Path, b32 Overwrite);
+Platform_State
+platform_get_state();
 
 b32
-PlatformReadEntireFile(void *Data, u64 *Size, char *Path);
+platform_write_file(void *Data, i32 BytesToWrite, const char *Path, b32 Overwrite);
+
+b32
+platform_read_entire_file(void *Data, u64 *Size, char *Path);
 
 #endif //PLATFORM_H

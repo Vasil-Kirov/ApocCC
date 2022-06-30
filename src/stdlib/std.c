@@ -468,7 +468,7 @@ void _vstd_Printf(int FormatSize, const char* Format, ...)
     int BufferSize = FormatString(Buffer, Format, FormatSize, Args);
     
     va_end(Args);
-    PlatformWriteFile(Buffer, BufferSize, "0", false);
+    platform_write_file(Buffer, BufferSize, "0", false);
 }
 
 void _vstd_sPrintf(int FormatSize, char *Buffer, const char* Format, ...)

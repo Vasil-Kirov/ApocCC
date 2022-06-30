@@ -27,8 +27,8 @@ static ap_memory MemoryAllocators[2];
 void
 InitAPMem(ap_memory *Memory, u64 Size, u64 ChunkSize)
 {
-	Memory->Start = PlatformReserveMemory(Size);
-	PlatformAllocateReserved(Memory->Start, ChunkSize);
+	Memory->Start = platform_reserve_memory(Size);
+	platform_allocate_reserved(Memory->Start, ChunkSize);
 	
 	Memory->End = (u8 *)Memory->Start + ChunkSize; 
 	Memory->Current = Memory->Start;
@@ -57,7 +57,7 @@ AllocateMemory(u64 Size, i8 Index)
 			const char *NAME[2] = { "permanent", "debug" };
 			LG_FATAL("MEMORY OVERFLOW when allocating %s memory", NAME[Index]);
 		}
-		PlatformAllocateReserved((u8 *)MemoryAllocators[Index].Start + MemoryAllocators[Index].ChunkIndex * MemoryAllocators[Index].ChunkSize, MemoryAllocators[Index].ChunkSize);
+		platform_allocate_reserved((u8 *)MemoryAllocators[Index].Start + MemoryAllocators[Index].ChunkIndex * MemoryAllocators[Index].ChunkSize, MemoryAllocators[Index].ChunkSize);
 		MemoryAllocators[Index].ChunkIndex++;
 		MemoryAllocators[Index].End = (u8 *)MemoryAllocators[Index].End + MemoryAllocators[Index].ChunkSize;
 	}

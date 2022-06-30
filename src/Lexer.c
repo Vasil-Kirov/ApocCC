@@ -163,10 +163,10 @@ lex_file(char *path)
 	
 	entire_file file_buffer;
 	
-	file_buffer.size = PlatformGetFileSize(path)+1;
+	file_buffer.size = platform_get_file_size(path)+1;
 	file_buffer.data = AllocateCompileMemory(file_buffer.size);
 	memset(file_buffer.data, 0, file_buffer.size);
-	if(PlatformReadEntireFile(file_buffer.data, &file_buffer.size, path) == false)
+	if(platform_read_entire_file(file_buffer.data, &file_buffer.size, path) == false)
 	{
 		LG_FATAL("Couldn't find input file %s", path);
 	}

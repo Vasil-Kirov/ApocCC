@@ -6,7 +6,7 @@ void *
 _ISimpleDArrayCreate(size_t TypeSize)
 {
 	u64 CurrentlyCommited = TypeSize * 2048 + sizeof(DArray_Header);
-	void *Result = PlatformAllocateChunk(CurrentlyCommited);
+	void *Result = platform_allocate_chunk(CurrentlyCommited);
 	DArray_Header *Header = (DArray_Header *)Result;
 	Header->Count = 0;
 	Header->CurrentlyAllocated = CurrentlyCommited - sizeof(DArray_Header);
@@ -24,7 +24,7 @@ _ISimpleDArrayPush(void **Array, void *Item)
 	   SDHeader(ArrayPtr)->CurrentlyAllocated)
 	{
 		u64 NewSize = (u64)(SDHeader(ArrayPtr)->CurrentlyAllocated * 1.5);
-		void *NewPtr = PlatformAllocateChunk(NewSize);
+		void *NewPtr = platform_allocate_chunk(NewSize);
 		if(NewPtr == 0) LG_FATAL("Failed to allocate needed memory");
 		
 		SDHeader(ArrayPtr)->CurrentlyAllocated = NewSize;
@@ -33,7 +33,7 @@ _ISimpleDArrayPush(void **Array, void *Item)
 		memcpy(NewPtr, MemoryStartPointer,
 			   SDHeader(ArrayPtr)->CurrentlyUsed + sizeof(DArray_Header));
 		
-		PlatformFreeChunk(*Array);
+		platform_free_chunk(*Array);
 		*Array = (char *)NewPtr + sizeof(DArray_Header);
 		ArrayPtr = *Array;	
 	}
@@ -55,7 +55,7 @@ _ISimpleDArrayInsert(void **Array, void *Item, int Index)
 	if(Offset > SDHeader(ArrayPtr)->CurrentlyAllocated)
 	{
 		u64 NewSize = (u64)(SDHeader(ArrayPtr)->CurrentlyAllocated * 1.5);
-		void *NewPtr = PlatformAllocateChunk(NewSize);
+		void *NewPtr = platform_allocate_chunk(NewSize);
 		if(NewPtr == 0) LG_FATAL("Failed to allocate needed memory");
 		
 		SDHeader(ArrayPtr)->CurrentlyAllocated = NewSize;
@@ -64,7 +64,7 @@ _ISimpleDArrayInsert(void **Array, void *Item, int Index)
 		memcpy(NewPtr, MemoryStartPointer,
 			   SDHeader(ArrayPtr)->CurrentlyUsed + sizeof(DArray_Header));
 		
-		PlatformFreeChunk(*Array);
+		platform_free_chunk(*Array);
 		*Array = (char *)NewPtr + sizeof(DArray_Header);
 		ArrayPtr = *Array;	
 	}
@@ -83,7 +83,7 @@ _ISimpleDArraySkip(void **Array, int Amount)
 	   SDHeader(ArrayPtr)->CurrentlyAllocated)
 	{
 		u64 NewSize = (u64)(SDHeader(ArrayPtr)->CurrentlyAllocated * 1.5);
-		void *NewPtr = PlatformAllocateChunk(NewSize);
+		void *NewPtr = platform_allocate_chunk(NewSize);
 		if(NewPtr == 0) LG_FATAL("Failed to allocate needed memory");
 		
 		SDHeader(ArrayPtr)->CurrentlyAllocated = NewSize;
@@ -92,7 +92,7 @@ _ISimpleDArraySkip(void **Array, int Amount)
 		memcpy(NewPtr, MemoryStartPointer,
 			   SDHeader(ArrayPtr)->CurrentlyUsed + sizeof(DArray_Header));
 		
-		PlatformFreeChunk(*Array);
+		platform_free_chunk(*Array);
 		*Array = (char *)NewPtr + sizeof(DArray_Header);
 		ArrayPtr = *Array;
 	}

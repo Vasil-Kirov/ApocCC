@@ -1,21 +1,13 @@
-#if defined(_WIN32)
+#if defined(CM_LINUX)
+
 
 #include <platform/platform.h>
-#include <Windows.h>
-
-
-static HINSTANCE Instance;
-static HWND Window;
-static RAWINPUT *RawInputMemory;
 
 
 
 
-LRESULT WINAPI
-WindowProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam);
 
-void
-RegisterRawInput();
+
 
 void
 platform_get_absolute_path(char *Out)
@@ -297,5 +289,6 @@ WindowProc(HWND ThisWindow, UINT Message, WPARAM wParam, LPARAM lParam)
 	}
 	return 0;
 }
+
 
 #endif
