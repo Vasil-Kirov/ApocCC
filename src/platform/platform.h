@@ -25,7 +25,7 @@ typedef struct _file_info
 	i8 Extension[260];
 	i16 ExtensionSize;
 	b32 isValid;
-} file_info;
+} File_Info;
 
 typedef struct _Quad
 {
