@@ -84,6 +84,9 @@ int main(int argc, char *argv[])
 		LG_FATAL("apoc [file]");	
 	}
 
+	LG_INFO("test");
+	LG_DEBUG("test");
+	LG_ERROR("test");
 	LG_WARN("Lexing...");
 	lex_file(argv[1]);
 	LG_WARN("Done.");
