@@ -1,0 +1,6 @@
+[DEBUG] test
+[ERROR] test
+[FATAL] Semantic error: Use of undeclared symbol.
+Line: 19
+Column: 7
+File: Test.apoc

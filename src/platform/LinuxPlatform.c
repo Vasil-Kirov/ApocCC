@@ -92,7 +92,7 @@ platform_write_file(void *data, i32 bytes_to_write, const char *path, b32 overwr
 		{
 			delete_file(path);
 		}
-		file = open(path, O_APPEND | O_CREAT);
+		file = open(path, O_APPEND | O_CREAT | O_RDWR);
 	}
 	
 	i32 written = write(file, data, bytes_to_write);
