@@ -28,6 +28,6 @@ _ISimpleDArrayInsert(void **Array, void *Item, int Index);
 #define SDCreate(Type) (Type *)_ISimpleDArrayCreate(sizeof(Type))
 #define SDCount(Array) SDHeader(Array)->Count
 #define SDPush(Array, Item) _ISimpleDArrayPush((void **)&(Array), (void *)&(Item))
-#define SDFree(Array) PlatformFreeChunk(Array);
+#define SDFree(Array) platform_free_chunk(Array);
 
 #endif //_SIMPLE_D_ARRAY_H

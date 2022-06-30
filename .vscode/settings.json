@@ -32,7 +32,10 @@
         "parser.h": "c",
         "stdarg.h": "c",
         "log.h": "c",
-        "simpledarray.h": "c"
+        "simpledarray.h": "c",
+        "sched.h": "c",
+        "*.tcc": "c",
+        "cerrno": "c"
     },
     "C_Cpp.vcFormat.newLine.beforeOpenBrace.block": "ignore",
     "C_Cpp.vcFormat.newLine.beforeOpenBrace.function": "newLine",

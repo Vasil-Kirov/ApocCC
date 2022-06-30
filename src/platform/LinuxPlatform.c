@@ -2,28 +2,35 @@
 
 
 #include <platform/platform.h>
+#include <Memory.h>
+#include <stdlib/std.h>
+#include <linux/limits.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 
-
-
-
-
+#include <pthread.h>
+#include <errno.h>
 
 
 void
 platform_get_absolute_path(char *Out)
 {
-	if (!GetModuleFileNameA(NULL, Out, MAX_PATH))
+	readlink("/proc/self/exe", Out, PATH_MAX);
+	if (Out[0] == 0)
 	{
 		// This can't be an error since it will result in an infinite loop
 		// as errors and fatal errors call this function
 		LG_WARN("Failed to get directory location, file path might be too long");
 	}
+
 	size_t Size = vstd_strlen(Out);
 	
 	// NOTE(Vasko): Remove exe file name
 	for(size_t i = Size-1; i >= 0; --i)
 	{
-		if(Out[i] == '\\')
+		if(Out[i] == '/')
 		{
 			Out[i+1] = '\0';
 			break;
@@ -31,263 +38,198 @@ platform_get_absolute_path(char *Out)
 	}
 }
 
+// TODO(Vasko): Implement
+/*
 void
 platform_message_box(const char *Caption, const char *Text)
 {
 	MessageBoxA(Window, Text, Caption, MB_OK);
 }
+*/
 
 b32
-platform_write_file(void *Data, i32 BytesToWrite, const char *Path, b32 Overwrite)
+delete_file(const char *file)
 {
-	b32 IsSTD = false;
-    HANDLE File;
-    if(Path[1] == '\0')
-    {
-        switch(Path[0])
-        {
-            case '0':
-            {
-                File = GetStdHandle((DWORD)-11);
-				IsSTD = true;
-            }break;
-            case '1':
-            {
-                File = GetStdHandle((DWORD)-12);
-				IsSTD = true;
-            }break;
-            default:
+	struct stat file_info;
+	
+	if (lstat(file, &file_info) < 0)
+		return false;
+	
+	if (S_ISDIR(file_info.st_mode))
+		return (rmdir(file));
+	
+	return (unlink(file));
+}
+
+b32
+platform_write_file(void *data, i32 bytes_to_write, const char *path, b32 overwrite)
+{
+	b32 is_std = false;
+	int file;
+	if(path[1] == '\0')
+	{
+		switch(path[0])
+		{
+			case '0':
+			{
+				file = 1;
+				is_std = true;
+			}break;
+			case '1':
+			{
+				file = 2;
+				is_std = true;
+			}break;
+			default:
 			{
 				return false;
 			}break;
-        }
-    }
-    else
-    {
-		if(Overwrite)
-		{
-			DeleteFile(Path);
 		}
-		File = CreateFileA(Path, FILE_GENERIC_WRITE , 0, 0,
-                           OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL,
-                           0);
-		// NOTE(Vasko): FILE_GENERIC_WRITE should do that by itself
-		// but it doesn't
-		SetFilePointer(File, 0, 0, FILE_END);
-    }
-    
-    DWORD BytesWritten;
-    WriteFile(File, Data, BytesToWrite, &BytesWritten, 0);
-	if(!IsSTD) CloseHandle(File);
-	if(BytesWritten == 0) return false;
-    return true;
+	}
+	else
+	{
+		if(overwrite)
+		{
+			delete_file(path);
+		}
+		file = open(path, O_APPEND | O_CREAT);
+	}
+	
+	i32 written = write(file, data, bytes_to_write);
+	if(!is_std) close(file);
+	if(written != bytes_to_write) return false;
+	return true;
 }
 
 Platform_Thread
-platform_create_thread(void *Func, void *Args)
+platform_create_thread(void *func, void *args)
 {
-	return CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Func, Args, 0, 0);
+	pthread_t thread_id; 
+	pthread_create(&thread_id, NULL, func, args);
+	Platform_Thread result = AllocatePermanentMemory(sizeof(pthread_t));
+	*(pthread_t *)result = thread_id;
+	return result;
 }
 
 void
-platform_wait_for_thread(Platform_Thread Thread)
+platform_wait_for_thread(Platform_Thread thread)
 {
-	WaitForSingleObject(Thread, INFINITE);
+	pthread_join(*(pthread_t *)thread, NULL);
 }
 
-b32
-platform_is_thread_over(Platform_Thread Thread)
-{
-	DWORD Result = WaitForSingleObject(Thread, 0);
-	return Result == WAIT_OBJECT_0;
-}
 
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
 void
-platform_output_string(char *String, log_level Level)
+platform_output_string(char *string, log_level level)
 {
-    //		MAGIC NUMBERS! (ored rgb)
-	//		13 = r | b | intense
-	//		4 = r
-	//		6 = r | g
-	//		8 = intense
-    u8 Colors[] = {13, 4, 6, FOREGROUND_GREEN | FOREGROUND_INTENSITY, 8};
-	HANDLE STDOUT = GetStdHandle(STD_OUTPUT_HANDLE);
-	//		FATAL = 0
-	//		ERROR = 1
-	//		WARN = 2
-	//		INFO = 4
+	const char *colors[] = {KMAG, KRED, KYEL, KGRN, KWHT};
+	const char *color = colors[level];
+
+	int stdout = 1;
 	
-	u16 Attrib = Colors[Level];
-	SetConsoleTextAttribute(STDOUT, Attrib);
-	OutputDebugString(String);
-	unsigned long written = 0;
-	WriteFile(STDOUT, String, (DWORD)vstd_strlen((char *)String), &written, 0);
-	SetConsoleTextAttribute(STDOUT, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
-}
-
-void
-platform_quit()
-{
-	PostQuitMessage(0);
-}
-
-void
-platform_set_window_size(Quad NewSize)
-{
-	RECT Client = {0};
-	GetClientRect(Window, &Client);
+	size_t str_size = vstd_strlen(string);
 	
-	SetWindowPos(Window, HWND_TOP, Client.left, Client.top, NewSize.Width, NewSize.Height, SWP_SHOWWINDOW);
-}
+	char print_str[str_size + sizeof(KWHT)];
+	memset(print_str, 0, str_size + sizeof(KWHT));
+	vstd_sprintf(print_str, "%s%s", color, string);
 
+	ssize_t written = write(stdout, print_str, str_size + sizeof(KWHT));
+	if(written < str_size + sizeof(KNRM))
+	{
+		LG_WARN("Failed to write the whole message to stdout");
+	}
+}
 
 void
 platform_exit(i32 ExitCode)
 {
-	ExitProcess(ExitCode);
+	exit(ExitCode);
 }
 
 void
 platform_initialize()
 {
-    Instance = GetModuleHandle(0);
-}
-
-
-Platform_State
-platform_get_state()
-{
-	return (Platform_State)Window;
-}
-
-static i32 ShortcutTimer;
-
-b32
-platform_handle_messages()
-{
-	MSG Message;
-	ZeroMemory(&Message, sizeof(Message));
-	while(PeekMessage(&Message, 0, 0U, 0U, PM_REMOVE))
-	{
-		TranslateMessage(&Message);
-		DispatchMessage(&Message);
-		if(Message.message == WM_QUIT)
-		{
-			return false;
-		}
-		
-		if(ShortcutTimer > 0)
-		{
-			ShortcutTimer--;
-		}
-	}
 	
-	return true;
 }
 
+
 void *
-platform_reserve_memory(u64 Size)
+platform_reserve_memory(u64 size)
 {
-	return VirtualAlloc(NULL, Size, MEM_RESERVE, PAGE_READWRITE);
+	void *result = mmap(NULL, size + sizeof(i64), PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+	if(result == MAP_FAILED)
+	{
+		LG_ERROR("Mmap failed to allocate memory: %d", errno);
+		return NULL;
+	}
+	*(u64 *)result = size;
+
+	return (u8 *)result + sizeof(i64);
 }
 
 void
-platform_allocate_reserved(void *Address, u64 Size)
+platform_allocate_reserved(void *address, u64 size)
 {
-	VirtualAlloc(Address, Size, MEM_COMMIT, PAGE_READWRITE);
+	mprotect((u8 *)address - sizeof(i64), size, PROT_READ | PROT_WRITE);
 }
 
 void *
-platform_allocate_chunk(u64 Size)
+platform_allocate_chunk(u64 size)
 {
-	return VirtualAlloc(NULL, Size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	void *result = mmap(NULL, size + sizeof(i64), PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, 0, 0);
+	if(result == MAP_FAILED)
+	{
+		LG_ERROR("Mmap failed to allocate memory: %d", errno);
+		return NULL;
+	}
+	*(u64 *)result = size;
+
+	return (u8 *)result + sizeof(i64);
 }
 
 void
-platform_free_chunk(void *Chunk)
+platform_free_chunk(void *address)
 {
-	VirtualFree(Chunk, 0, MEM_RELEASE);
+	u64 size = *(u64 *)((u8 *)address - sizeof(i64));
+	munmap((u8 *)address - sizeof(i64), size);
 }
 
 u64
-platform_get_file_size(char *Path)
+platform_get_file_size(char *path)
 {
-	HANDLE File = CreateFile(Path, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	
-	
-	if(File == INVALID_HANDLE_VALUE) return 0;
-	
-	
-	LARGE_INTEGER Size;
-	GetFileSizeEx(File, &Size);
-	CloseHandle(File);
-	
-	return Size.QuadPart;
+	struct stat file_info = {};
+	stat(path, &file_info);
+
+	return file_info.st_size;
 }
 
 b32
-platform_read_entire_file(void *Data, u64 *Size, char *Path)
+platform_read_entire_file(void *data, u64 *size, char *path)
 {
-	HANDLE File = CreateFile(Path, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(File == NULL) 
+	int file = open(path, O_RDONLY);
+	if(file == -1)
 	{
+		LG_ERROR("File %s doesn't exit platform_read_entire_file()", path);
 		return false;
 	}
-	LARGE_INTEGER FileSize;
-	GetFileSizeEx(File, &FileSize);
-	*Size = FileSize.QuadPart;
-	
-	u64 HaveRead = 0;
-	while(FileSize.QuadPart > 0)
+
+	struct stat file_info = {};
+	stat(path, &file_info);
+
+	if(read(file, data, file_info.st_size) == -1)
 	{
-		DWORD ReadThisLoop;
-		DWORD ToRead = (DWORD)FileSize.QuadPart;
-		if(FileSize.QuadPart > UINT32_MAX)
-		{
-			ToRead = UINT32_MAX;
-		}
-		ReadFile(File, Data+HaveRead, ToRead, &ReadThisLoop, NULL);
-		if(ReadThisLoop == 0)
-		{
-			CloseHandle(File);
-			return false;
-		}
-		FileSize.QuadPart -= ReadThisLoop;
-		HaveRead += ReadThisLoop;
+		LG_ERROR("Couldn't read file %s", path);
+		return false;
 	}
-	
-	CloseHandle(File);
+	*size = file_info.st_size;
 	return true;
-}
-
-
-LRESULT WINAPI
-WindowProc(HWND ThisWindow, UINT Message, WPARAM wParam, LPARAM lParam)
-{
-	
-	switch (Message)
-	{
-		
-		// NOTE(Vasko): might wanna look into this more
-#if 0
-		case WM_SYSCOMMAND:
-		{
-			if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
-				return 0;
-		}break;
-#endif
-		
-		case WM_DESTROY:
-		{
-			PostQuitMessage(0);
-		}break;
-		
-		default:
-		{
-			return DefWindowProc(ThisWindow, Message, wParam, lParam);
-		}
-	}
-	return 0;
 }
 
 

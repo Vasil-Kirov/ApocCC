@@ -145,7 +145,7 @@ parse()
 		raise_parsing_unexpected_token("end of file", last_read_token);
 	}
 	pop_scope((Token_Iden){.file = info_tok.file, .column = 1, .line = get_line_tracker()});
-	if(is_scope_stack_empty())
+	if(!is_scope_stack_empty())
 		raise_semantic_error("not all scopes closed by eof", (Token_Iden){.file = info_tok.file, .column = 1, .line = get_line_tracker()});
 	return root;
 }

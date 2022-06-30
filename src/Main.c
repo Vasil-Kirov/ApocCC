@@ -7,6 +7,7 @@
 #include <Parser.h>
 #include <SimpleDArray.h>
 #include <Analyzer.h>
+#include <Stack.h>
 
 #include <platform/platform.h>
 
@@ -18,10 +19,30 @@
 #include <SimpleDArray.c>
 #include <Analyzer.c>
 
+
+// I don't like linux
+#if defined(DEBUG)
+extern inline Stack _stack_allocate(int type_size);
+
+extern inline void _stack_push(Stack *s, void *item);
+
+extern inline void *_stack_pop(Stack *s);
+
+extern inline void *_stack_peek(Stack *s);
+
+extern inline b32 is_alpha(char c);
+extern inline b32 is_alnum(char c);
+extern inline b32 is_non_special_char(char c);
+extern inline b32 is_number(char c);
+extern inline b32 is_number(char c);
+extern inline b32 is_whitespace(char c);
+extern inline b32 is_alnum(char c);
+#endif
+
 #ifdef _WIN32
 #include <platform/Win32Platform.c>
 #else
-
+#include <platform/LinuxPlatform.c>
 #endif
 
 void raise_semantic_error(const char *error_msg, Token_Iden token)
@@ -58,36 +79,13 @@ int main(int argc, char *argv[])
 	initialize_compiler();
 	initialize_analyzer();
 
-// NOTE(Vasko): Stack implementation testing
-/*
-	Stack random_stack;
-	random_stack = stack_allocate(int);
-
-	for(int i = 0; i < 10; ++i)
+	if(argc < 2)
 	{
-		stack_push(random_stack, i);
-		stack_push(random_stack, i);
+		LG_FATAL("apoc [file]");	
 	}
-	for(int i = 9; i >= 0; --i)
-	{
-		Assert(stack_pop(random_stack, int) == i);
-		Assert(stack_pop(random_stack, int) == i);
-	}
-
-	for(int i = 0; i < 10; ++i)
-	{
-		stack_push(random_stack, i);
-		stack_pop(random_stack, int);
-		stack_push(random_stack, i);
-	}
-	for(int i = 9; i >= 0; --i)
-	{
-		Assert(stack_pop(random_stack, int) == i);
-	}
-*/
 
 	LG_WARN("Lexing...");
-	lex_file("E:\\C_Projects\\Apocalypse\\Test.apoc");
+	lex_file(argv[1]);
 	LG_WARN("Done.");
 	
 	LG_WARN("Parsing...");

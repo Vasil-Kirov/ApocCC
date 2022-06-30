@@ -152,7 +152,7 @@ analyze(Ast_Node *ast_tree)
 		LG_INFO("Symbol: %s\n\n", symbol.identifier);
 	}
 	*/
-	Scope_Info scope_info = {.file = get_file_name(), .start_line = 1};
+	Scope_Info scope_info = {.file = (const char *)get_file_name(), .start_line = 1};
 	push_scope(scope_info);
 	analyze_file_level_statement(ast_tree);
 	

@@ -5,7 +5,7 @@
             "name": "(Windows) Launch",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/game.exe",
+            "program": "${workspaceFolder}/bin/apoc.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin/",
@@ -14,10 +14,10 @@
         },
         {
             "name": "(Linux) Launch",
-            "type": "cppvsdbg",
+            "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/game",
-            "args": [],
+            "program": "${workspaceFolder}/bin/apoc",
+            "args": ["../Test.apoc"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin/",
             "environment": []

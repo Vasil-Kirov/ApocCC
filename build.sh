@@ -15,11 +15,13 @@ compile(){
         echo "ERROR: Unkown build type $1"
         return;
     fi
+
+    export LinkerFlags="-lpthread"
     export Includes="--include-directory ../src --include-directory ../include"
-    export CompilerFlags="$CompilerFlags -ffast-math -mavx -DCM_LINUX"
+    export CompilerFlags="$CompilerFlags -ffast-math -mavx -DCM_LINUX -std=gnu11"
+    
     pushd bin
-    pwd
-    clang -o apoc $CompilerFlags $Includes ../src/Main.c ../src/Code-Gen.cpp
+    clang -o apoc $CompilerFlags $Includes ../src/Main.c $LinkerFlags
     popd
 
     return;

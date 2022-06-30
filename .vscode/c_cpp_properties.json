@@ -20,6 +20,9 @@
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c11",
             "cppStandard": "c++11",
+            "compilerArgs": [
+                "-std=gnu11"
+            ],
             "intelliSenseMode": "clang-x64"
         },
         {
