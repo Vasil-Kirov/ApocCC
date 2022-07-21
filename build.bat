@@ -25,13 +25,13 @@ IF [%1] == [] (
 	GOTO ERROR
 )
 
-
+SET LLVM_INCLUDE=-I"E:\GitClone\llvm-project\llvm\include"
 SET LinkerFlags=-luser32 -lGdi32 -lOpenGL32
 SET CompilerFlags=%CompilerFlags% -ffast-math -mavx
 SET Includes=-I ..\src -I ..\include
 
 PUSHD bin
-clang.exe -o apoc.exe %CompilerFlags% %Includes% ..\src\Main.c ..\src\Code-Gen.cpp %LinkerFlags%
+clang.exe -o apoc.exe %CompilerFlags% %Includes% %LLVM_INCLUDE% ..\src\Main.c ..\src\Code-Gen.cpp %LinkerFlags%
 POPD
 
 

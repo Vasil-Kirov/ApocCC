@@ -81,6 +81,7 @@ typedef enum
 		tok_rshift_equals = -39,
 
 		tok_break = -40,
+		tok_else = -41,
 
 	} Token;
 
@@ -92,18 +93,17 @@ typedef struct _str_hash_table
 
 typedef struct _token
 {
-	u64 identifier_index;
+	u8 *identifier;
 	Token type;
 	u64 line;
 	u64 column;
 	char *file;
 } Token_Iden;
 
-static Token_Iden get_token(char *file);
+Token_Iden get_token(char *file);
 
 void initialize_compiler();
-static void lex_file(char *path);
-u8 *get_identifier(u64 index);
+void lex_file(char *path);
 i16 check_for_char_combination(char **buf);
 
 Token_Iden get_prev_token();
@@ -118,7 +118,7 @@ u8 *type_to_str(Ast_Type type);
 
 u64 get_line_tracker();
 
-static u8 *get_file_name();
+u8 *get_file_name();
 
 #ifdef __cplusplus
 }

@@ -41,7 +41,7 @@ command_list = {
 		.footer_panel = false,
 		.save_dirty_files = true,
 		.cursor_at_end = false,
-		.cmd = { { "bin\Main.exe", .os = "win" } }
+		.cmd = { { "bin\apoc.exe Test.apoc", .os = "win" } }
 	},
 	{
 		.name = "visual_studio",
@@ -49,7 +49,7 @@ command_list = {
 		.footer_panel = false,
 		.save_dirty_files = false,
 		.cursor_at_end = false,
-		.cmd = { { "devenv bin\Main.exe", .os = "win" } }
+		.cmd = { { "devenv bin\apoc.exe", .os = "win" } }
 	},
 };
 

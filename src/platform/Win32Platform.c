@@ -250,9 +250,9 @@ platform_read_entire_file(void *Data, u64 *Size, char *Path)
 	{
 		DWORD ReadThisLoop;
 		DWORD ToRead = (DWORD)FileSize.QuadPart;
-		if(FileSize.QuadPart > UINT32_MAX)
+		if(FileSize.QuadPart > 0xffffffff)
 		{
-			ToRead = UINT32_MAX;
+			ToRead = 0xffffffff;
 		}
 		ReadFile(File, Data+HaveRead, ToRead, &ReadThisLoop, NULL);
 		if(ReadThisLoop == 0)

@@ -7,16 +7,12 @@ static Type_Table *type_table;
 static Stack scope_stack;
 static Scope_Info *scopes;
 
+
 void
 initialize_analyzer()
 {
-	Var_Type default_type = {
-		.is_const = false,
-		.is_primitive = true,
-		.pointer_count = 0,
-		.prim_repr = invalid_type
-	};
-	shdefault(type_table, default_type);
+	Type_Info invalid = {.type = T_INVALID};
+	shdefault(type_table, invalid);
 	scopes = SDCreate(Scope_Info);
 	scope_stack = stack_allocate(Scope_Info);
 }
@@ -24,56 +20,58 @@ initialize_analyzer()
 void
 add_primitive_type(const char *name, Var_Size size)
 {
-	Var_Type type = {
-		.is_primitive = true,
-		.prim_repr = size, 
+	Type type = T_INVALID;
+	if(size < real32)
+		type = T_INTEGER;
+	else if(size < empty)
+		type = T_FLOAT;
+	else if(size == empty)
+		type = T_VOID;
+	
+	Assert(type != T_INVALID);
+	
+	Type_Info type_info = {
+		.type = type,
+		.primitive.size = size,
 	};
 
 	if(shgeti(type_table, name) == -1)
 	{
-		shput(type_table, name, type);
+		shput(type_table, name, type_info);
 	}
 }
 
 void
-add_type(Ast_Struct structure)
+add_type(Ast_Node *structure)
 {
-	Var_Type type = {
-		.is_const = false,
-		.is_primitive = false,
-		.pointer_count = 0,
-		.struct_id = structure.struct_id,
-		.maybe_members = structure.members,
+	Assert(structure->type == type_struct);
+	Type_Info type_info = {
+		.type = T_STRUCT,
+		.structure = structure
 	};
 	
-	if(shgeti(type_table, structure.struct_id.name) != -1)
+	Ast_Struct s = structure->structure;
+	for(int i = 0; i < s.member_count; ++i)
 	{
-		raise_semantic_error("Redifinition of symbol", structure.struct_id.token);
+		Symbol member_symbol = {.tag = S_STRUCT_MEMBER, .s_member.index = i,
+			.identifier = s.members[i].identifier.name, .type = s.members[i].type,
+			.node = structure};
+		add_symbol(member_symbol, &s.members[i].identifier);
+		
 	}
-	shput(type_table, structure.struct_id.name, type);
-}
-
-void
-update_type(Ast_Struct structure)
-{
-	Var_Type type = {
-		.is_const = false,
-		.is_primitive = false,
-		.pointer_count = 0,
-		.struct_id = structure.struct_id,
-	};
 	
-	if(shgeti(type_table, structure.struct_id.name) == -1)
+	if(shgeti(type_table, structure->structure.struct_id.name) != -1)
 	{
-		raise_semantic_error("Updating non-existant symbol?", structure.struct_id.token);
+		raise_semantic_error("Redifinition of symbol", structure->structure.struct_id.token);
 	}
-	shput(type_table, structure.struct_id.name, type);
+	shput(type_table, structure->structure.struct_id.name, type_info);
 }
 
-Var_Type
+Type_Info
 get_type(u8 *name)
 {
-	Var_Type got = shget(type_table, name);
+	Type_Info got = shget(type_table, name);
+	got.identifier = name;
 	return got;
 }
 
@@ -172,10 +170,17 @@ analyze_file_level_statement(Ast_Node *node)
 		case type_func:
 		{
 			verify_func(node);
-			analyze_file_level_statement(node->left);
-		}
+			Ast_Node *next_node = NULL;
+			if(node->left->type == type_scope_start)
+				next_node = node->left->left;
+			else
+				next_node = node->left;
+			analyze_file_level_statement(next_node);
+		}break;
 		default:
 		{
+			LG_WARN("File level statement of type %s (id: %d) not analyzed",
+					type_to_str(node->type), node->type);
 			if(node->left != NULL)
 				analyze_file_level_statement(node->left);
 		}
@@ -184,24 +189,41 @@ analyze_file_level_statement(Ast_Node *node)
 }
 
 void
-verify_symbols()
-{
-
-}
-
-void
 verify_func(Ast_Node *node)
 {
+	Assert(node->function.type.identifier);
+	Token_Iden type_error_token = node->function.type.token;
+	node->function.type = get_type(node->function.type.identifier);
+	if(node->function.type.type == T_INVALID)
+	{
+		char error_msg[1024] = {};
+		vstd_sprintf(error_msg, "Undeclared type [%s]", node->function.type.identifier);
+		raise_semantic_error(error_msg, type_error_token);
+	}
+	
 	if(node->left->type == type_scope_start)
-		verify_func_level_statement(node->left->right);
+	{
+		Token_Iden scope_tok = node->left->scope_desc.token;
+		Scope_Info new_scope = {.file = scope_tok.file, .start_line = scope_tok.line};
+		push_scope(new_scope);
+		
+		verify_func_level_statement(node->left->right, node);
+	}	
 }
 
 void
-verify_func_level_statement(Ast_Node *node)
+verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 {
 	if(node == NULL) return;
 	switch(node->type)
 	{
+		case type_var:
+		{
+			Ast_Variable var = node->variable;
+			Symbol symbol = {.identifier = var.identifier.name,
+				.type =var.type, .node = node, .token = var.identifier.token};
+			add_symbol(symbol, &node->variable.identifier);
+		}break;
 		case type_assignment:
 		{
 			verify_assignment(node);
@@ -216,13 +238,31 @@ verify_func_level_statement(Ast_Node *node)
 			Token_Iden scope_tok = node->scope_desc.token;
 			Scope_Info new_scope = {.file = scope_tok.file, .start_line = scope_tok.line};
 			push_scope(new_scope);
+			verify_func_level_statement(node->right, func_node);
+		} break;
+		case type_return:
+		{
+			Type_Info return_type = get_expression_type(node->right, node->holder.token);
+			
+			if(!check_type_compatibility(func_node->function.type,
+											return_type))
+			{
+				char error[4096 * 3] = {};
+				vstd_sprintf(error, "return type of %s is incompatible with"
+							 " function %s's return type %s",
+							 var_type_to_name(return_type),
+							 func_node->function.identifier.name,
+							 var_type_to_name(func_node->function.type));
+				raise_semantic_error(error, node->holder.token);
+			}
 		} break;
 		default:
 		{
-			LG_WARN("Type not handled: %s (id: %d)", type_to_str(node->type), node->type);
+			LG_WARN("Func level statement of type %s (id: %d) not analyzed",
+					type_to_str(node->type), node->type);
 		}
 	}
-	verify_func_level_statement(node->left);
+	verify_func_level_statement(node->left, func_node);
 }
 
 
@@ -231,46 +271,50 @@ verify_assignment(Ast_Node *node)
 {
 	if(node->type != type_assignment)
 	{
-		LG_FATAL("Compiler bug in file %s at line %d, expected node type_assignment, got %s (id: %d)", __FILE__, __LINE__, type_to_str(node->type), node->type);
+		LG_FATAL("Compiler bug in file %s at line %d, expected node type_assignment, got %s (id: %d)",
+				 __FILE__, __LINE__, type_to_str(node->type), node->type);
 	}
-	Var_Type expression_type = get_expression_type(node->assignment.expression, node->assignment.token);
-	if(node->assignment.variable.type.is_primitive && node->assignment.variable.type.prim_repr == detect)
+	Type_Info expression_type = get_expression_type(node->assignment.expression,
+													node->assignment.token);
+	
+	
+	if(!node->assignment.is_declaration)
 	{
+		node->assignment.variable.type = get_symbol_spot(node->assignment.token)->type;
+	}
+	
+	if(node->assignment.variable.type.type == T_DETECT)
+	{
+		if(is_untyped(expression_type))
+			expression_type = untyped_to_type(expression_type);
 		node->assignment.variable.type = expression_type;
 	}
 	else if(!check_type_compatibility(node->assignment.variable.type, expression_type))
 	{
 		char *error = AllocateCompileMemory(2048);
-		vstd_sprintf(error, "Tried to assign %s to variable of type %s", var_type_to_name(node->assignment.variable.type), var_type_to_name(expression_type));
+		vstd_sprintf(error, "Tried to assign %s to variable of type %s",
+					 var_type_to_name(expression_type),
+					 var_type_to_name(node->assignment.variable.type));
 		raise_semantic_error(error, node->assignment.token);
 	}
-	Symbol this_symbol = {.token = node->assignment.token, .node = node, .identifier = node->assignment.variable.identifier.name,
-							.type = node->assignment.variable.type, .counter = 0};
-	add_symbol(this_symbol, &node->assignment.variable.identifier);
-}
-
-b32
-are_types_the_same(Var_Type a, Var_Type b)
-{
-	if(a.is_primitive != b.is_primitive)
-		return false;
-	if(a.is_primitive)
+	
+	if(node->assignment.is_declaration)
 	{
-		return a.prim_repr == b.prim_repr && a.pointer_count == b.pointer_count;
-	}
-	else
-	{
-		return vstd_strcmp((char *)a.struct_id.name, (char *)b.struct_id.name);
+		Symbol this_symbol = {.token = node->assignment.token, .node = node,
+			.identifier = node->assignment.variable.identifier.name,
+			.type = node->assignment.variable.type};
+		add_symbol(this_symbol, &node->assignment.variable.identifier);
 	}
 }
 
-void
-verify_selector(Symbol *identifier, Ast_Node *selected, Token_Iden error_tok)
+Type_Info
+verify_selector(Type_Info left_type, Ast_Node *selected, Token_Iden error_tok)
 {
-	if(identifier->type.is_primitive)
+	if(!is_accessible(left_type))
 	{
-		raise_semantic_error("Accessing members of a primitive variable", error_tok);
+		raise_semantic_error("Primitive variable has no members to be accessed with '.'", error_tok);
 	}
+	
 	Token_Iden selected_tok = {};
 	if(selected->type == type_identifier)
 	{
@@ -285,279 +329,396 @@ verify_selector(Symbol *identifier, Ast_Node *selected, Token_Iden error_tok)
 		raise_semantic_error("Improper struct accessing", error_tok);
 	}
 	
-	Symbol *selected_sym = get_symbol_spot(selected_tok);
-	Var_Type structure = get_type(identifier->type.struct_id.name);
+	u8 *selected_id = selected_tok.identifier;
 	
-	size_t member_count = SDCount(structure.maybe_members);
+	Assert(left_type.identifier);
+	Type_Info structure = left_type;
+	size_t member_count = structure.structure->structure.member_count;
 	for(size_t i = 0; i < member_count; ++i)
 	{
-		if(are_types_the_same(selected_sym->type, structure.maybe_members[i].type))
+		if(vstd_strcmp((char *)selected_id, 
+					   (char *)structure.structure->structure.members[i].identifier.name))
 		{
-			if(vstd_strcmp((char *)selected_sym->identifier, (char *)structure.maybe_members[i].identifier.name))
-				return;
+			/*if(structure.maybe_members[i].type.is_primitive == false)
+			{
+			}*/
+			return structure.structure->structure.members[i].type;
 		}
 	}
 
 	{
 		char *error = AllocateCompileMemory(2048);
-		vstd_sprintf(error, "Accessing non existant member of struct (Type %s, Member %s)", structure.struct_id.name, selected_sym->identifier);
+		vstd_sprintf(error, "Accessing non existant member of struct (Type %s, Member %s)",
+					 structure.structure->structure.struct_id.name, selected_id);
 		raise_semantic_error(error, selected_tok);
 	}
+	return (Type_Info){T_INVALID};
 }
 
-Var_Type
-get_number_type(u8 *string)
+Type_Info
+number_to_untyped_type(u8 *number)
 {
-	Var_Type integer = {.is_primitive = true, .prim_repr = byte4};
-	for(size_t i = 0; string[i] != 0; ++i)
+	for(int i = 0; number[i] != 0; ++i)
 	{
-		if(string[i] == '.') return (Var_Type){.is_primitive = true, .prim_repr = real64};
+		if(number[i] == '.')
+			return (Type_Info){T_UNTYPED_FLOAT};
 	}
-	if(string[0] == '-')
-	{
-		i64 number = str_to_i64((const char *)string);
-		if(number > -2147483647)
-		{
-			return integer;
-		}
-		else
-		{
-			return (Var_Type){.is_primitive = true, .prim_repr = byte8};
-		}
-	}
-	else
-	{
-		u64 number = str_to_u64((const char *)string);
-		if(number <= 2147483647)
-		{
-			return integer;
-		}
-		else if(number <= 9223372036854775807)
-		{
-			return (Var_Type){.is_primitive = true, .prim_repr = byte8};
-		}
-		else
-		{
-			return (Var_Type){.is_primitive = true, .prim_repr = ubyte8};
-		}
-	}
-
-	Assert(false);
-	
+	return (Type_Info){T_UNTYPED_INTEGER};
 }
 
+Type_Info
+untyped_to_type(Type_Info type)
+{
+	if(type.type == T_UNTYPED_INTEGER)
+		return (Type_Info){.type = T_INTEGER, .primitive.size = byte8};
+	if(type.type == T_UNTYPED_FLOAT)
+		return (Type_Info){.type = T_FLOAT, .primitive.size = real64};
+	Assert(false);
+	return (Type_Info){};
+}
 
-Var_Type
+Type_Info
 get_expression_type(Ast_Node *expression, Token_Iden desc_token)
 {
-	Token_Iden token;
-
 	if(expression == NULL)
-		return (Var_Type){.is_primitive = true, .prim_repr = invalid_type};
+		return (Type_Info){.type = T_INVALID};
 
-	Var_Type result = {};
+	Type_Info result = {};
 	if(expression->type == type_identifier)
 	{
-		if(expression->right->type == type_selector)
+		if(expression->right && expression->right->type == type_selector)
 		{
 			Symbol *id_symbol = get_symbol_spot(expression->identifier.token);
-			verify_selector(id_symbol, expression->selector.selected, expression->identifier.token);
-			result = get_expression_type(expression->right, desc_token);
+			result = verify_selector(id_symbol->type, expression->right->selector.selected, 
+							expression->identifier.token);
 		}
 		else
 		{
-			result = expression->identifier.symbol_spot->type;
-			token = expression->identifier.token;
-		}
-	}
-	else if(expression->type == type_selector)
-	{
-		if(expression->selector.selected->type == type_selector)
-		{
-			result = get_expression_type(expression->right, desc_token);
-		}
-		else if(expression->selector.selected->type == type_func_call)
-		{
-			result = verify_func_call(expression->right);
-			token = expression->selector.selected->func_call.identifier.token;
-		}
-		else 
-		{
-			Assert(expression->selector.selected->type == type_identifier);
-			result = get_symbol_spot(expression->selector.selected->identifier.token)->type;
-			token = expression->selector.selected->identifier.token;
-			// NOTE(Vasko): not a decleration, doesn't have a symbol spot
-			//		result = expression->selector.selected->identifier.symbol_spot->type;
+			if(expression->identifier.symbol_spot)
+				result = expression->identifier.symbol_spot->type;
+			else
+			{
+				result = get_symbol_spot(expression->identifier.token)->type;
+			}
 		}
 	}
 	else if(expression->type == type_func_call)
 	{
-		result = verify_func_call(expression);
-		token = expression->func_call.identifier.token;
+		result = verify_func_call(expression, desc_token);
+	}
+	else if(expression->type == type_struct_init)
+	{
+		result = verify_struct_init(expression, desc_token);
 	}
 	else if(expression->type == type_literal)
 	{
-		result = get_number_type(expression->atom.identifier.name); 
-		token = expression->atom.identifier.token;
+		result = number_to_untyped_type(expression->atom.identifier.name); 
 	}
 	else if(expression->type == type_const_str)
 	{
-		result.is_primitive = true;
-		result.pointer_count = 1;
-		result.prim_repr = ubyte1;
-		token = expression->atom.identifier.token;
+		result.type = T_STRING;
+		result.identifier = (u8 *)"string";
+		result.v_string.content = &(expression->atom.identifier);
 	}
-
-	if(result.is_primitive && result.prim_repr == invalid_type)
+	else if(expression->type == type_unary_expr)
 	{
-		raise_semantic_error("Invalid type", token);
+		result = get_expression_type(expression->unary_expr.expression, desc_token);
 	}
-
-	Var_Type left_type = get_expression_type(expression->left, desc_token);
-	Var_Type right_type = get_expression_type(expression->right, desc_token);
-
-	if(left_type.is_primitive && left_type.prim_repr == invalid_type)
-	{}
+	else result = (Type_Info){T_INVALID};
+	
+	
+	Type_Info left_type = get_expression_type(expression->left, desc_token);
+	Type_Info right_type = {};
+	if(expression->type == type_binary_expr && expression->binary_expr.op == '.')
+	{
+		if(type_is_invalid(left_type) || expression->right->type != type_selector)
+			raise_semantic_error("Invalid usage of [.]", expression->binary_expr.token);
+		
+		result = verify_selector(left_type, expression->right->selector.selected, 
+								 expression->binary_expr.token);
+	}
 	else
+		right_type = get_expression_type(expression->right, desc_token);
+	
+	
+	
+	if(!type_is_invalid(left_type))
 	{
+		if(type_is_invalid(result))
+			result = left_type;
+			
 		if(!are_op_compatible(left_type, result))
 		{
 			char *error = AllocateCompileMemory(2048);
-			vstd_sprintf(error, "You can't perform an operation with types %s and %s", var_type_to_name(result), var_type_to_name(left_type));
+			vstd_sprintf(error, "You can't perform an operation with types %s and %s",
+						 var_type_to_name(result), var_type_to_name(left_type));
 			raise_semantic_error(error, desc_token);
 		}
 	}
 
-	if(right_type.is_primitive && right_type.prim_repr == invalid_type)
-	{}
-	else
+	if(!type_is_invalid(right_type))
 	{
-		if(!are_op_compatible(right_type, result))
+		if(type_is_invalid(result))
+			result = left_type;
+		
+		if(!type_is_invalid(result) && !are_op_compatible(right_type, result))
 		{
 			char *error = AllocateCompileMemory(2048);
-			vstd_sprintf(error, "You can't perform an operation with types %s and %s", var_type_to_name(result), var_type_to_name(right_type));
+			vstd_sprintf(error, "You can't perform an operation with types %s and %s",
+						 var_type_to_name(result), var_type_to_name(right_type));
 			raise_semantic_error(error, desc_token);
 		}
 	}
 	return result;
 }
 
-Var_Type
-verify_func_call(Ast_Node *func_call)
+Type_Info
+verify_func_call(Ast_Node *func_call, Token_Iden expr_token)
 {
-	return get_symbol_spot(func_call->func_call.identifier.token)->type;
+	Symbol *func_sym = get_symbol_spot(func_call->func_call.identifier.token);
+	Ast_Node **func_args = func_sym->node->function.arguments;
+	Ast_Node **passed_expr = func_call->func_call.arguments;
+	size_t expr_count = SDCount(passed_expr);
+	for(size_t i = 0; i < expr_count; ++i)
+	{
+		Type_Info expr_type = get_expression_type(passed_expr[i], expr_token);
+		Type_Info arg_type = func_args[i]->variable.type;
+		
+		if(!check_type_compatibility(arg_type, expr_type))
+		{
+			char *error = AllocateCompileMemory(2048);
+			vstd_sprintf(error, "Expression #%d in function call is of type %s,"
+						 " argument #%d is of incompatible type %s",
+						 i + 1,
+						 var_type_to_name(expr_type),
+						 i + 1,
+						 var_type_to_name(arg_type));
+			raise_semantic_error(error, expr_token);
+		}
+	}
+	
+	return func_sym->type;
+}
+
+Type_Info
+verify_struct_init(Ast_Node *struct_init, Token_Iden error_token)
+{
+	if(struct_init->type != type_struct_init)
+	{
+		raise_semantic_error("Incorrect name of struct used for struct initialization", error_token);
+	}
+	
+	Token_Iden init_token = struct_init->struct_init.id_token;
+	u8 *struct_id = init_token.identifier;
+	Ast_Node **expressions = struct_init->struct_init.expressions;
+	Type_Info struct_type = get_type(struct_id);
+	
+	if(struct_type.type != T_STRUCT)
+	{
+		raise_semantic_error("Incorrect identifier used for struct initialization", init_token);
+	}
+	Ast_Variable *members = struct_type.structure->structure.members;
+	
+	if(type_is_invalid(struct_type))
+	{
+		char *error = AllocateCompileMemory(4 * (vstd_strlen((char *)struct_id) + 16));
+		vstd_sprintf(error, "Struct %s doesn't exist, error in struct initializer", struct_id);
+		raise_semantic_error(error, init_token);
+	}
+	if(SDCount(expressions) > SDCount(members))
+	{
+		raise_semantic_error("Too many expressions in struct initialization", init_token);
+	}
+	
+	for(size_t i = 0; i < SDCount(expressions); ++i)
+	{
+		Type_Info expr_type = get_expression_type(expressions[i], init_token);
+		Type_Info member_type = members[i].type;
+		if(!check_type_compatibility(member_type, expr_type))
+		{
+			char *error = AllocateCompileMemory(2048);
+			vstd_sprintf(error, "Expression #%d in struct initialization is of type %s,"
+						 " member #%d is of incompatible type %s",
+						 i + 1,
+						 var_type_to_name(expr_type),
+						 i + 1,
+						 var_type_to_name(member_type));
+			raise_semantic_error(error, init_token);
+		}
+	}
+	return struct_type;
 }
 
 Symbol *
 get_symbol_spot(Token_Iden token)
 {
 	Symbol *result = NULL;
-	u8 *identifier = get_identifier(token.identifier_index);
+	u8 *identifier = token.identifier;
 
-	size_t scan_size = SDCount(scopes);
-	for(size_t i = 0; i < scan_size; ++i)
+
+	Scope_Info saved_scopes[4096] = {};
+	size_t last_scope = 0;
+
+	while(!is_stack_empty(scope_stack))
 	{
-		Scope_Info scope = scopes[i];
-		size_t table_size = SDCount(scope.symbol_table);
-		for(size_t j = 0; j < table_size; ++j)
+		Scope_Info to_scan = stack_pop(scope_stack, Scope_Info);
+		size_t scan_size = SDCount(to_scan.symbol_table);
+		Symbol *scanning_table = to_scan.symbol_table;
+
+		saved_scopes[last_scope++] = to_scan;
+		for(size_t i = 0; i < scan_size; ++i)
 		{
-			if(vstd_strcmp((char *)(scope.symbol_table[j].identifier), (char *)identifier))
+			Symbol a = scanning_table[i];
+			if(vstd_strcmp((char *)a.identifier, (char *)identifier))
 			{
-				result = &scope.symbol_table[j];
+				result = scanning_table + i;
 			}
 		}
-		
 	}
 	
+	for(signed int i = last_scope - 1; i >= 0; --i)
+	{
+		stack_push(scope_stack, saved_scopes[i]);
+	}
+
+	// NOTE(Vasko): Loops to check for function definitions
 	if(result == NULL)
 	{
-		raise_semantic_error("Use of undeclared symbol", token);
+		size_t scan_size = SDCount(scopes);
+		for(size_t i = 0; i < scan_size; ++i)
+		{
+			Scope_Info scope = scopes[i];
+			size_t table_size = SDCount(scope.symbol_table);
+			for(size_t j = 0; j < table_size; ++j)
+			{
+				if(vstd_strcmp((char *)(scope.symbol_table[j].identifier), (char *)identifier))
+				{
+					result = &scope.symbol_table[j];
+					goto EXIT_FUNC_SEARCH;
+				}
+			}	
+		}
+	}
+	EXIT_FUNC_SEARCH:
+
+	if(result == NULL)
+	{
+		char *error = AllocateCompileMemory(1024 * 1024);
+		memset(error, 0, 1024 * 1024);
+		vstd_sprintf(error, "Use of undeclared symbol \"%s\"", identifier);
+		raise_semantic_error(error, token);
 	}
 
 	return result;
 }
 
-b32
-check_primitive_compatibility(Var_Size a, Var_Size b)
-{
-	if(a == b || a << 4 == b || a >> 4 == b)
-		return true;
-	return false;
-}
 
 
 // TODO: operator overloading
 b32
-are_op_compatible(Var_Type a, Var_Type b)
+are_op_compatible(Type_Info a, Type_Info b)
 {
-	return a.is_primitive && b.is_primitive;
+	if(a.type == T_POINTER && is_pointer_rhs_compatible(b))
+		return true;
+	if(b.type == T_POINTER && is_pointer_rhs_compatible(a))
+		return true;
+	
+	if(!is_rhs_valid(a) || !is_rhs_valid(b))
+		return false;
+	
+	return check_type_compatibility(a, b);
 }
 
 b32
-check_type_compatibility(Var_Type a, Var_Type b)
+check_type_compatibility(Type_Info a, Type_Info b)
 {
-	if(a.is_primitive != b.is_primitive)
+	if(a.type != b.type)
 		return false;
-
-	if(a.pointer_count > 0 && b.pointer_count > 0)
+	if(!vstd_strcmp((char *)a.identifier, (char *)b.identifier))
 		return false;
-
-	if(a.is_primitive)
-	{
-		if(a.pointer_count > 0)
-		{
-			if(b.prim_repr >= byte1 && b.prim_repr <= ubyte8)
-				return true;
-			return false;
-		}
-		if(b.pointer_count > 0)
-			return true;
-
-		return check_primitive_compatibility(a.prim_repr, b.prim_repr) || a.prim_repr == detect || b.prim_repr == detect;
-	}
-	else
-	{
-		return vstd_strcmp((char *)a.struct_id.name, (char *)b.struct_id.name) && a.pointer_count == b.pointer_count;
-	}
 	
+	return true;
 }
 
 void
 verify_struct(Ast_Node *struct_node)
 {
 	Ast_Variable *members = struct_node->structure.members;
-	Var_Type struct_type = get_type(struct_node->structure.struct_id.name);
+	Type_Info struct_type = get_type(struct_node->structure.struct_id.name);
 	for(size_t i = 0; i < SDCount(members); ++i)
 	{
-		if(members[i].type.pointer_count == 0 && !members[i].type.is_primitive && vstd_strcmp((char *)members[i].type.struct_id.name, (char *)struct_type.struct_id.name))
+		if(struct_type.type == T_STRUCT && members[i].type.type == T_STRUCT && 
+		   vstd_strcmp((char *)members[i].type.identifier, (char *)struct_type.identifier))
 		{
-			raise_semantic_error("You can't put a struct as it's own member variable, use a pointer", members[i].identifier.token);
+			raise_semantic_error("You can't put a struct as it's own member variable, use a pointer",
+								 members[i].identifier.token);
 		}
 	}
 }
 
 
 u8 *
-var_type_to_name(Var_Type type)
+var_type_to_name(Type_Info type)
 {
-	if(type.is_primitive)
+	char *result = AllocatePermanentMemory(1024);
+	vstd_strcat(result, "[");
+	if(is_type_primitive(type))
 	{
-		switch (type.prim_repr)
+		switch (type.primitive.size)
 		{
-			case byte1: return (u8 *)"i8"; break;
-			case byte2: return (u8 *)"i16"; break;
-			case byte4: return (u8 *)"i32"; break;
-			case byte8: return (u8 *)"i64"; break;
-			case ubyte1: return (u8 *)"u8"; break;
-			case ubyte2: return (u8 *)"u16"; break;
-			case ubyte4: return (u8 *)"u32"; break;
-			case ubyte8: return (u8 *)"u64"; break;
-			case real32: return (u8 *)"r32"; break;
-			case real64: return (u8 *)"r64"; break;
-			case detect: return (u8 *)"detect"; break;
-			case empty: return (u8 *)"void"; break;
-			case invalid_type: return (u8 *)"invalid"; break;
+			case byte1: vstd_strcat(result, "i8"); break;
+			case byte2: vstd_strcat(result, "i16"); break;
+			case byte4: vstd_strcat(result, "i32"); break;
+			case byte8: vstd_strcat(result, "i64"); break;
+			case ubyte1: vstd_strcat(result, "u8"); break;
+			case ubyte2: vstd_strcat(result, "u16"); break;
+			case ubyte4: vstd_strcat(result, "u32"); break;
+			case ubyte8: vstd_strcat(result, "u64"); break;
+			case real32: vstd_strcat(result, "r32"); break;
+			case real64: vstd_strcat(result, "r64"); break;
+			case detect: vstd_strcat(result, "detect"); break;
+			case empty: vstd_strcat(result, "void"); break;
+			default: vstd_strcat(result, "untyped number"); break;
 		}
 	}
-	else return type.struct_id.name;
+	else if(type.type == T_STRUCT)
+	{
+		vstd_strcat(result, (const char *)type.structure->structure.struct_id.name);
+	}
+	else if(type.type == T_POINTER)
+	{
+		Type_Info *current = &type;
+		
+		while(current->type == T_POINTER)
+		{
+			vstd_strcat(result, "*");
+			current = current->pointer.type;
+		}
+		vstd_strcat(result, " ");
+		vstd_strcat(result, (const char *)var_type_to_name(*current));
+		
+		char *edited_copy = AllocatePermanentMemory(4096);
+		int e_i = 0;
+		
+		for(int i = 0; result[i] != 0; ++i)
+		{
+			if((result[i] == '[' || result[i] == ']') && i > 0)
+			{}
+			else
+				edited_copy[e_i++] = result[i];
+		}
+		strcpy_s(result, 1024, edited_copy);
+		
+	}
+	else if(type.type == T_STRING)
+	{
+		vstd_strcat(result, "string");
+	}
+	else
+	{
+		vstd_strcat(result, "[not implemented]");
+	}
+	
+	vstd_strcat(result, "]");
+	return (u8 *)result;
 }

@@ -4,10 +4,12 @@
 #include <Log.h>
 #include <Memory.h>
 #include <Lexer.h>
+#include <Type.h>
 #include <Parser.h>
 #include <SimpleDArray.h>
 #include <Analyzer.h>
 #include <Stack.h>
+
 
 #include <platform/platform.h>
 
@@ -15,6 +17,7 @@
 #include <Log.c>
 #include <Memory.c>
 #include <Lexer.c>
+#include <Type.c>
 #include <Parser.c>
 #include <SimpleDArray.c>
 #include <Analyzer.c>
@@ -47,28 +50,27 @@ extern inline b32 is_alnum(char c);
 
 void raise_semantic_error(const char *error_msg, Token_Iden token)
 {
-	LG_FATAL("Semantic error: %s.\nLine: %d\nColumn: %d\nFile: %s", error_msg, token.line, token.column, token.file);
+	LG_FATAL("%s (%d, %d):\n\tSemantic error: %s",
+			 token.file, token.line, token.column, error_msg);
 }
 
 void raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file, u64 line,
 							  u64 column)
 {
 	LG_FATAL("%s (%d, %d):\n\tAn error occured while tokenizing: %s", file, line, column, error_msg);
-	/*
-	  while (**at_buffer != ';' && !is_whitespace(**at_buffer))
-	  (*at_buffer)++;	
-	*/
 }
 
 void raise_parsing_unexpected_token(const char *expected_tok, Token_Iden token)
 {
 	if(token.type == tok_identifier)
 	{
-		LG_ERROR("%s (%d, %d):\n\tFound unexpected token, expected %s", token.file, token.line, token.column, expected_tok);
-		LG_FATAL("Token: %s", get_identifier(token.identifier_index));
+		LG_FATAL("%s (%d, %d):\n\tFound unexpected token [%s], expected %s, got [ \"%s\" ]",
+				 token.file, token.line, token.column, token_to_str(token.type),
+				 expected_tok, token.identifier);
 	}
 	else
-		LG_FATAL("%s (%d, %d):\n\tFound unexpected token, expected %s", token.file, token.line, token.column, expected_tok);
+		LG_FATAL("%s (%d, %d):\n\tFound unexpected token [%s], expected %s",
+			 token.file, token.line, token.column, token_to_str(token.type), expected_tok);
 }
 
 int main(int argc, char *argv[])
@@ -84,9 +86,6 @@ int main(int argc, char *argv[])
 		LG_FATAL("apoc [file]");	
 	}
 
-	LG_INFO("test");
-	LG_DEBUG("test");
-	LG_ERROR("test");
 	LG_WARN("Lexing...");
 	lex_file(argv[1]);
 	LG_WARN("Done.");

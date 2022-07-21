@@ -3,21 +3,31 @@
 #ifndef _PARSER_H
 #define _PARSER_H
 
+//@TODO: REMOVE COMMENT
+/*
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+*/
+
+#define REASONABLE_MAXIMUM 256
+
 
 #include <Lexer.h>
 #include <Stack.h>
 #include <Basic.h>
+#include <Type.h>
 
+//#define INVALID_TYPE (Var_Type){.is_primitive = true, .prim_repr = invalid_type}
+	
 typedef struct _abstract_syntax_tree Ast_Node;
 
 typedef enum
 {
 	type_root         = -100,
-
+		
+	type_else         = -56,
 	type_scope_end    = -55,
 	type_scope_start  = -54,
 	type_postfix      = -53,
@@ -49,30 +59,12 @@ typedef enum
 	type_divide       = '/',
 
 } Ast_Type;
-
-typedef enum
-{
-	invalid_type = 0xFFFF,
-	byte1  = 0x001,
-	byte2  = 0x002,
-	byte4  = 0x004,
-	byte8  = 0x008,
-	ubyte1 = 0x010,
-	ubyte2 = 0x020,
-	ubyte4 = 0x040,
-	ubyte8 = 0x080,
-	real32 = 0x1000,
-	real64 = 0x2000,
-	detect = 0x4000,
-	empty  = 0x8000 // void
-} Var_Size;
+	
+	
+// Var_Size values are sorted
+// signed 1 < unsigned 1 < unsigned 2	
 
 
-typedef struct
-{
-	Ast_Type type;
-	Token_Iden iden_index;
-} Type_And_Token;
 
 typedef struct
 {
@@ -81,15 +73,14 @@ typedef struct
 } Ast_Node_Array;
 
 typedef struct _Symbol Symbol;
-typedef struct 
+typedef struct _Ast_Identifier
 {
 	Token_Iden token;
 	u8 *name;
 	Symbol *symbol_spot;
 } Ast_Identifier;
 
-typedef struct _ast_variable Ast_Variable; 
-
+/*
 typedef struct
 {
 	b32 is_primitive;
@@ -99,23 +90,26 @@ typedef struct
 		struct
 		{
 			Ast_Identifier struct_id;
-			Ast_Variable *maybe_members;
+			Ast_Variable *maybe_members; // NOTE(Vasko): SimpleDArray
 		};
 	};
 	b32 is_const;
 	int pointer_count;
 } Var_Type;
+*/
 
-typedef struct _ast_variable
+typedef struct _Ast_Variable
 {
-	Var_Type type;
+	Type_Info type;
+	b32 is_const;
 	Ast_Identifier identifier;
 } Ast_Variable;
 
-typedef struct
+typedef struct _Ast_Struct
 {
 	Ast_Identifier struct_id;
-    Ast_Variable *members; // Note(Vasko): SimpleDArray
+    Ast_Variable members[REASONABLE_MAXIMUM];
+	int member_count;
 } Ast_Struct;
 
 typedef struct
@@ -123,10 +117,14 @@ typedef struct
     Ast_Identifier identifier;
 } Ast_Atom;
 
+typedef struct 
+{
+	Token_Iden token;
+} Ast_Token_Holder;
 
 typedef struct
 {
-	Var_Type type;
+	Type_Info type;
 	Ast_Identifier identifier;
 	Ast_Node **arguments; // Simple DArray
 } Ast_Func;
@@ -141,6 +139,7 @@ typedef struct
 typedef struct
 {
 	Token op;
+	Token_Iden token;
 } Ast_Binary_Expr;
 
 typedef struct
@@ -176,6 +175,7 @@ typedef struct
 
 typedef struct
 {
+	Token_Iden id_token;
 	Ast_Node **expressions; // Note(Vasko): SimpleDArray
 } Ast_Struct_Init;
 
@@ -214,6 +214,7 @@ struct _abstract_syntax_tree
 		Ast_Struct_Init struct_init;
 		Ast_Indexing index;
 		Ast_Postfix postfix;
+		Ast_Token_Holder holder;
 		Scope_Desc scope_desc;
 	};
 	Ast_Node *left;
@@ -253,11 +254,11 @@ parse_struct();
 
 #include <Analyzer.h>
 
-Var_Type
+Type_Info
 parse_type();
 
 b32
-type_is_invalid(Var_Type type);
+type_is_invalid(Type_Info type);
 
 Ast_Node *
 parse();
@@ -271,8 +272,10 @@ parse_func();
 void
 parser_eat(Token expected_token);
 
-
+// @TODO: Remove comment
+/*
 #ifdef __cplusplus
 }
 #endif
+*/
 #endif //_PARSER_H

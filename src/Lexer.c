@@ -3,10 +3,9 @@
 #include <Parser.h>
 
 static u8 *at_buffer;
-static str_hash_table *KeywordTable;
+static str_hash_table *keyword_table;
 static Token_Iden *token_buffer;
 static u64 last_token;
-static u8 **identifier_buffer;
 static u64 current_line;
 static u64 current_column;
 static u64 token_line_tracker;
@@ -17,16 +16,16 @@ void
 advance_buffer(u8 **buffer)
 {
 	if(**buffer != '\0')
-		{
-	if(**buffer == '\n')
+	{
+		if(**buffer == '\n')
 		{
 			current_line++;
 			current_column = 1;
 		}
-	else
-		current_column++;
-	(*buffer)++;
-		}
+		else
+			current_column++;
+		(*buffer)++;
+	}
 }
 
 void
@@ -51,40 +50,41 @@ void
 initialize_compiler()
 {
 	// NOTE(Vasko): Add keywords to string hash table
-	shput(KeywordTable, "func", tok_func);
-	shput(KeywordTable, "extern", tok_extern);
-	shput(KeywordTable, "struct", tok_struct);
-	shput(KeywordTable, "import", tok_import);
-	shput(KeywordTable, "cast", tok_cast);
-	shput(KeywordTable, "if", tok_if);
-	shput(KeywordTable, "for", tok_for);
-	shput(KeywordTable, "switch", tok_switch);
-	shput(KeywordTable, "case", tok_case);
-	shput(KeywordTable, "as", tok_as);
-	shput(KeywordTable, "break", tok_break);
+	shput(keyword_table, "func", tok_func);
+	shput(keyword_table, "extern", tok_extern);
+	shput(keyword_table, "struct", tok_struct);
+	shput(keyword_table, "import", tok_import);
+	shput(keyword_table, "cast", tok_cast);
+	shput(keyword_table, "if", tok_if);
+	shput(keyword_table, "for", tok_for);
+	shput(keyword_table, "switch", tok_switch);
+	shput(keyword_table, "case", tok_case);
+	shput(keyword_table, "as", tok_as);
+	shput(keyword_table, "break", tok_break);
+	shput(keyword_table, "else", tok_else);
 	
-	shput(KeywordTable, "->", tok_arrow);
-	shput(KeywordTable, "--", tok_minusminus);
-	shput(KeywordTable, "++", tok_plusplus);
-	shput(KeywordTable, "||", tok_logical_or);
-	shput(KeywordTable, "==", tok_logical_is);
-	shput(KeywordTable, "!=", tok_logical_isnot);
-	shput(KeywordTable, "&&", tok_logical_and);
-	shput(KeywordTable, "::", tok_const);
-	shput(KeywordTable, "<<", tok_bits_lshift);
-	shput(KeywordTable, ">>", tok_bits_rshift);
-	shput(KeywordTable, ">=", tok_logical_gequal);
-	shput(KeywordTable, "<=", tok_logical_lequal);
-	shput(KeywordTable, "+=", tok_plus_equals);
-	shput(KeywordTable, "-=", tok_minus_equals);
-	shput(KeywordTable, "*=", tok_mult_equals);
-	shput(KeywordTable, "/=", tok_div_equals);
-	shput(KeywordTable, "%=", tok_mod_equals);
-	shput(KeywordTable, "&=", tok_and_equals);
-	shput(KeywordTable, "^=", tok_xor_equals);
-	shput(KeywordTable, "|=", tok_or_equals);
-	shput(KeywordTable, "<<=", tok_lshift_equals);
-	shput(KeywordTable, ">>=", tok_rshift_equals);
+	shput(keyword_table, "->", tok_arrow);
+	shput(keyword_table, "--", tok_minusminus);
+	shput(keyword_table, "++", tok_plusplus);
+	shput(keyword_table, "||", tok_logical_or);
+	shput(keyword_table, "==", tok_logical_is);
+	shput(keyword_table, "!=", tok_logical_isnot);
+	shput(keyword_table, "&&", tok_logical_and);
+	shput(keyword_table, "::", tok_const);
+	shput(keyword_table, "<<", tok_bits_lshift);
+	shput(keyword_table, ">>", tok_bits_rshift);
+	shput(keyword_table, ">=", tok_logical_gequal);
+	shput(keyword_table, "<=", tok_logical_lequal);
+	shput(keyword_table, "+=", tok_plus_equals);
+	shput(keyword_table, "-=", tok_minus_equals);
+	shput(keyword_table, "*=", tok_mult_equals);
+	shput(keyword_table, "/=", tok_div_equals);
+	shput(keyword_table, "%=", tok_mod_equals);
+	shput(keyword_table, "&=", tok_and_equals);
+	shput(keyword_table, "^=", tok_xor_equals);
+	shput(keyword_table, "|=", tok_or_equals);
+	shput(keyword_table, "<<=", tok_lshift_equals);
+	shput(keyword_table, ">>=", tok_rshift_equals);
 
 	// NOTE(Vasko): Add basic types to string hash table
 	add_primitive_type("i8",   byte1);
@@ -130,13 +130,7 @@ get_next_expecting(Token type, const char *error_msg)
 	return token;
 }
 
-u8 *
-get_identifier(u64 index)
-{
-	return(identifier_buffer[index]);
-}
-
-static u8 *file;
+u8 *file;
 u8 *get_file_name()
 {
 	return file;
@@ -146,7 +140,7 @@ u64
 get_line_tracker(){ return token_line_tracker; }
 
 
-static void
+void
 lex_file(char *path)
 {
 	file = (u8 *)path;
@@ -154,11 +148,6 @@ lex_file(char *path)
 	{
 		arrfree(token_buffer);
 		token_buffer = NULL;
-	}
-	if(identifier_buffer)
-	{
-		arrfree(identifier_buffer);
-		identifier_buffer = NULL;
 	}
 	
 	entire_file file_buffer;
@@ -172,7 +161,7 @@ lex_file(char *path)
 	}
 	at_buffer = file_buffer.data;
 
-	shdefault(KeywordTable, KEYWORD_ERROR);
+	shdefault(keyword_table, KEYWORD_ERROR);
 	current_line = 1;
 	current_column = 1;
 
@@ -183,12 +172,13 @@ lex_file(char *path)
 			arrput(token_buffer, to_put);
 	}
 	
-	Token_Iden eof_token = {.type = tok_eof, .identifier_index = 0};
+	Token_Iden eof_token = {.type = tok_eof, .identifier = 0,
+		.file = path, .line = current_line, .column = current_column};
 	arrput(token_buffer, eof_token);
 }
 
 // NOTE(Vasko): file is here to be put into the token, for easier error messages
-static Token_Iden get_token(char *file)
+Token_Iden get_token(char *file)
 {
 	while(is_whitespace(*at_buffer))
 	{
@@ -214,7 +204,7 @@ static Token_Iden get_token(char *file)
 		name[identifier_size] = '\0';
 		
 		
-		i16 token = shget(KeywordTable, name);
+		i16 token = shget(keyword_table, name);
 		if (token == KEYWORD_ERROR)
 		{
 			u8 *identifier = AllocateCompileMemory(identifier_size+1);
@@ -222,13 +212,11 @@ static Token_Iden get_token(char *file)
 			identifier[identifier_size] = '\0';
 			
 			token = tok_identifier;
-			u64 index = arrlen(identifier_buffer);
-			arrput(identifier_buffer, identifier);
 			
-			return (Token_Iden){.type = token, .identifier_index = index, .line = start_line,
+			return (Token_Iden){.type = token, .identifier = identifier, .line = start_line,
 								.column = start_col, .file = file};
 		}
-		return (Token_Iden){.type = token, .identifier_index = 0, .line = start_line,
+		return (Token_Iden){.type = token, .identifier = NULL, .line = start_line,
 							.column = start_col, .file = file};
 	}
 	else if(is_number(last_char))
@@ -254,11 +242,8 @@ static Token_Iden get_token(char *file)
 		u8 *number_string = AllocateCompileMemory(num_size+1);
 		memcpy(number_string, string_start, num_size);
 		number_string[num_size] = '\0';
-		
-		u64 index = arrlen(identifier_buffer);
-		arrput(identifier_buffer, number_string);
-		
-		return (Token_Iden){.type = tok_number, .identifier_index = index, .line = start_line,
+			
+		return (Token_Iden){.type = tok_number, .identifier = number_string, .line = start_line,
 							.column = start_col, .file = file};
 	}
 	else
@@ -272,22 +257,25 @@ static Token_Iden get_token(char *file)
 			{
 				advance_buffer(&at_buffer);
 			}
+			advance_buffer(&at_buffer);
 			u64 num_size = at_buffer - string_start;
 			u8 *number_string = AllocateCompileMemory(num_size);
 			memcpy(number_string, string_start, num_size);
 			number_string[num_size] = '\0';
-			u64 index = arrlen(identifier_buffer);
-			arrput(identifier_buffer, number_string);
-			advance_buffer(&at_buffer);
 
-			return (Token_Iden){.type = tok_const_str, .identifier_index = index, .line = start_line,
+			return (Token_Iden){.type = tok_const_str, .identifier = number_string, .line = start_line,
 								.column = start_col, .file = file};
 		}
 		else
 		{
 			while(!is_whitespace(*at_buffer) && !is_alnum(*at_buffer))
 			{
-				if(*at_buffer == 0) return (Token_Iden){};
+				if(*at_buffer == 0)
+				{
+					if(at_buffer == string_start)
+						return (Token_Iden){};
+					break;
+				}
 				advance_buffer(&at_buffer);
 			}
 			if(at_buffer - string_start == 1)
@@ -312,7 +300,7 @@ static Token_Iden get_token(char *file)
 			symbol[identifier_size] = '\0';
 
 			Token_Iden result = {};
-			result.type = shget(KeywordTable, symbol);
+			result.type = shget(keyword_table, symbol);
 			result.line = start_line;
 			result.column = start_col;
 			result.file = file;

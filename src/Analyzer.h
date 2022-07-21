@@ -9,15 +9,29 @@
 typedef struct
 {
 	u8 *key;
-	Var_Type value;
+	Type_Info value;
 } Type_Table;
+
+typedef enum
+{
+	S_FUNCTION,
+	S_VARIABLE,
+	S_STRUCT_MEMBER,
+} Symbol_Type;
 
 typedef struct _Symbol
 {
+	Symbol_Type tag;
+	union 
+	{
+		struct
+		{
+			int index;
+		} s_member;
+	};
 	u8 *identifier;
-	Var_Type type;
+	Type_Info type;
 	Ast_Node *node;
-	int counter;
 	Token_Iden token;
 } Symbol;
 
@@ -42,11 +56,11 @@ analyze(Ast_Node *ast_tree);
 void
 add_primitive_type(const char *name, Var_Size size);
 
-Var_Type
+Type_Info
 get_type(u8 *name);
 
 void
-add_type(Ast_Struct structure);
+add_type(Ast_Node *structure);
 
 void
 update_type(Ast_Struct structure);
@@ -61,7 +75,7 @@ void
 analyze_file_level_statement(Ast_Node *node);
 
 u8 *
-var_type_to_name(Var_Type type);
+var_type_to_name(Type_Info type);
 
 Symbol *
 get_symbol_spot(Token_Iden token);
@@ -73,25 +87,30 @@ void
 verify_func(Ast_Node *node);
 
 void
-verify_func_level_statement(Ast_Node *node);
+verify_func_level_statement(Ast_Node *node, Ast_Node *func_node);
 
 b32
-check_type_compatibility(Var_Type a, Var_Type b);
+check_type_compatibility(Type_Info a, Type_Info b);
 
 void
 verify_assignment(Ast_Node *node);
 
-Var_Type
+Type_Info
 get_expression_type(Ast_Node *expression, Token_Iden desc_token);
 
-Var_Type
-verify_func_call(Ast_Node *func_call);
+Type_Info
+verify_func_call(Ast_Node *func_call, Token_Iden expr_token);
+
+Type_Info
+verify_struct_init(Ast_Node *struct_init, Token_Iden error_token);
 
 b32
-are_op_compatible(Var_Type a, Var_Type b);
+are_op_compatible(Type_Info a, Type_Info b);
 
 b32
 is_scope_stack_empty();
 
+Type_Info
+untyped_to_type(Type_Info type);
 
 #endif
