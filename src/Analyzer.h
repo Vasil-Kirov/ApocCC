@@ -14,9 +14,11 @@ typedef struct
 
 typedef enum
 {
+	S_NONE,
 	S_FUNCTION,
 	S_VARIABLE,
 	S_STRUCT_MEMBER,
+	S_FUNC_ARG
 } Symbol_Type;
 
 typedef struct _Symbol
@@ -37,6 +39,7 @@ typedef struct _Symbol
 
 typedef struct 
 {
+	b32 has_return;
 	unsigned int start_line;
 	unsigned int end_line;
 	const char *file;
@@ -96,7 +99,7 @@ void
 verify_assignment(Ast_Node *node);
 
 Type_Info
-get_expression_type(Ast_Node *expression, Token_Iden desc_token);
+get_expression_type(Ast_Node *expression, Token_Iden desc_token, Type_Info *previous);
 
 Type_Info
 verify_func_call(Ast_Node *func_call, Token_Iden expr_token);

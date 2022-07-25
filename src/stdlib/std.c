@@ -5,6 +5,16 @@
 #include <Builtin.h>
 #define V_WRITE_BUFFER_SIZE 8192
 
+
+void
+strcpy_secure(char *destination, size_t max_size, const char *source)
+{
+		size_t length = vstd_strlen((char *)source) + 1;
+		if(length > max_size)
+				return;
+		memcpy(destination, source, length);
+}
+
 f64
 vstd_pow(f64 a, f64 b)
 {

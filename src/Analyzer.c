@@ -49,7 +49,7 @@ add_type(Ast_Node *structure)
 		.type = T_STRUCT,
 		.structure = structure
 	};
-	
+
 	Ast_Struct s = structure->structure;
 	for(int i = 0; i < s.member_count; ++i)
 	{
@@ -88,7 +88,7 @@ is_scope_stack_empty() { return is_stack_empty(scope_stack); }
 void
 pop_scope(Token_Iden closing_token)
 {
-	if(is_stack_empty(scope_stack))
+	if(is_scope_stack_empty())
 	{
 		raise_semantic_error("Found a closing scope with no matching openning one", closing_token);
 	}
@@ -221,7 +221,7 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 		{
 			Ast_Variable var = node->variable;
 			Symbol symbol = {.identifier = var.identifier.name,
-				.type =var.type, .node = node, .token = var.identifier.token};
+				.type =var.type, .node = node, .token = var.identifier.token, .tag = S_VARIABLE};
 			add_symbol(symbol, &node->variable.identifier);
 		}break;
 		case type_assignment:
@@ -230,6 +230,15 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 		} break;
 		case type_scope_end:
 		{
+			Scope_Info this_scope = stack_pop(scope_stack, Scope_Info);
+			if(scope_stack.top == 0)
+			{
+				if(!this_scope.has_return)
+				{
+					raise_semantic_error("Not all paths lead to a return statement", node->scope_desc.token);
+				}
+			}
+			stack_push(scope_stack, this_scope);
 			pop_scope(node->scope_desc.token);
 			return;
 		} break;
@@ -242,8 +251,10 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 		} break;
 		case type_return:
 		{
-			Type_Info return_type = get_expression_type(node->right, node->holder.token);
-			
+			Type_Info return_type = get_expression_type(node->right, node->holder.token, NULL);
+		
+			if(type_is_invalid(return_type))
+				return_type = (Type_Info){.type = T_VOID, .identifier = (u8 *)"void"};
 			if(!check_type_compatibility(func_node->function.type,
 											return_type))
 			{
@@ -255,6 +266,10 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 							 var_type_to_name(func_node->function.type));
 				raise_semantic_error(error, node->holder.token);
 			}
+			Scope_Info scope = stack_pop(scope_stack, Scope_Info);
+			scope.has_return = true;
+			stack_push(scope_stack, scope);
+
 		} break;
 		default:
 		{
@@ -275,18 +290,23 @@ verify_assignment(Ast_Node *node)
 				 __FILE__, __LINE__, type_to_str(node->type), node->type);
 	}
 	Type_Info expression_type = get_expression_type(node->assignment.expression,
-													node->assignment.token);
-	
-	
+													node->assignment.token, NULL);
 	if(!node->assignment.is_declaration)
 	{
 		node->assignment.variable.type = get_symbol_spot(node->assignment.token)->type;
+	}
+	if(type_is_invalid(expression_type))
+	{
+		raise_semantic_error("Invalid expression", node->assignment.token);
 	}
 	
 	if(node->assignment.variable.type.type == T_DETECT)
 	{
 		if(is_untyped(expression_type))
+		{
 			expression_type = untyped_to_type(expression_type);
+			expression_type.identifier = (u8 *)"i64";
+		}
 		node->assignment.variable.type = expression_type;
 	}
 	else if(!check_type_compatibility(node->assignment.variable.type, expression_type))
@@ -302,7 +322,7 @@ verify_assignment(Ast_Node *node)
 	{
 		Symbol this_symbol = {.token = node->assignment.token, .node = node,
 			.identifier = node->assignment.variable.identifier.name,
-			.type = node->assignment.variable.type};
+			.type = node->assignment.variable.type, .tag = S_VARIABLE};
 		add_symbol(this_symbol, &node->assignment.variable.identifier);
 	}
 }
@@ -378,29 +398,28 @@ untyped_to_type(Type_Info type)
 }
 
 Type_Info
-get_expression_type(Ast_Node *expression, Token_Iden desc_token)
+get_expression_type(Ast_Node *expression, Token_Iden desc_token, Type_Info *previous)
 {
 	if(expression == NULL)
 		return (Type_Info){.type = T_INVALID};
 
-	Type_Info result = {};
+	Type_Info result = {.type = T_INVALID};
 	if(expression->type == type_identifier)
 	{
-		if(expression->right && expression->right->type == type_selector)
-		{
-			Symbol *id_symbol = get_symbol_spot(expression->identifier.token);
-			result = verify_selector(id_symbol->type, expression->right->selector.selected, 
-							expression->identifier.token);
-		}
-		else
-		{
 			if(expression->identifier.symbol_spot)
-				result = expression->identifier.symbol_spot->type;
+					result = expression->identifier.symbol_spot->type;
 			else
 			{
-				result = get_symbol_spot(expression->identifier.token)->type;
+					result = get_symbol_spot(expression->identifier.token)->type;
 			}
-		}
+	}
+
+	else if(expression->type == type_selector)
+	{
+			if(previous == NULL)
+					raise_semantic_error("Used  [.] operator on an invalid expression", desc_token);
+			*previous = verify_selector(*previous, expression->selector.selected, 
+							expression->identifier.token);
 	}
 	else if(expression->type == type_func_call)
 	{
@@ -422,23 +441,13 @@ get_expression_type(Ast_Node *expression, Token_Iden desc_token)
 	}
 	else if(expression->type == type_unary_expr)
 	{
-		result = get_expression_type(expression->unary_expr.expression, desc_token);
+		result = get_expression_type(expression->unary_expr.expression, desc_token, &result);
 	}
 	else result = (Type_Info){T_INVALID};
 	
 	
-	Type_Info left_type = get_expression_type(expression->left, desc_token);
-	Type_Info right_type = {};
-	if(expression->type == type_binary_expr && expression->binary_expr.op == '.')
-	{
-		if(type_is_invalid(left_type) || expression->right->type != type_selector)
-			raise_semantic_error("Invalid usage of [.]", expression->binary_expr.token);
-		
-		result = verify_selector(left_type, expression->right->selector.selected, 
-								 expression->binary_expr.token);
-	}
-	else
-		right_type = get_expression_type(expression->right, desc_token);
+	Type_Info left_type = get_expression_type(expression->left, desc_token, &result);
+	Type_Info right_type = get_expression_type(expression->right, desc_token, &result);
 	
 	
 	
@@ -481,7 +490,7 @@ verify_func_call(Ast_Node *func_call, Token_Iden expr_token)
 	size_t expr_count = SDCount(passed_expr);
 	for(size_t i = 0; i < expr_count; ++i)
 	{
-		Type_Info expr_type = get_expression_type(passed_expr[i], expr_token);
+		Type_Info expr_type = get_expression_type(passed_expr[i], expr_token, NULL);
 		Type_Info arg_type = func_args[i]->variable.type;
 		
 		if(!check_type_compatibility(arg_type, expr_type))
@@ -518,6 +527,7 @@ verify_struct_init(Ast_Node *struct_init, Token_Iden error_token)
 		raise_semantic_error("Incorrect identifier used for struct initialization", init_token);
 	}
 	Ast_Variable *members = struct_type.structure->structure.members;
+	int member_count = struct_type.structure->structure.member_count;
 	
 	if(type_is_invalid(struct_type))
 	{
@@ -525,14 +535,14 @@ verify_struct_init(Ast_Node *struct_init, Token_Iden error_token)
 		vstd_sprintf(error, "Struct %s doesn't exist, error in struct initializer", struct_id);
 		raise_semantic_error(error, init_token);
 	}
-	if(SDCount(expressions) > SDCount(members))
+	if(SDCount(expressions) > member_count)
 	{
 		raise_semantic_error("Too many expressions in struct initialization", init_token);
 	}
 	
 	for(size_t i = 0; i < SDCount(expressions); ++i)
 	{
-		Type_Info expr_type = get_expression_type(expressions[i], init_token);
+		Type_Info expr_type = get_expression_type(expressions[i], init_token, NULL);
 		Type_Info member_type = members[i].type;
 		if(!check_type_compatibility(member_type, expr_type))
 		{
@@ -632,6 +642,18 @@ are_op_compatible(Type_Info a, Type_Info b)
 b32
 check_type_compatibility(Type_Info a, Type_Info b)
 {
+	if(a.type == T_UNTYPED_INTEGER || a.type == T_UNTYPED_FLOAT)
+	{
+		a = untyped_to_type(a);
+		if(a.type == b.type)
+			return true;
+	}	
+	if(b.type == T_UNTYPED_INTEGER || b.type == T_UNTYPED_FLOAT)
+	{
+		b = untyped_to_type(b);
+		if(a.type == b.type)
+			return true;
+	}
 	if(a.type != b.type)
 		return false;
 	if(!vstd_strcmp((char *)a.identifier, (char *)b.identifier))
@@ -644,8 +666,10 @@ void
 verify_struct(Ast_Node *struct_node)
 {
 	Ast_Variable *members = struct_node->structure.members;
+	int member_count = struct_node->structure.member_count;
+
 	Type_Info struct_type = get_type(struct_node->structure.struct_id.name);
-	for(size_t i = 0; i < SDCount(members); ++i)
+	for(size_t i = 0; i < member_count; ++i)
 	{
 		if(struct_type.type == T_STRUCT && members[i].type.type == T_STRUCT && 
 		   vstd_strcmp((char *)members[i].type.identifier, (char *)struct_type.identifier))
@@ -664,6 +688,8 @@ var_type_to_name(Type_Info type)
 	vstd_strcat(result, "[");
 	if(is_type_primitive(type))
 	{
+		if(type.type == T_VOID)
+			type.primitive.size = empty;
 		switch (type.primitive.size)
 		{
 			case byte1: vstd_strcat(result, "i8"); break;
@@ -707,7 +733,7 @@ var_type_to_name(Type_Info type)
 			else
 				edited_copy[e_i++] = result[i];
 		}
-		strcpy_s(result, 1024, edited_copy);
+		strcpy_secure(result, 1024, edited_copy);
 		
 	}
 	else if(type.type == T_STRING)

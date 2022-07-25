@@ -9,12 +9,15 @@
 
 func add_nums(a: i32, b: i32) -> i32
 {
+	unused := 10;
+	a :i32 = unused();
 	-> some_num { a + b }.num;
 }
 
 func main() -> i32
 {
-	-> add_nums(10, 20);
+	-> 10;
+//	-> add_nums(10, 20);
 }
 
 struct some_num

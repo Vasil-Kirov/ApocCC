@@ -1,6 +1,7 @@
 #include <Basic.h>
 #include <Log.h>
 #include <stdarg.h>
+#include <platform/platform.h>
 
 static const char * const LevelLabels[] = {
 	"[FATAL] ", "[ERROR] ", "[WARNING] ", "[DEBUG] ", "[INFO] "
@@ -45,3 +46,4 @@ Log(log_level Level, const char *Format, ...)
 		platform_exit(1);
 	}
 }
+

@@ -1,6 +1,9 @@
 #include <Lexer.h>
 #include <Basic.h>
 #include <Parser.h>
+#include <Memory.h>
+#include <platform/platform.h>
+#include <stdlib/std.h>
 
 static u8 *at_buffer;
 static str_hash_table *keyword_table;
@@ -307,11 +310,19 @@ Token_Iden get_token(char *file)
 			
 			if (result.type == KEYWORD_ERROR)
 			{
+				while(identifier_size)
+				{
+					symbol[--identifier_size] = '\0';
+					result.type = shget(keyword_table, symbol);
+					if(result.type != KEYWORD_ERROR)
+					{
+						rewind_buffer_to(&at_buffer, string_start + identifier_size);
+						return result;
+					}
+				}
 				rewind_buffer_to(&at_buffer, string_start + 1);
 				result.type = string_start[0];
-				return result;
 			}
-
 			return result;
 		}
 	}
@@ -376,9 +387,11 @@ u8 *token_to_str(Token token)
 		case tok_break: return (u8 *)"tok_break"; break;
 		default:
 		{
-			u8 *result = AllocatePermanentMemory(sizeof(u8) * 2);
-			result[0] = (u8)token;
-			result[1] = 0;
+			u8 *result = AllocatePermanentMemory(sizeof(u8) * 4);
+			result[0] = ' ';
+			result[1] = (u8)token;
+			result[2] = ' ';
+			result[3] = '\0';
 			return result;
 		}
 

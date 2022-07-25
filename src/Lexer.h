@@ -8,7 +8,9 @@ extern "C"
 {
 #endif
 
-
+#include <Basic.h>
+#include <Errors.h>
+		
 typedef enum
 	{
 		tok_minus = '-',
@@ -91,7 +93,7 @@ typedef struct _str_hash_table
 	i64 value;
 } str_hash_table;
 
-typedef struct _token
+typedef struct _Token_Iden 
 {
 	u8 *identifier;
 	Token type;
@@ -113,8 +115,8 @@ Token_Iden peek_ahead(int amount);
 Token_Iden get_next_expecting(Token type, const char *error_msg);
 
 u8 *token_to_str(Token token);
-#include <Parser.h>
-u8 *type_to_str(Ast_Type type);
+enum _Ast_Type;
+u8 *type_to_str(enum _Ast_Type type);
 
 u64 get_line_tracker();
 

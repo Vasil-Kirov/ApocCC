@@ -23,7 +23,7 @@ extern "C"
 	
 typedef struct _abstract_syntax_tree Ast_Node;
 
-typedef enum
+typedef enum _Ast_Type
 {
 	type_root         = -100,
 		

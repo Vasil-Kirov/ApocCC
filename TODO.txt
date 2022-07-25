@@ -1,3 +1,8 @@
+- Parser currently doesn't allow for an expression that gives a function pointer to be called immediately
+- e.x. some_func_that_gives_a_func_pointer()()
+- here the function gives back a pointer to a different function that is immediately called
+- the parser curerntly doesn't parse that and the analyzer doesn't analyze it
+
 
 - A way for a variable to be allocated before calling a function and then act as if
 	it was passed in the function but be returned and not make the person

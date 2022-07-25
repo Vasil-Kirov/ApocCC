@@ -1,10 +1,10 @@
 #include <Parser.h>
 #include <Analyzer.h>
+#include <Memory.h>
 
 static b32 reached_eof;
 static Token_Iden last_read_token;
 static const char *expected;
-static b32 is_top_level = true;
 
 #define parse_expect(func, str) \
 	func();                     \
@@ -105,11 +105,12 @@ ast_assignment(Token_Iden identifier_token, Ast_Node *expression)
 }
 
 Ast_Node *
-ast_struct(Ast_Identifier id, Ast_Variable *members)
+ast_struct(Ast_Identifier id, Ast_Variable *members, int  member_count)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_struct;
 	result->structure.struct_id = id;
+	result->structure.member_count = member_count;
 	memcpy(result->structure.members, members, sizeof(Ast_Variable) * REASONABLE_MAXIMUM);
 	
 	return result;
@@ -468,6 +469,7 @@ parse_var(Token_Iden name_token)
 	{
 		get_next_token();
 		type_info.type = T_DETECT;
+		type_info.token = type_tok;
 	}
 	else if(type_tok.type == tok_identifier || type_tok.type == tok_star)
 	{
@@ -521,10 +523,18 @@ parse_identifier(Token_Iden name_token)
 			}
 			return var_parsed;
 		}
+		else if(decider.type == '=')
+		{
+			get_next_token();
+PARSE_ASSIGN_EXPRESSION:;
+			Ast_Node *expression = parse_expression(';');
+			if(expression == NULL)
+				raise_parsing_unexpected_token("expression", decider);
+			return ast_assignment_from_decl(var_parsed->variable, expression);
+		}
 		else
 		{
-			Ast_Node *detect_expression = parse_expression(';');
-			return ast_assignment_from_decl(var_parsed->variable, detect_expression);
+			goto PARSE_ASSIGN_EXPRESSION;
 		}
 	}
 }
@@ -683,6 +693,7 @@ parse_accesor(Ast_Node *selected)
 	return result;
 }
 
+
 Ast_Node *
 parse_atom_expression()
 {
@@ -699,6 +710,7 @@ parse_atom_expression()
 		get_next_token();
 		parser_eat('{');
 		result = parse_struct_initialize(next);
+		result->right = parse_atom_expression();
 	}
 	else if(is_indexing(next, 1))
 	{
@@ -833,6 +845,11 @@ type_is_invalid(Type_Info type)
 Ast_Node *
 parse_expression(Token stop_at)
 {
+	if(peek_next_token().type == stop_at)
+	{
+		get_next_token();
+		return NULL;
+	}
 	Ast_Node *result = parse_binary_expression(stop_at, 1);
 	if(stop_at != '\x18')
 	{
@@ -899,7 +916,7 @@ parse_struct()
 		raise_parsing_unexpected_token("struct members", curr_tok);
 	}
 
-	Ast_Node *result = ast_struct(ast_identifier(struct_id)->identifier, members);
+	Ast_Node *result = ast_struct(ast_identifier(struct_id)->identifier, members, member_count);
 	add_type(result);
 	return result;
 }
@@ -933,7 +950,8 @@ parse_func()
 	}
 	else
 	{
-		func_type.type = T_VOID;		
+		func_type.type = T_VOID;
+		func_type.identifier = (u8 *)"void";
 	}
 	this_func.type = func_type;
 
@@ -945,7 +963,7 @@ parse_func()
 
 	{
 		Symbol this_symbol = {.token = func_identifier, .node = result, 
-			.identifier = this_func.identifier.name, .type = func_type};
+			.identifier = this_func.identifier.name, .type = func_type, .tag = S_FUNCTION};
 		add_symbol(this_symbol, &result->function.identifier);
 	}
 
@@ -956,7 +974,7 @@ parse_func()
 		{
 			Ast_Variable arg = result->function.arguments[i]->variable;
 			Symbol arg_symbol = {.token = func_identifier, .node = result->function.arguments[i],
-				.identifier = arg.identifier.name, .type = arg.type};
+				.identifier = arg.identifier.name, .type = arg.type, .tag = S_FUNC_ARG};
 			add_symbol(arg_symbol, &result->function.identifier);
 		}
 		result->left = parse_body(func_identifier, true);

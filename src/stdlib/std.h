@@ -18,6 +18,9 @@ struct vstdRect
     int y2;
 };
 
+void
+strcpy_secure(char *destination, size_t max_size, const char *source);
+
 u64
 str_to_u64(const char *string);
 
@@ -33,19 +36,19 @@ vstd_strcat_multiple(char *output, int amount, ...);
 void
 vstd_stepout_dir(char *path);
 
-inline b32
+b32
 is_whitespace(char c);
 
-inline b32
+b32
 is_non_special_char(char c);
 
-inline b32
+b32
 is_alpha(char c);
 
-inline b32
+b32
 is_alnum(char c); 
 
-inline b32
+b32
 is_number(char c);
 
 f64

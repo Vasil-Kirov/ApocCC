@@ -1,0 +1,13 @@
+-g
+-std=gnu11
+-O0
+-Wall
+-DCM_LINUX
+-mavx
+-ffast-math
+-DDEBUG
+-lpthread
+--include-directory
+/home/vasko/Programming/Apocalypse/src
+--include-directory
+/home/vasko/Programming/Apocalypse/include

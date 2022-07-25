@@ -54,15 +54,7 @@ typedef struct _entire_file
 #define Assert(expression) if(!(expression)) { LG_FATAL("%s (%d):\n\tAssertion failed.", __FILE__, __LINE__); }
 #define ADD_LOGGER Assert(false)
 
-#include <Lexer.h>
-
-void
-raise_semantic_error(const char *error_msg, Token_Iden token);
-
-void
-raise_token_syntax_error(const char *error_msg, u8 **at_buffer, char *file, u64 line, u64 column);
-
-void
-raise_parsing_unexpected_token(const char *expected_tok, Token_Iden token);
+#include <stdlib/std.h>
+#include <Log.h>
 
 #endif //_BASIC_H
