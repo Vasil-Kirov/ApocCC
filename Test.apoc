@@ -1,26 +1,14 @@
 
-// This is a comment
-
-// TODO(Vasko): implement else
-//	else
-//	{
-//		nums = Two_Nums {9, "this shouldn't go here"};
-//	}
+func printf(str:* u8, ...) -> i32;
 
 func add_nums(a: i32, b: i32) -> i32
 {
-	unused := 10;
-	a :i32 = unused();
-	-> some_num { a + b }.num;
+	-> a + b;
 }
 
 func main() -> i32
 {
+	number := add_nums(10, 15);
+	printf("Hello World %d", number);
 	-> 10;
-//	-> add_nums(10, 20);
-}
-
-struct some_num
-{
-	num: i32;
 }

@@ -579,7 +579,7 @@ parse_indexing(Token_Iden identifier)
 	Ast_Node *result = alloc_node();
 	result->type = type_index;
 	result->index.expression = parse_expression(']');
-	result->index.indentifier = pure_identifier(identifier);
+	result->index.identifier = pure_identifier(identifier);
 	return result;
 }
 
@@ -756,6 +756,12 @@ parse_atom_expression()
 		result->type = type_postfix;
 		result->postfix.type = tok_plusplus;
 	}
+	else if(next.type == tok_minusminus)
+	{
+		get_next_token();
+		result->type = type_postfix;
+		result->postfix.type = tok_minusminus;
+	}
 
 	// NOTE(Vasko): probably not needed anymore
 	last_read_token = next;
@@ -858,25 +864,51 @@ parse_expression(Token stop_at)
 	return result;
 }
 
+u8 *
+ptr_to_identifier(Type_Info ptr)
+{
+	if(ptr.type == T_POINTER)
+	{
+		u8 *result = ptr_to_identifier(*ptr.pointer.type);
+		vstd_strcat((char *)result, "*");
+		return result;
+	}
+	else
+	{
+		Assert(ptr.identifier);
+		size_t len = vstd_strlen((char *)ptr.identifier);
+		u8 *result = AllocateCompileMemory(len + 64);
+		memcpy(result, ptr.identifier, len);
+		return result;
+	}
+}
 
 Type_Info
 parse_type()
 {
 	Type_Info result = {};
-	Token_Iden pointer_or_type = get_next_token();
+	Token_Iden pointer_or_type = peek_next_token();
 	result.token = pointer_or_type;
 	
 	if (pointer_or_type.type == '*')
 	{
+		get_next_token();
 		result.type = T_POINTER;
 		Type_Info pointed = parse_type();
 		result.pointer.type = AllocateCompileMemory(sizeof(Type_Info));
 		memcpy(result.pointer.type, &pointed, sizeof(Type_Info));
+		result.identifier = ptr_to_identifier(result);
 	}
-	else
+	else if(pointer_or_type.type == tok_identifier)
 	{
 		// @Note: Invalid types are checked in analyzer
 		result = get_type(pointer_or_type.identifier);
+		if(!type_is_invalid(result))
+			get_next_token();
+	}
+	else
+	{
+		result = (Type_Info){.type = T_INVALID};
 	}
 	result.token = pointer_or_type;
 	return result;
@@ -926,6 +958,10 @@ parse_func_arg()
 {
 	// @TODO: fix
 	Token_Iden identifier_token = get_next_token();
+	if(identifier_token.type == tok_var_args)
+	{
+		return ast_variable((Type_Info){.type = T_DETECT}, pure_identifier(identifier_token), true);
+	}
 	Ast_Node *result = parse_var(identifier_token);
 	if(result == NULL)
 		raise_parsing_unexpected_token("correctly formated argument", identifier_token);
@@ -947,6 +983,14 @@ parse_func()
 	if (peek_next_token().type != '{')
 	{
 		func_type = parse_type();
+		if(type_is_invalid(func_type))
+		{
+			if(peek_next_token().type != ';')
+			{
+				raise_parsing_unexpected_token("valid type", peek_next_token());
+			}
+			func_type = (Type_Info){.type = T_VOID, .identifier = (u8 *)"void", .primitive.size = empty};
+		}
 	}
 	else
 	{

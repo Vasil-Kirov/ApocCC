@@ -85,6 +85,8 @@ typedef enum
 		tok_break = -40,
 		tok_else = -41,
 
+		tok_var_args = -42,
+
 	} Token;
 
 typedef struct _str_hash_table

@@ -10,17 +10,17 @@ typedef struct _abstract_syntax_tree Ast_Node;
 typedef enum
 {
 	invalid_type = 0xFFFF,
-	byte1  = 0x001,
-	byte2  = 0x004,
-	byte4  = 0x010,
-	byte8  = 0x040,
-	ubyte1 = 0x002,
-	ubyte2 = 0x008,
-	ubyte4 = 0x020,
-	ubyte8 = 0x080,
-	real32 = 0x1000,
-	real64 = 0x2000,
-	empty  = 0x4000,
+	byte1  = 1,
+	byte2  = 2,
+	byte4  = 3,
+	byte8  = 4,
+	ubyte1 = 5,
+	ubyte2 = 6,
+	ubyte4 = 7,
+	ubyte8 = 8,
+	real32 = 9,
+	real64 = 10,
+	empty  = 11,
 	detect // @TODO: Remove
 } Var_Size;
 

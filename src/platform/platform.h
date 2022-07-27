@@ -2,6 +2,12 @@
 
 #ifndef PLATFORM_H
 #define PLATFORM_H
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #include <Basic.h>
 #include <Log.h>
 
@@ -87,5 +93,12 @@ platform_write_file(void *Data, i32 BytesToWrite, const char *Path, b32 Overwrit
 
 b32
 platform_read_entire_file(void *Data, u64 *Size, char *Path);
+
+void
+platform_call(const char *command);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //PLATFORM_H

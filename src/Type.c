@@ -8,6 +8,15 @@ is_pointer_rhs_compatible(Type_Info type)
 }
 
 b32
+is_string_pointer(Type_Info type)
+{
+	if(type.type == T_POINTER && type.pointer.type->type == T_INTEGER &&
+		(type.pointer.type->primitive.size == ubyte1 || type.pointer.type->primitive.size == byte1))
+		return true;
+	return false;
+}
+
+b32
 is_type_primitive(Type_Info type)
 {
 	if(type.type == T_UNTYPED_INTEGER || type.type == T_UNTYPED_FLOAT || 

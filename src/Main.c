@@ -10,6 +10,7 @@
 #include <Analyzer.h>
 #include <Stack.h>
 #include <Errors.h>
+#include <C_Backend.h>
 
 #include <platform/platform.h>
 
@@ -62,18 +63,22 @@ int main(int argc, char *argv[])
 		LG_FATAL("apoc [file]");	
 	}
 
-	LG_WARN("Lexing...");
+	LG_INFO("Lexing...");
 	lex_file(argv[1]);
-	LG_WARN("Done.");
+	LG_INFO("Done.");
 	
-	LG_WARN("Parsing...");
+	LG_INFO("Parsing...");
 	Ast_Node *ast_tree = parse();
-	LG_WARN("Done.");
+	LG_INFO("Done.");
 	
-	LG_WARN("Performing semantic analysis");
+	LG_INFO("Performing semantic analysis...");
 	analyze(ast_tree);
-	LG_WARN("Done.");
+	LG_INFO("Done.");
 
+	LG_INFO("Generating code...");
+	c_backend_generate(ast_tree, get_type_table());
+	LG_INFO("Done.");
+	
 	ResetCompileMemory();
 	return 0;
 }

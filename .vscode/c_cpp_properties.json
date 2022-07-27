@@ -46,7 +46,7 @@
             "windowsSdkVersion": "10.0.19041.0",
             "compilerPath": "C:\\Program Files\\LLVM\\bin\\clang.exe",
             "cStandard": "c11",
-            "cppStandard": "c++11",
+            "cppStandard": "c++17",
             "intelliSenseMode": "windows-clang-x64",
             "compilerArgs": [
                 "/Zc:preprocessor-"

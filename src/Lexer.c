@@ -88,6 +88,7 @@ initialize_compiler()
 	shput(keyword_table, "|=", tok_or_equals);
 	shput(keyword_table, "<<=", tok_lshift_equals);
 	shput(keyword_table, ">>=", tok_rshift_equals);
+	shput(keyword_table, "...", tok_var_args);
 
 	// NOTE(Vasko): Add basic types to string hash table
 	add_primitive_type("i8",   byte1);
@@ -258,13 +259,18 @@ Token_Iden get_token(char *file)
 			advance_buffer(&at_buffer);
 			while(*at_buffer != '"')
 			{
+				if(*at_buffer == '\\')
+				{
+					advance_buffer(&at_buffer);
+					advance_buffer(&at_buffer);
+				}
 				advance_buffer(&at_buffer);
 			}
 			advance_buffer(&at_buffer);
-			u64 num_size = at_buffer - string_start;
+			u64 num_size = at_buffer - string_start + 1;
 			u8 *number_string = AllocateCompileMemory(num_size);
 			memcpy(number_string, string_start, num_size);
-			number_string[num_size] = '\0';
+			number_string[num_size-1] = '\0';
 
 			return (Token_Iden){.type = tok_const_str, .identifier = number_string, .line = start_line,
 								.column = start_col, .file = file};

@@ -18,6 +18,14 @@ void
 RegisterRawInput();
 
 void
+platform_call(const char *command)
+{
+	STARTUPINFO st = {};
+	PROCESS_INFORMATION pc = {};
+	CreateProcessA(NULL, (LPSTR)command, NULL, NULL, true, 0, NULL, NULL, &st, &pc);
+}
+
+void
 platform_get_absolute_path(char *Out)
 {
 	if (!GetModuleFileNameA(NULL, Out, MAX_PATH))

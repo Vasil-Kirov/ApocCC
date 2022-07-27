@@ -4,10 +4,10 @@
             "type": "shell",
             "label": "Build Engine",
             "windows": {
-                "command": "${workspaceFolder}/build.bat"
+                "command": "${workspaceFolder}/b.bat"
             },
             "linux": {
-                "command": "${workspaceFolder}/build.sh"
+                "command": "${workspaceFolder}/b.sh"
             },
             "options": {
                 "cwd": "${workspaceFolder}/"

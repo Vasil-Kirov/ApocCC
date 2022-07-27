@@ -26,12 +26,14 @@ IF [%1] == [] (
 )
 
 SET LLVM_INCLUDE=-I"E:\GitClone\llvm-project\llvm\include"
-SET LinkerFlags=-luser32 -lGdi32 -lOpenGL32
-SET CompilerFlags=%CompilerFlags% -ffast-math -mavx
+SET LinkerFlags=-luser32 -lShell32.lib
+SET CompilerFlags=%CompilerFlags% -ffast-math -mavx -Wno-microsoft-enum-forward-reference
 SET Includes=-I ..\src -I ..\include
+SET BackendFiles=..\src\Code-Gen.cpp ..\src\C_Backend.cpp
 
 PUSHD bin
-clang.exe -o apoc.exe %CompilerFlags% %Includes% %LLVM_INCLUDE% ..\src\Main.c ..\src\Code-Gen.cpp %LinkerFlags%
+REM clang++.exe -c -o backend.lib %BackendFiles% %CompilerFlags% %Includes% %LLVM_INCLUDE%
+clang.exe -o apoc.exe %BackendFiles% ..\src\Main.c %CompilerFlags% %Includes% %LLVM_INCLUDE% %LinkerFlags%
 POPD
 
 

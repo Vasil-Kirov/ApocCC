@@ -3,13 +3,10 @@
 #ifndef _PARSER_H
 #define _PARSER_H
 
-//@TODO: REMOVE COMMENT
-/*
 #ifdef __cplusplus
 extern "C"
 {
 #endif
-*/
 
 #define REASONABLE_MAXIMUM 256
 
@@ -181,7 +178,7 @@ typedef struct
 
 typedef struct
 {
-	Ast_Identifier indentifier;
+	Ast_Identifier identifier;
 	Ast_Node *expression;
 } Ast_Indexing;
 
@@ -272,10 +269,8 @@ parse_func();
 void
 parser_eat(Token expected_token);
 
-// @TODO: Remove comment
-/*
 #ifdef __cplusplus
 }
 #endif
-*/
+
 #endif //_PARSER_H

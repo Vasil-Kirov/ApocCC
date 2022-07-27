@@ -31,8 +31,10 @@ typedef u32 b32;
 typedef float f32;
 typedef double f64;
 
+#ifndef __cplusplus
 #define true 1
 #define false 0
+#endif
 
 typedef struct _entire_file
 {

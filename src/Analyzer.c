@@ -8,6 +8,12 @@ static Stack scope_stack;
 static Scope_Info *scopes;
 
 
+Type_Table *
+get_type_table()
+{
+	return type_table;
+}
+
 void
 initialize_analyzer()
 {
@@ -194,6 +200,13 @@ verify_func(Ast_Node *node)
 	Assert(node->function.type.identifier);
 	Token_Iden type_error_token = node->function.type.token;
 	node->function.type = get_type(node->function.type.identifier);
+	size_t arg_count = SDCount(node->function.arguments);
+	for (size_t i = 0; i < arg_count; i++)
+	{
+		if(node->function.arguments[i]->variable.type.type == T_DETECT && i != arg_count - 1)
+			raise_semantic_error("Variable length arguments must be last in the function signature", node->function.identifier.token);
+	}
+	
 	if(node->function.type.type == T_INVALID)
 	{
 		char error_msg[1024] = {};
@@ -484,28 +497,42 @@ get_expression_type(Ast_Node *expression, Token_Iden desc_token, Type_Info *prev
 Type_Info
 verify_func_call(Ast_Node *func_call, Token_Iden expr_token)
 {
+	b32 has_va_args = false;
 	Symbol *func_sym = get_symbol_spot(func_call->func_call.identifier.token);
 	Ast_Node **func_args = func_sym->node->function.arguments;
 	Ast_Node **passed_expr = func_call->func_call.arguments;
 	size_t expr_count = SDCount(passed_expr);
+	size_t args_count = SDCount(func_args);
+
+	size_t j = 0;
 	for(size_t i = 0; i < expr_count; ++i)
 	{
 		Type_Info expr_type = get_expression_type(passed_expr[i], expr_token, NULL);
-		Type_Info arg_type = func_args[i]->variable.type;
-		
-		if(!check_type_compatibility(arg_type, expr_type))
+		Type_Info arg_type = func_args[j]->variable.type;
+		if(arg_type.type == T_DETECT)
+		{
+			has_va_args = true;
+		}
+		else if(!check_type_compatibility(arg_type, expr_type))
 		{
 			char *error = AllocateCompileMemory(2048);
 			vstd_sprintf(error, "Expression #%d in function call is of type %s,"
 						 " argument #%d is of incompatible type %s",
 						 i + 1,
 						 var_type_to_name(expr_type),
-						 i + 1,
+						 j + 1,
 						 var_type_to_name(arg_type));
-			raise_semantic_error(error, expr_token);
+			raise_semantic_error(error, func_call->func_call.identifier.token);
 		}
+		if(!has_va_args)
+			j++;
 	}
-	
+	if(!has_va_args && args_count != expr_count)
+	{
+		char *error = AllocateCompileMemory(2048);
+		vstd_sprintf(error, "Incorrect number of arguments, passed %d, function required %d", expr_count, args_count);
+		raise_semantic_error(error, func_call->func_call.identifier.token);
+	}	
 	return func_sym->type;
 }
 
@@ -654,6 +681,10 @@ check_type_compatibility(Type_Info a, Type_Info b)
 		if(a.type == b.type)
 			return true;
 	}
+	if(a.type == T_STRING && is_string_pointer(b))
+		return true;
+	if(b.type == T_STRING && is_string_pointer(a))
+		return true;
 	if(a.type != b.type)
 		return false;
 	if(!vstd_strcmp((char *)a.identifier, (char *)b.identifier))
