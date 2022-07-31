@@ -3,28 +3,17 @@
 #include <stdlib/std.h>
 #include <Memory.h>
 
-static Type_Table *type_table;
-static Stack scope_stack;
-static Scope_Info *scopes;
-
-
-Type_Table *
-get_type_table()
-{
-	return type_table;
-}
-
 void
-initialize_analyzer()
+initialize_analyzer(File_Contents *f)
 {
 	Type_Info invalid = {.type = T_INVALID};
-	shdefault(type_table, invalid);
-	scopes = SDCreate(Scope_Info);
-	scope_stack = stack_allocate(Scope_Info);
+	shdefault(f->type_table, invalid);
+	f->scopes = SDCreate(Scope_Info);
+	f->scope_stack = stack_allocate(Scope_Info);
 }
 
 void
-add_primitive_type(const char *name, Var_Size size)
+add_primitive_type(File_Contents *f, const char *name, Var_Size size)
 {
 	Type type = T_INVALID;
 	if(size < real32)
@@ -33,6 +22,8 @@ add_primitive_type(const char *name, Var_Size size)
 		type = T_FLOAT;
 	else if(size == empty)
 		type = T_VOID;
+	else if(size == logical_bit)
+		type = T_BOOLEAN;
 	
 	Assert(type != T_INVALID);
 	
@@ -41,14 +32,14 @@ add_primitive_type(const char *name, Var_Size size)
 		.primitive.size = size,
 	};
 
-	if(shgeti(type_table, name) == -1)
+	if(shgeti(f->type_table, name) == -1)
 	{
-		shput(type_table, name, type_info);
+		shput(f->type_table, name, type_info);
 	}
 }
 
 void
-add_type(Ast_Node *structure)
+add_type(File_Contents *f, Ast_Node *structure)
 {
 	Assert(structure->type == type_struct);
 	Type_Info type_info = {
@@ -62,52 +53,52 @@ add_type(Ast_Node *structure)
 		Symbol member_symbol = {.tag = S_STRUCT_MEMBER, .s_member.index = i,
 			.identifier = s.members[i].identifier.name, .type = s.members[i].type,
 			.node = structure};
-		add_symbol(member_symbol, &s.members[i].identifier);
+		add_symbol(f, member_symbol, &s.members[i].identifier);
 		
 	}
 	
-	if(shgeti(type_table, structure->structure.struct_id.name) != -1)
+	if(shgeti(f->type_table, structure->structure.struct_id.name) != -1)
 	{
 		raise_semantic_error("Redifinition of symbol", structure->structure.struct_id.token);
 	}
-	shput(type_table, structure->structure.struct_id.name, type_info);
+	shput(f->type_table, structure->structure.struct_id.name, type_info);
 }
 
 Type_Info
-get_type(u8 *name)
+get_type(File_Contents *f, u8 *name)
 {
-	Type_Info got = shget(type_table, name);
+	Type_Info got = shget(f->type_table, name);
 	got.identifier = name;
 	return got;
 }
 
 void
-push_scope(Scope_Info current_scope)
+push_scope(File_Contents *f, Scope_Info current_scope)
 {
 	current_scope.symbol_table = SDCreate(Symbol);
-	stack_push(scope_stack, current_scope);
+	stack_push(f->scope_stack, current_scope);
 }
 
 b32
-is_scope_stack_empty() { return is_stack_empty(scope_stack); } 
+is_scope_stack_empty(File_Contents *f) { return is_stack_empty(f->scope_stack); } 
 
 void
-pop_scope(Token_Iden closing_token)
+pop_scope(File_Contents *f, Token_Iden scope_tok)
 {
-	if(is_scope_stack_empty())
+	if(is_scope_stack_empty(f))
 	{
-		raise_semantic_error("Found a closing scope with no matching openning one", closing_token);
+		raise_semantic_error("Found a closing scope with no matching openning one", scope_tok);
 	}
 
 	Scope_Info saved_scopes[4096] = {};
 	size_t last_scope = 0;
-	Scope_Info popped = stack_pop(scope_stack, Scope_Info);
+	Scope_Info popped = stack_pop(f->scope_stack, Scope_Info);
 	popped.end_line = get_line_tracker();
 	Symbol *popped_table = popped.symbol_table;
 	size_t symbol_table_size = SDCount(popped_table);
-	while(!is_stack_empty(scope_stack))
+	while(!is_scope_stack_empty(f))
 	{
-		Scope_Info to_scan = stack_pop(scope_stack, Scope_Info);
+		Scope_Info to_scan = stack_pop(f->scope_stack, Scope_Info);
 		size_t scan_size = SDCount(to_scan.symbol_table);
 		Symbol *scanning_table = to_scan.symbol_table;
 
@@ -130,24 +121,34 @@ pop_scope(Token_Iden closing_token)
 	
 	for(signed int i = last_scope - 1; i >= 0; --i)
 	{
-		stack_push(scope_stack, saved_scopes[i]);
+		stack_push(f->scope_stack, saved_scopes[i]);
 	}
 
-	SDPush(scopes, popped);
+	SDPush(f->scopes, popped);
 }
 
 void
-add_symbol(Symbol symbol, Ast_Identifier *identifier)
+add_symbol(File_Contents *f, Symbol symbol, Ast_Identifier *identifier)
 {
-	Scope_Info stack_top = stack_peek(scope_stack, Scope_Info);
+	Scope_Info stack_top = stack_peek(f->scope_stack, Scope_Info);
 	Symbol *symbol_table = stack_top.symbol_table;
 	SDPush(symbol_table, symbol);
 	identifier->symbol_spot = &symbol_table[SDCount(symbol_table) - 1];
 }
 
+void
+raise_formated_semantic_error(Token_Iden token, const char *format, ...)
+{
+	char *error = AllocateCompileMemory(4096);
+	va_list args;
+	va_start(args, format);
+	vstd_vsnsprintf(error, strlen(format), format, args);
+	va_end(args);
+	raise_semantic_error(error, token);
+}
 
 void
-analyze(Ast_Node *ast_tree)
+analyze(File_Contents *f, Ast_Node *ast_tree)
 {
 	/*
 	for (size_t i = 0; i < SDCount(symbol_table); i++)
@@ -157,7 +158,7 @@ analyze(Ast_Node *ast_tree)
 	}
 	*/
 	Scope_Info scope_info = {.file = (const char *)get_file_name(), .start_line = 1};
-	push_scope(scope_info);
+	push_scope(f, scope_info);
 	analyze_file_level_statement(ast_tree);
 	
 }
@@ -195,11 +196,11 @@ analyze_file_level_statement(Ast_Node *node)
 }
 
 void
-verify_func(Ast_Node *node)
+verify_func(File_Contents *f, Ast_Node *node)
 {
 	Assert(node->function.type.identifier);
 	Token_Iden type_error_token = node->function.type.token;
-	node->function.type = get_type(node->function.type.identifier);
+	node->function.type = get_type(f, node->function.type.identifier);
 	size_t arg_count = SDCount(node->function.arguments);
 	for (size_t i = 0; i < arg_count; i++)
 	{
@@ -230,6 +231,25 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 	if(node == NULL) return;
 	switch(node->type)
 	{
+		case type_for:
+		{
+			if(node->for_loop.type == F_STANDARD)
+			{
+				Type_Info expression = get_expression_type(node->for_loop.expr2, node->for_loop.token, NULL);
+				if(expression.type != T_BOOLEAN)
+				{
+					raise_formated_semantic_error(node->for_loop.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(expression));
+				}
+			}
+			else
+			{
+				Type_Info expression = get_expression_type(node->for_loop.expr1, node->for_loop.token, NULL);
+				if(expression.type != T_BOOLEAN)
+				{
+					raise_formated_semantic_error(node->for_loop.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(expression));
+				}
+			}
+		} break;
 		case type_var:
 		{
 			Ast_Variable var = node->variable;
@@ -237,9 +257,21 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 				.type =var.type, .node = node, .token = var.identifier.token, .tag = S_VARIABLE};
 			add_symbol(symbol, &node->variable.identifier);
 		}break;
+		case type_if:
+		{
+			Type_Info if_type = get_expression_type(node->condition, node->left->scope_desc.token, NULL);
+			if(if_type.type != T_BOOLEAN)
+			{
+				raise_formated_semantic_error(node->left->scope_desc.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(if_type));
+			}
+		} break;
 		case type_assignment:
 		{
 			verify_assignment(node);
+		} break;
+		case type_func_call:
+		{
+			verify_func_call(node, node->func_call.identifier.token);
 		} break;
 		case type_scope_end:
 		{
@@ -411,6 +443,47 @@ untyped_to_type(Type_Info type)
 }
 
 Type_Info
+get_binary_expr_type(Ast_Node *expr, Type_Info left, Type_Info right)
+{
+	Assert(expr->type == type_binary_expr);
+	if(!check_type_compatibility(left, right))
+	{
+		char *error = AllocateCompileMemory(4096);
+		vstd_sprintf(error, "Types %s and %s are incompatible", var_type_to_name(left), var_type_to_name(right));
+		raise_semantic_error(error, expr->binary_expr.token);
+	}
+	switch(expr->binary_expr.op)
+	{
+		case tok_logical_or:	 // ||
+		case tok_logical_is:	 // ==
+		case tok_logical_isnot: // !=
+		case tok_logical_and:	 // &&
+		case tok_logical_lequal:
+		case tok_logical_gequal:
+		case tok_logical_greater:
+		case tok_logical_lesser:
+		{
+			return (Type_Info){.type = T_BOOLEAN, .primitive.size = logical_bit};
+		} break;
+		default:
+		{
+			return left;
+		} break;
+	
+	}
+}
+
+b32
+is_bits_op(Token op)
+{
+	return op == tok_bits_lshift || op == tok_bits_rshift ||
+		op == tok_bits_or ||
+		op == tok_bits_xor ||
+		op == tok_bits_not ||
+		op == tok_bits_and;
+}
+
+Type_Info
 get_expression_type(Ast_Node *expression, Token_Iden desc_token, Type_Info *previous)
 {
 	if(expression == NULL)
@@ -426,7 +499,6 @@ get_expression_type(Ast_Node *expression, Token_Iden desc_token, Type_Info *prev
 					result = get_symbol_spot(expression->identifier.token)->type;
 			}
 	}
-
 	else if(expression->type == type_selector)
 	{
 			if(previous == NULL)
@@ -457,13 +529,43 @@ get_expression_type(Ast_Node *expression, Token_Iden desc_token, Type_Info *prev
 		result = get_expression_type(expression->unary_expr.expression, desc_token, &result);
 	}
 	else result = (Type_Info){T_INVALID};
-	
-	
-	Type_Info left_type = get_expression_type(expression->left, desc_token, &result);
-	Type_Info right_type = get_expression_type(expression->right, desc_token, &result);
-	
-	
-	
+
+	result = fix_type(result);	
+	Type_Info left_type = fix_type(get_expression_type(expression->left, desc_token, &result));
+	Type_Info right_type = fix_type(get_expression_type(expression->right, desc_token, &result));
+
+	if(expression->type == type_cast)
+	{
+		Type_Info cast_type = fix_type(expression->cast.type);
+		if(!is_castable(right_type, cast_type))
+		{
+			raise_formated_semantic_error(expression->cast.token, "Cannot cast type %s to %s",
+											var_type_to_name(right_type), var_type_to_name(cast_type));
+		}
+		result = cast_type; 
+		right_type = cast_type;
+		expression->cast.type = cast_type;
+	}
+	else if(expression->type == type_binary_expr)
+	{
+		if(is_bits_op(expression->binary_expr.op))
+		{
+			if(is_float(left_type) || is_float(right_type))
+				raise_semantic_error("Cannot perform a bitwise operation on a floating point number", expression->binary_expr.token);
+		}
+		if(!type_is_invalid(left_type) && !type_is_invalid(right_type))
+			return get_binary_expr_type(expression, left_type, right_type);
+	}
+	else if(expression->type == type_unary_expr)
+	{
+		if(expression->unary_expr.op == tok_not)
+		{
+			if(right_type.type != T_BOOLEAN)
+			{
+				raise_semantic_error("Cannot use [ ! ] operator not a non boolean expression", desc_token);
+			}
+		}
+	}
 	if(!type_is_invalid(left_type))
 	{
 		if(type_is_invalid(result))
@@ -569,6 +671,7 @@ verify_struct_init(Ast_Node *struct_init, Token_Iden error_token)
 	
 	for(size_t i = 0; i < SDCount(expressions); ++i)
 	{
+		members[i].type = fix_type(members[i].type);
 		Type_Info expr_type = get_expression_type(expressions[i], init_token, NULL);
 		Type_Info member_type = members[i].type;
 		if(!check_type_compatibility(member_type, expr_type))
@@ -671,15 +774,29 @@ check_type_compatibility(Type_Info a, Type_Info b)
 {
 	if(a.type == T_UNTYPED_INTEGER || a.type == T_UNTYPED_FLOAT)
 	{
+		if(a.type == T_UNTYPED_FLOAT && b.type == T_INTEGER)
+			return false;
+
+		if(is_integer(b) || is_float(b))
+			return true;
+		/*
 		a = untyped_to_type(a);
 		if(a.type == b.type)
 			return true;
+		*/
 	}	
 	if(b.type == T_UNTYPED_INTEGER || b.type == T_UNTYPED_FLOAT)
 	{
+		if(b.type == T_UNTYPED_FLOAT && a.type == T_INTEGER)
+			return false;
+		
+		if(is_integer(a) || is_float(a))
+			return true;
+		/*
 		b = untyped_to_type(b);
 		if(a.type == b.type)
 			return true;
+		*/
 	}
 	if(a.type == T_STRING && is_string_pointer(b))
 		return true;
@@ -735,7 +852,14 @@ var_type_to_name(Type_Info type)
 			case real64: vstd_strcat(result, "r64"); break;
 			case detect: vstd_strcat(result, "detect"); break;
 			case empty: vstd_strcat(result, "void"); break;
-			default: vstd_strcat(result, "untyped number"); break;
+			case logical_bit: vstd_strcat(result, "b32"); break;
+			default:
+			{
+				if(type.type == T_UNTYPED_INTEGER)
+					vstd_strcat(result, "untyped integer");
+				else if(type.type == T_UNTYPED_FLOAT)
+					vstd_strcat(result, "untyped float");
+			} break;
 		}
 	}
 	else if(type.type == T_STRUCT)
@@ -773,7 +897,10 @@ var_type_to_name(Type_Info type)
 	}
 	else
 	{
-		vstd_strcat(result, "[not implemented]");
+		if(type.identifier)
+			vstd_strcat(result, (char *)type.identifier);
+		else
+			vstd_strcat(result, " 'unkown' ");
 	}
 	
 	vstd_strcat(result, "]");

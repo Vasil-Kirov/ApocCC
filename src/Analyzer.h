@@ -46,6 +46,23 @@ typedef struct
 	Symbol *symbol_table;
 } Scope_Info;
 
+typedef struct _File_Contents
+{
+	Token_Iden *prev_token;
+	Token_Iden *curr_token;
+	Token_Iden *next_token;
+	Token_Iden *saved_token;
+	Token_Iden *token_buffer;
+	Type_Table *type_table;
+	Stack		scope_stack;
+	Scope_Info *scopes;
+	u64         file_size;
+	char       *file_data;
+	char       *at;
+	char       *path;
+	u64 current_line;
+	u64 current_column;
+} File_Contents;
 
 void
 push_scope(Scope_Info current_scope);

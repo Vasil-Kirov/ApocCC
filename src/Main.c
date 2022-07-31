@@ -64,11 +64,11 @@ int main(int argc, char *argv[])
 	}
 
 	LG_INFO("Lexing...");
-	lex_file(argv[1]);
+	File_Contents *f = lex_file(argv[1]);
 	LG_INFO("Done.");
 	
 	LG_INFO("Parsing...");
-	Ast_Node *ast_tree = parse();
+	Ast_Node *ast_tree = parse(f);
 	LG_INFO("Done.");
 	
 	LG_INFO("Performing semantic analysis...");
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 	LG_INFO("Done.");
 
 	LG_INFO("Generating code...");
-	c_backend_generate(ast_tree, get_type_table());
+	c_backend_generate(ast_tree, type_table, scopes);
 	LG_INFO("Done.");
 	
 	ResetCompileMemory();

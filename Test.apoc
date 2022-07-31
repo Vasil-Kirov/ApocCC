@@ -1,14 +1,25 @@
-
 func printf(str:* u8, ...) -> i32;
-
-func add_nums(a: i32, b: i32) -> i32
-{
-	-> a + b;
-}
 
 func main() -> i32
 {
-	number := add_nums(10, 15);
-	printf("Hello World %d", number);
-	-> 10;
+	//val := Values {5, 5};
+	//num := #i64(10 + #i32!#b32#i32(-val.f1));
+	//num = #f32 num * 2.5;	
+	num := 13;
+	a_float := #f32 num * 2.5;
+	for i := 0; i < 10; i++
+	{
+		a_float += i;
+	}
+
+	printf("%f", a_float);
+
+	-> 0;
+}
+
+
+struct Values
+{
+	f1: f32;
+	i1: i32;
 }

@@ -21,6 +21,7 @@ typedef enum
 	real32 = 9,
 	real64 = 10,
 	empty  = 11,
+	logical_bit = 12,
 	detect // @TODO: Remove
 } Var_Size;
 
@@ -37,6 +38,7 @@ typedef enum
 	T_INVALID         = 1 << 8,
 	T_VOID            = 1 << 9,
 	T_STRING          = 1 << 10,
+	T_BOOLEAN		  = 1 << 11,
 } Type;
 
 typedef enum

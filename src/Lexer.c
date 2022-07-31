@@ -5,48 +5,41 @@
 #include <platform/platform.h>
 #include <stdlib/std.h>
 
-static u8 *at_buffer;
 static str_hash_table *keyword_table;
-static Token_Iden *token_buffer;
-static u64 last_token;
-static u64 current_line;
-static u64 current_column;
-static u64 token_line_tracker;
 
 #define KEYWORD_ERROR 32767
 
 void
-advance_buffer(u8 **buffer)
+advance_buffer(File_Contents *f)
 {
-	if(**buffer != '\0')
+	if(*f->at != '\0')
 	{
-		if(**buffer == '\n')
+		if(*f->at == '\n')
 		{
-			current_line++;
-			current_column = 1;
+			f->current_line++;
+			f->current_column = 1;
 		}
 		else
-			current_column++;
-		(*buffer)++;
+			f->current_column++;
+		f->at++;
 	}
 }
 
 void
-rewind_buffer_to(u8 **buffer, u8 *to)
+rewind_buffer_to(File_Contents *f, u8 *to)
 {
-	while(*buffer != to)
-		{
-			current_column--;
-			(*buffer)--;
-			
-			char c = **buffer;
-			if(c == '\n')
-				{
-					current_line--;
-					current_column = 1;
-				}
+	while (f->at != to)
+	{
+		f->current_column--;
+		f->at--;
 
+		char c = *f->at;
+		if (c == '\n')
+		{
+			f->current_line--;
+			f->current_column = 1;
 		}
+	}
 }
 
 void
@@ -101,59 +94,50 @@ initialize_compiler()
 	add_primitive_type("u32",  ubyte4);
 	add_primitive_type("u64",  ubyte8);
 
-	add_primitive_type("r32",  real32);
-	add_primitive_type("r64",  real64);
+	add_primitive_type("f32",  real32);
+	add_primitive_type("f64",  real64);
 
 	add_primitive_type("void", empty);
+	add_primitive_type("b32", logical_bit);
+}
+
+void
+save_token_position(File_Contents *f) {f->saved_token = f->curr_token;}
+
+void
+load_token_position(File_Contents *f)
+{
+	Assert(f->saved_token != 0);
+	f->curr_token = f->saved_token;
 }
 
 Token_Iden
-get_prev_token() { return token_buffer[last_token - 1]; }
-
-Token_Iden
-get_next_token() 
+advance_token(File_Contents *f) 
 {
-	token_line_tracker = token_buffer[last_token].line;
-	return token_buffer[last_token++]; 
+	f->curr_token++;
+	f->prev_token++;
+	f->next_token++;
+	return *f->prev_token;
 }
 
 Token_Iden
-peek_next_token() { return token_buffer[last_token]; }
-
-Token_Iden
-peek_ahead(int amount) { return token_buffer[last_token + amount]; }
-
-Token_Iden
-get_next_expecting(Token type, const char *error_msg)
+get_next_expecting(File_Contents *f, Token type, const char *error_msg)
 {
-	Token_Iden token = token_buffer[last_token++];
+	Token_Iden token = advance_token(f);
 	if(token.type != type)
-		{
-			raise_parsing_unexpected_token(error_msg, token);
-		}
+	{
+		raise_parsing_unexpected_token(error_msg, token);
+	}
 	return token;
 }
 
-u8 *file;
-u8 *get_file_name()
-{
-	return file;
-}
 
-u64
-get_line_tracker(){ return token_line_tracker; }
-
-
-void
+File_Contents *
 lex_file(char *path)
 {
-	file = (u8 *)path;
-	if(token_buffer) 
-	{
-		arrfree(token_buffer);
-		token_buffer = NULL;
-	}
-	
+	File_Contents *f = AllocatePermanentMemory(sizeof(File_Contents));
+	memset(f, 0, sizeof(File_Contents));
+	f->path = (u8 *)path;
 	entire_file file_buffer;
 	
 	file_buffer.size = platform_get_file_size(path)+1;
@@ -163,45 +147,51 @@ lex_file(char *path)
 	{
 		LG_FATAL("Couldn't find input file %s", path);
 	}
-	at_buffer = file_buffer.data;
+	f->file_data = file_buffer.data;
+	f->file_size = file_buffer.size;
+	f->at = f->file_data;
+	f->current_line = 1;
+	f->current_column = 1;
+	f->token_buffer = SDCreate(Token_Iden);
 
 	shdefault(keyword_table, KEYWORD_ERROR);
-	current_line = 1;
-	current_column = 1;
 
-	while(at_buffer - (u8 *)file_buffer.data < (i64)file_buffer.size)
+	while(f->at - f->file_data < (i64)f->file_size)
 	{
-		Token_Iden to_put = get_token(path);
+		Token_Iden to_put = get_token(f);
 		if(to_put.type != ' ' && to_put.type != '\0')
-			arrput(token_buffer, to_put);
+			SDPush(f->token_buffer, to_put);
 	}
 	
 	Token_Iden eof_token = {.type = tok_eof, .identifier = 0,
-		.file = path, .line = current_line, .column = current_column};
-	arrput(token_buffer, eof_token);
+		.file = path, .line = f->current_line, .column = f->current_column};
+	SDPush(f->token_buffer, eof_token);
+	f->curr_token = f->token_buffer;
+	f->prev_token = f->token_buffer - 1;
+	f->next_token = f->token_buffer + 1;
+	return f;
 }
 
-// NOTE(Vasko): file is here to be put into the token, for easier error messages
-Token_Iden get_token(char *file)
+Token_Iden get_token(File_Contents *f)
 {
-	while(is_whitespace(*at_buffer))
+	while(is_whitespace(f->at))
 	{
-	    advance_buffer(&at_buffer);
+	    advance_buffer(f);
 	}
 	
-	char last_char = *at_buffer;
-	u8 *string_start = at_buffer;
+	char last_char = *f->at;
+	u8 *string_start = f->at;
 	
 	if(is_alpha(last_char))
 	{
-	    u64 start_col = current_column;
-		u64 start_line = current_line;
-		while(is_alnum(*at_buffer) || is_non_special_char(*at_buffer))
+	    u64 start_col = f->current_column;
+		u64 start_line = f->current_line;
+		while(is_alnum(*f->at) || is_non_special_char(*f->at))
 		{
-		    advance_buffer(&at_buffer);
+		    advance_buffer(f);
 		}
 		
-		u64 identifier_size = at_buffer - string_start;
+		u64 identifier_size = f->at - string_start;
 		
 		char name[identifier_size+1];
 		memcpy(name, string_start, identifier_size);
@@ -218,91 +208,90 @@ Token_Iden get_token(char *file)
 			token = tok_identifier;
 			
 			return (Token_Iden){.type = token, .identifier = identifier, .line = start_line,
-								.column = start_col, .file = file};
+								.column = start_col, .file = f->path};
 		}
 		return (Token_Iden){.type = token, .identifier = NULL, .line = start_line,
-							.column = start_col, .file = file};
+							.column = start_col, .file = f->path};
 	}
 	else if(is_number(last_char))
 	{
-		u64 start_col = current_column;
-		u64 start_line = current_line;
+		u64 start_col = f->current_column;
+		u64 start_line = f->current_line;
 		b32 found_dot = false;
 		do {
-			advance_buffer(&at_buffer);
-			if(*at_buffer == '.')
+			advance_buffer(f);
+			if(*f->at == '.')
 			{
 				if(found_dot)
 				{
-					raise_token_syntax_error("Number has an extra dot", &at_buffer, file, start_line,
+					raise_token_syntax_error(f, "Number has an extra dot", f->path, start_line,
 											 start_col);
-					return get_token(file);
+					return get_token(f);
 				}
 				found_dot = true;
 			}
-		} while (is_number(*at_buffer) || *at_buffer == '.');
-		u64 num_size = at_buffer - string_start;
+		} while (is_number(*f->at) || *f->at == '.');
+		u64 num_size = f->at - string_start;
 		
 		u8 *number_string = AllocateCompileMemory(num_size+1);
 		memcpy(number_string, string_start, num_size);
 		number_string[num_size] = '\0';
 			
 		return (Token_Iden){.type = tok_number, .identifier = number_string, .line = start_line,
-							.column = start_col, .file = file};
+							.column = start_col, .file = f->path};
 	}
 	else
 	{
-		u64 start_col = current_column;
-		u64 start_line = current_line;
-		if(*at_buffer == '"')
+		u64 start_col = f->current_column;
+		u64 start_line = f->current_line;
+		if(*f->at == '"')
 		{
-			advance_buffer(&at_buffer);
-			while(*at_buffer != '"')
+			advance_buffer(f);
+			while(*f->at != '"')
 			{
-				if(*at_buffer == '\\')
+				if(*f->at == '\\')
 				{
-					advance_buffer(&at_buffer);
-					advance_buffer(&at_buffer);
+					advance_buffer(f);
 				}
-				advance_buffer(&at_buffer);
+				advance_buffer(f);
 			}
-			advance_buffer(&at_buffer);
-			u64 num_size = at_buffer - string_start + 1;
+			advance_buffer(f);
+			u64 num_size = f->at - string_start + 1;
 			u8 *number_string = AllocateCompileMemory(num_size);
 			memcpy(number_string, string_start, num_size);
 			number_string[num_size-1] = '\0';
 
 			return (Token_Iden){.type = tok_const_str, .identifier = number_string, .line = start_line,
-								.column = start_col, .file = file};
+								.column = start_col, .file = f->path};
 		}
 		else
 		{
-			while(!is_whitespace(*at_buffer) && !is_alnum(*at_buffer))
+			while(!is_whitespace(*f->at) && !is_alnum(*f->at))
 			{
-				if(*at_buffer == 0)
+				if(*f->at == 0)
 				{
-					if(at_buffer == string_start)
+					if(f->at == string_start)
 						return (Token_Iden){};
 					break;
 				}
-				advance_buffer(&at_buffer);
+				advance_buffer(f);
 			}
-			if(at_buffer - string_start == 1)
+			if(f->at - string_start == 1)
 			{
 				Token_Iden result = {.type = string_start[0], .line = start_line,
-									.column = start_col, .file = file};
+									.column = start_col, .file = f->path};
 				return result;
 			}
 			
 			if(string_start[0] == '/' && string_start[1] == '/')
 			{
-				while(*at_buffer != '\n')
-					advance_buffer(&at_buffer);
-				advance_buffer(&at_buffer);
-				return get_token(file);
+				while(*f->at != '\n')
+					advance_buffer(f);
+				advance_buffer(f);
+				return get_token(f);
 			}
 
-			u64 identifier_size = at_buffer - string_start;
+			u64 identifier_size = f->at - string_start;
 
 			char symbol[identifier_size + 1];
 			memcpy(symbol, string_start, identifier_size);
@@ -312,7 +301,7 @@ Token_Iden get_token(char *file)
 			result.type = shget(keyword_table, symbol);
 			result.line = start_line;
 			result.column = start_col;
-			result.file = file;
+			result.file = f->path;
 			
 			if (result.type == KEYWORD_ERROR)
 			{
@@ -322,11 +311,11 @@ Token_Iden get_token(char *file)
 					result.type = shget(keyword_table, symbol);
 					if(result.type != KEYWORD_ERROR)
 					{
-						rewind_buffer_to(&at_buffer, string_start + identifier_size);
+						rewind_buffer_to(f, string_start + identifier_size);
 						return result;
 					}
 				}
-				rewind_buffer_to(&at_buffer, string_start + 1);
+				rewind_buffer_to(f, string_start + 1);
 				result.type = string_start[0];
 			}
 			return result;

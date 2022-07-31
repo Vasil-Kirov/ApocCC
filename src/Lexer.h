@@ -101,28 +101,25 @@ typedef struct _Token_Iden
 	Token type;
 	u64 line;
 	u64 column;
+	char *location;
 	char *file;
 } Token_Iden;
 
-Token_Iden get_token(char *file);
+typedef struct _File_Contents File_Contents;
+
+Token_Iden get_token(File_Contents *f);
 
 void initialize_compiler();
-void lex_file(char *path);
-i16 check_for_char_combination(char **buf);
+File_Contents *lex_file(char *path);
 
-Token_Iden get_prev_token();
-Token_Iden get_next_token();
-Token_Iden peek_next_token();
-Token_Iden peek_ahead(int amount);
-Token_Iden get_next_expecting(Token type, const char *error_msg);
+void save_token_position();
+void load_token_position();
+Token_Iden advance_token();
+Token_Iden get_next_expecting(File_Contents *f, Token type, const char *error_msg);
 
 u8 *token_to_str(Token token);
 enum _Ast_Type;
 u8 *type_to_str(enum _Ast_Type type);
-
-u64 get_line_tracker();
-
-u8 *get_file_name();
 
 #ifdef __cplusplus
 }

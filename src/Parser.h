@@ -17,6 +17,7 @@ extern "C"
 #include <Type.h>
 
 //#define INVALID_TYPE (Var_Type){.is_primitive = true, .prim_repr = invalid_type}
+#define NO_EXPECT '\x18'
 	
 typedef struct _abstract_syntax_tree Ast_Node;
 
@@ -24,6 +25,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_cast         = -57,
 	type_else         = -56,
 	type_scope_end    = -55,
 	type_scope_start  = -54,
@@ -142,9 +144,11 @@ typedef struct
 typedef struct
 {
 	b32 is_declaration;
-	Ast_Variable variable;
-	Ast_Node *expression;
-	Token_Iden token;
+	Ast_Node *lhs;
+	Ast_Node *rhs;
+	Token assign_type;
+	Token_Iden err_token;
+	Type_Info decl_type;
 } Ast_Assignment;
 
 typedef struct
@@ -167,18 +171,13 @@ typedef struct
 
 typedef struct
 {
-	Ast_Node *selected;
-} Ast_Selector;
-
-typedef struct
-{
 	Token_Iden id_token;
 	Ast_Node **expressions; // Note(Vasko): SimpleDArray
 } Ast_Struct_Init;
 
 typedef struct
 {
-	Ast_Identifier identifier;
+	Token_Iden token;
 	Ast_Node *expression;
 } Ast_Indexing;
 
@@ -192,11 +191,34 @@ typedef struct
 	Token_Iden token;
 } Scope_Desc;
 
+typedef enum
+{
+	F_STANDARD,
+	F_WHILE,
+} For_Type;
+
+typedef struct
+{
+	For_Type type;
+	Ast_Node *expr1;
+	Ast_Node *expr2;
+	Ast_Node *expr3;
+	Token_Iden token;
+} Ast_For;
+
+typedef struct
+{
+	Token_Iden token;
+	Type_Info type;
+} Ast_Cast;
+
 struct _abstract_syntax_tree
 {
 	Ast_Type type;
 	union
 	{
+		Ast_Cast cast;
+		Ast_For for_loop;
 		Ast_Func function;
 		Ast_Node *condition;
 		Ast_Unary_Expr unary_expr;
@@ -206,7 +228,6 @@ struct _abstract_syntax_tree
 		Ast_Call func_call;
 		Ast_Atom atom;
 		Ast_Identifier identifier;
-		Ast_Selector selector;
 		Ast_Struct structure;
 		Ast_Struct_Init struct_init;
 		Ast_Indexing index;
@@ -229,7 +250,7 @@ Ast_Node *
 parse_statement();
 
 Ast_Node *
-parse_expression(Token stop_at);
+parse_expression(File_Contents *f, Token stop_at);
 
 Ast_Variable
 parse_declaration_left(Token_Iden identifier);
@@ -252,22 +273,22 @@ parse_struct();
 #include <Analyzer.h>
 
 Type_Info
-parse_type();
+parse_type(File_Contents *f);
 
 b32
 type_is_invalid(Type_Info type);
 
 Ast_Node *
-parse();
+parse(File_Contents *f);
 
 Ast_Node *
 parse_next_token();
 
 Ast_Node *
-parse_func();
+parse_func(File_Contents *f);
 
 void
-parser_eat(Token expected_token);
+parser_eat(File_Contents *f, Token expected_token);
 
 #ifdef __cplusplus
 }

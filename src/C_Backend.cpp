@@ -4,14 +4,15 @@
 #include <stb_ds.h>
 
 void
-c_backend_generate(Ast_Node *ast_root, Type_Table *type_table)
+c_backend_generate(Ast_Node *ast_root, Type_Table *type_table, Scope_Info *scopes)
 {
 	string c_file;
 	string *c_file_ptr = &c_file;
 	write_types(c_file_ptr, type_table);
+	write_func_signature(c_file_ptr, scopes);
 	code_from_statement(ast_root, c_file_ptr);
 	platform_write_file((void *)c_file.c_str(), c_file.length(), "c_out/out.c", true);
-	platform_call("clang c_out/out.c -Wno-everything");
+	platform_call("clang c_out/out.c --debug -Wno-everything");
 }
 
 void
@@ -48,10 +49,46 @@ _write_formated(string *c_file, const char *format, size_t format_size, ...)
 	write_to_file(c_file, to_write);
 }
 
+void
+write_func_signature(string *c_file, Scope_Info *scopes)
+{
+	size_t scope_count = SDCount(scopes);
+	for (size_t i = 0; i < scope_count; i++)
+	{
+		Symbol *table = scopes[i].symbol_table;
+		size_t entry_count = SDCount(table);
+		for (size_t j = 0; j < entry_count; j++)
+		{
+			Symbol entry = table[j];
+			if(entry.tag == S_FUNCTION)
+			{
+				Assert(entry.node->type == type_func);
+				Ast_Func func = entry.node->function;
+				write_formated(c_file, "%s %s(", func.type.identifier, func.identifier.name);
+				if(func.arguments)
+				{	
+					size_t arg_count = SDCount(func.arguments);
+					for (size_t k = 0; k < arg_count; k++)
+					{
+						if(func.arguments[k]->variable.type.type == T_DETECT)
+							write_to_file(c_file, "...");
+						else
+							write_formated(c_file, "%s %s", func.arguments[k]->variable.type.identifier, func.arguments[k]->variable.identifier.name);
+						if(k != arg_count - 1)
+							write_to_file(c_file, ", ");
+					}
+				}
+				write_to_file(c_file, ");\n");
+			}
+		}
+		
+	}
+}
+
 static const char *type_names[] = {
 	"", "int8_t", "int16_t", "int32_t", "int64_t",
 	"uint8_t", "uint16_t", "uint32_t", "uint64_t",
-	"float", "double"
+	"float", "double", "", "uint32_t"
 };
 
 void
@@ -84,6 +121,20 @@ write_types(string *c_file, Type_Table *type_table)
 }
 
 void
+write_type(string *c_file, Type_Info type)
+{
+	Assert(type.type != T_INVALID);
+	if(type.type == T_POINTER)
+	{
+		write_type(c_file, *type.pointer.type);
+		write_to_file(c_file, "*");
+		return;
+	}
+	Assert(type.identifier);
+	write_to_file(c_file, type.identifier);
+}
+
+void
 code_from_statement(Ast_Node *node, string *c_file)
 {
 	b32 loop = true;
@@ -94,6 +145,31 @@ code_from_statement(Ast_Node *node, string *c_file)
 		switch(node->type)
 		{
 			case type_struct: {} break;
+			case type_for:
+			{
+				if(node->for_loop.type == F_STANDARD)
+				{
+					write_to_file(c_file, "for(");
+					write_expression(c_file, node->for_loop.expr1);
+					write_to_file(c_file, ";");
+					write_expression(c_file, node->for_loop.expr2);
+					write_to_file(c_file, ";");
+					write_expression(c_file, node->for_loop.expr3);
+					write_to_file(c_file, ")");
+				}
+				else
+				{
+					write_to_file(c_file, "while(");
+					write_expression(c_file, node->for_loop.expr1);
+					write_to_file(c_file, ")");
+				}
+			} break;
+			case type_if:
+			{
+				write_to_file(c_file, "if(");
+				write_expression(c_file, node->condition);
+				write_to_file(c_file, ")");
+			} break;
 			case type_func:
 			{
 				write_formated(c_file, "%s %s(", node->function.type.identifier,
@@ -270,8 +346,35 @@ unary_expr_to_str(string *c_file, Ast_Node *expression)
 		}
 		write_expression(c_file, expression->unary_expr.expression);
 	}
+	else if(expression->type == type_cast)
+	{
+		write_to_file(c_file, "(");
+		write_type(c_file, expression->cast.type);
+		write_to_file(c_file, ")");
+		write_expression(c_file, expression->right);	
+	}
 	else
 		atom_to_str(c_file, expression);
+}
+
+const char *
+binary_op_to_str(Token binary_op)
+{
+	switch(binary_op)
+	{
+		case tok_logical_and: return "&&";
+		case tok_logical_or: return "||";
+		case tok_logical_lequal: return "<=";
+		case tok_logical_gequal: return ">=";
+		case tok_logical_is: return "==";
+		case tok_logical_isnot: return "!=";
+		case tok_bits_lshift: return "<<";
+		case tok_bits_rshift: return ">>";
+		default:
+		{
+			return NULL;
+		}break;
+	}
 }
 
 void
@@ -280,8 +383,14 @@ binary_expr_to_str(string *c_file, Ast_Node *expression)
 	if(expression->type == type_binary_expr)
 	{
 		write_expression(c_file, expression->left);
-		u8 to_write[] = {(u8)expression->binary_expr.op, 0};
-		write_to_file(c_file, to_write);
+		const char *op_str = binary_op_to_str(expression->binary_expr.op);
+		if(op_str == NULL)
+		{
+			u8 to_write[] = {(u8)expression->binary_expr.op, 0};
+			write_to_file(c_file, to_write);
+		}
+		else
+			write_to_file(c_file, op_str);
 		write_expression(c_file, expression->right);
 	}
 	else

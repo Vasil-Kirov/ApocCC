@@ -1,0 +1,5 @@
+[FATAL] Test.apoc (12, 11):
+	Found unexpected token [tok_plus_equals], expected Correctly formated statement, like one of the following:
+a_float := 0
+a_float :: 0
+a_float = 0
