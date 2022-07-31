@@ -1,8 +1,9 @@
 #include <Basic.h>
 #include <Log.h>
 #include <Lexer.h>
+#include <Analyzer.h>
 
-void raise_semantic_error(const char *error_msg, struct _Token_Iden token)
+void raise_semantic_error(File_Contents *f, const char *error_msg, struct _Token_Iden token)
 {
 	LG_FATAL("%s (%d, %d):\n\tSemantic error: %s",
 			 token.file, token.line, token.column, error_msg);

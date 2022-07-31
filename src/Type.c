@@ -1,3 +1,6 @@
+#include <Type.h>
+#include <Basic.h>
+#include <Analyzer.h>
 
 b32
 is_pointer_rhs_compatible(Type_Info type)
@@ -50,12 +53,12 @@ is_castable(Type_Info type, Type_Info cast)
 }
 
 Type_Info
-fix_type(Type_Info type)
+fix_type(File_Contents *f, Type_Info type)
 {
 	Type_Info result = type;
 	if(type_is_invalid(type) && type.identifier)
 	{
-		result = get_type(type.identifier);
+		result = get_type(f, type.identifier);
 	}
 	return result;
 }

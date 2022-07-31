@@ -128,10 +128,9 @@ typedef struct
 	Ast_Node **arguments; // Simple DArray
 } Ast_Func;
 
-
 typedef struct
 {
-	Token op;
+	Token_Iden op;
 	Ast_Node *expression;
 } Ast_Unary_Expr;
 
@@ -140,9 +139,10 @@ typedef struct
 	Token op;
 	Token_Iden token;
 } Ast_Binary_Expr;
-
+	
 typedef struct
 {
+	b32 is_const;
 	b32 is_declaration;
 	Ast_Node *lhs;
 	Ast_Node *rhs;
@@ -153,8 +153,9 @@ typedef struct
 
 typedef struct
 {
-	Ast_Identifier identifier;
+	Ast_Node *operand;
 	Ast_Node **arguments; // Simple DArray of expressions
+	Token_Iden token;
 } Ast_Call;
 
 typedef enum
@@ -171,19 +172,22 @@ typedef struct
 
 typedef struct
 {
-	Token_Iden id_token;
+	Ast_Node *operand;
 	Ast_Node **expressions; // Note(Vasko): SimpleDArray
+	Token_Iden token;
 } Ast_Struct_Init;
 
 typedef struct
 {
-	Token_Iden token;
+	Ast_Node *operand;
 	Ast_Node *expression;
+	Token_Iden token;	
 } Ast_Indexing;
 
 typedef struct
 {
-	Token type;
+	Ast_Node *operand;
+	Token_Iden token;
 } Ast_Postfix;
 
 typedef struct
@@ -210,8 +214,17 @@ typedef struct
 {
 	Token_Iden token;
 	Type_Info type;
+	Ast_Node *expression;
 } Ast_Cast;
+	
+typedef struct
+{
+	Token_Iden dot_token;
+	Ast_Node *operand;
+	Ast_Node *identifier;
+} Ast_Selector;
 
+	
 struct _abstract_syntax_tree
 {
 	Ast_Type type;
@@ -219,6 +232,7 @@ struct _abstract_syntax_tree
 	{
 		Ast_Cast cast;
 		Ast_For for_loop;
+		Ast_Selector selector;
 		Ast_Func function;
 		Ast_Node *condition;
 		Ast_Unary_Expr unary_expr;
@@ -250,7 +264,7 @@ Ast_Node *
 parse_statement();
 
 Ast_Node *
-parse_expression(File_Contents *f, Token stop_at);
+parse_expression(File_Contents *f, Token stop_at, b32 is_lhs);
 
 Ast_Variable
 parse_declaration_left(Token_Iden identifier);
@@ -265,7 +279,7 @@ b32
 is_func_call(Token_Iden token, int check_ahead);
 
 Ast_Node *
-parse_func_call(Token_Iden name_token);
+parse_func_call(File_Contents *f, Ast_Node *operand);
 
 Ast_Node *
 parse_struct();

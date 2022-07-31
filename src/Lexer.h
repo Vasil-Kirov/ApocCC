@@ -110,7 +110,7 @@ typedef struct _File_Contents File_Contents;
 Token_Iden get_token(File_Contents *f);
 
 void initialize_compiler();
-File_Contents *lex_file(char *path);
+void lex_file(File_Contents *f, char *path);
 
 void save_token_position();
 void load_token_position();

@@ -57,72 +57,72 @@ typedef struct _File_Contents
 	Stack		scope_stack;
 	Scope_Info *scopes;
 	u64         file_size;
-	char       *file_data;
-	char       *at;
-	char       *path;
+	u8         *file_data;
+	u8         *at;
+	u8         *path;
 	u64 current_line;
 	u64 current_column;
 } File_Contents;
 
 void
-push_scope(Scope_Info current_scope);
+push_scope(File_Contents *f, Scope_Info current_scope);
 
 void
-pop_scope();
+pop_scope(File_Contents *f, Token_Iden scope_tok);
 
 void
-analyze(Ast_Node *ast_tree);
+analyze(File_Contents *f, Ast_Node *ast_tree);
 
 void
-add_primitive_type(const char *name, Var_Size size);
+add_primitive_type(File_Contents *f, const char *name, Var_Size size);
 
 Type_Info
-get_type(u8 *name);
+get_type(File_Contents *f, u8 *name);
 
 void
-add_type(Ast_Node *structure);
+add_type(File_Contents *f, Ast_Node *structure);
 
 void
 update_type(Ast_Struct structure);
 
 void
-add_symbol(Symbol symbol, Ast_Identifier *identifier);
+add_symbol(File_Contents *f, Symbol symbol);
 
 void
 initialize_analyzer();
 
 void
-analyze_file_level_statement(Ast_Node *node);
+analyze_file_level_statement(File_Contents *f, Ast_Node *node);
 
 u8 *
 var_type_to_name(Type_Info type);
 
 Symbol *
-get_symbol_spot(Token_Iden token);
+get_symbol_spot(File_Contents *f, Token_Iden token);
 
 void
-verify_struct(Ast_Node *struct_node);
+verify_struct(File_Contents *f, Ast_Node *struct_node);
 
 void
-verify_func(Ast_Node *node);
+verify_func(File_Contents *f, Ast_Node *node);
 
 void
-verify_func_level_statement(Ast_Node *node, Ast_Node *func_node);
+verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_node);
 
 b32
 check_type_compatibility(Type_Info a, Type_Info b);
 
 void
-verify_assignment(Ast_Node *node);
+verify_assignment(File_Contents *f, Ast_Node *node);
 
 Type_Info
-get_expression_type(Ast_Node *expression, Token_Iden desc_token, Type_Info *previous);
+get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Type_Info *previous);
 
 Type_Info
-verify_func_call(Ast_Node *func_call, Token_Iden expr_token);
+verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token);
 
 Type_Info
-verify_struct_init(Ast_Node *struct_init, Token_Iden error_token);
+verify_struct_init(File_Contents *f, Ast_Node *struct_init);
 
 b32
 are_op_compatible(Type_Info a, Type_Info b);

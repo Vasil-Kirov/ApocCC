@@ -75,8 +75,17 @@ typedef struct _Type_Info
 	u8 *identifier;
 } Type_Info;
 
+Type_Info
+fix_type(File_Contents *f, Type_Info type);
+
 b32
 is_type_primitive(Type_Info type);
+
+b32
+is_float(Type_Info type);
+
+b32
+is_integer(Type_Info type);
 
 b32
 is_accessible(Type_Info type);

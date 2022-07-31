@@ -36,7 +36,8 @@
         "sched.h": "c",
         "*.tcc": "c",
         "cerrno": "c",
-        "xstring": "cpp"
+        "xstring": "cpp",
+        "errors.h": "c"
     },
     "C_Cpp.vcFormat.newLine.beforeOpenBrace.block": "ignore",
     "C_Cpp.vcFormat.newLine.beforeOpenBrace.function": "newLine",

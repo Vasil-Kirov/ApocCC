@@ -43,7 +43,7 @@ rewind_buffer_to(File_Contents *f, u8 *to)
 }
 
 void
-initialize_compiler()
+initialize_compiler(File_Contents *f)
 {
 	// NOTE(Vasko): Add keywords to string hash table
 	shput(keyword_table, "func", tok_func);
@@ -84,21 +84,21 @@ initialize_compiler()
 	shput(keyword_table, "...", tok_var_args);
 
 	// NOTE(Vasko): Add basic types to string hash table
-	add_primitive_type("i8",   byte1);
-	add_primitive_type("i16",  byte2);
-	add_primitive_type("i32",  byte4);
-	add_primitive_type("i64",  byte8);
+	add_primitive_type(f, "i8",   byte1);
+	add_primitive_type(f, "i16",  byte2);
+	add_primitive_type(f, "i32",  byte4);
+	add_primitive_type(f, "i64",  byte8);
 
-	add_primitive_type("u8",   ubyte1);
-	add_primitive_type("u16",  ubyte2);
-	add_primitive_type("u32",  ubyte4);
-	add_primitive_type("u64",  ubyte8);
+	add_primitive_type(f, "u8",   ubyte1);
+	add_primitive_type(f, "u16",  ubyte2);
+	add_primitive_type(f, "u32",  ubyte4);
+	add_primitive_type(f, "u64",  ubyte8);
 
-	add_primitive_type("f32",  real32);
-	add_primitive_type("f64",  real64);
+	add_primitive_type(f, "f32",  real32);
+	add_primitive_type(f, "f64",  real64);
 
-	add_primitive_type("void", empty);
-	add_primitive_type("b32", logical_bit);
+	add_primitive_type(f, "void", empty);
+	add_primitive_type(f, "b32", logical_bit);
 }
 
 void
@@ -126,16 +126,15 @@ get_next_expecting(File_Contents *f, Token type, const char *error_msg)
 	Token_Iden token = advance_token(f);
 	if(token.type != type)
 	{
-		raise_parsing_unexpected_token(error_msg, token);
+		raise_parsing_unexpected_token(error_msg, f);
 	}
 	return token;
 }
 
-
-File_Contents *
-lex_file(char *path)
+void
+lex_file(File_Contents *f, char *path)
 {
-	File_Contents *f = AllocatePermanentMemory(sizeof(File_Contents));
+	
 	memset(f, 0, sizeof(File_Contents));
 	f->path = (u8 *)path;
 	entire_file file_buffer;
@@ -169,12 +168,11 @@ lex_file(char *path)
 	f->curr_token = f->token_buffer;
 	f->prev_token = f->token_buffer - 1;
 	f->next_token = f->token_buffer + 1;
-	return f;
 }
 
 Token_Iden get_token(File_Contents *f)
 {
-	while(is_whitespace(f->at))
+	while(is_whitespace(*f->at))
 	{
 	    advance_buffer(f);
 	}
@@ -208,10 +206,10 @@ Token_Iden get_token(File_Contents *f)
 			token = tok_identifier;
 			
 			return (Token_Iden){.type = token, .identifier = identifier, .line = start_line,
-								.column = start_col, .file = f->path};
+								.column = start_col, .file = (char *)f->path};
 		}
 		return (Token_Iden){.type = token, .identifier = NULL, .line = start_line,
-							.column = start_col, .file = f->path};
+							.column = start_col, .file = (char *)f->path};
 	}
 	else if(is_number(last_char))
 	{
@@ -224,7 +222,7 @@ Token_Iden get_token(File_Contents *f)
 			{
 				if(found_dot)
 				{
-					raise_token_syntax_error(f, "Number has an extra dot", f->path, start_line,
+					raise_token_syntax_error(f, "Number has an extra dot", (char *)f->path, start_line,
 											 start_col);
 					return get_token(f);
 				}
@@ -238,7 +236,7 @@ Token_Iden get_token(File_Contents *f)
 		number_string[num_size] = '\0';
 			
 		return (Token_Iden){.type = tok_number, .identifier = number_string, .line = start_line,
-							.column = start_col, .file = f->path};
+							.column = start_col, .file = (char *)f->path};
 	}
 	else
 	{
@@ -262,7 +260,7 @@ Token_Iden get_token(File_Contents *f)
 			number_string[num_size-1] = '\0';
 
 			return (Token_Iden){.type = tok_const_str, .identifier = number_string, .line = start_line,
-								.column = start_col, .file = f->path};
+								.column = start_col, .file = (char *)f->path};
 		}
 		else
 		{
@@ -279,7 +277,7 @@ Token_Iden get_token(File_Contents *f)
 			if(f->at - string_start == 1)
 			{
 				Token_Iden result = {.type = string_start[0], .line = start_line,
-									.column = start_col, .file = f->path};
+									.column = start_col, .file = (char *)f->path};
 				return result;
 			}
 			
@@ -301,7 +299,7 @@ Token_Iden get_token(File_Contents *f)
 			result.type = shget(keyword_table, symbol);
 			result.line = start_line;
 			result.column = start_col;
-			result.file = f->path;
+			result.file = (char *)f->path;
 			
 			if (result.type == KEYWORD_ERROR)
 			{

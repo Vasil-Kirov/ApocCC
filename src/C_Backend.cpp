@@ -206,7 +206,8 @@ code_from_statement(Ast_Node *node, string *c_file)
 				Ast_Node **expressions = node->func_call.arguments;
 				size_t arg_count = SDCount(node->func_call.arguments);
 				
-				write_formated(c_file, "%s(", node->func_call.identifier.name);
+				// @TODO: write operand
+				//write_formated(c_file, "%s(", node->func_call.operand);
 				for (size_t i = 0; i < arg_count; i++)
 				{
 					write_expression(c_file, expressions[i]);
@@ -220,10 +221,10 @@ code_from_statement(Ast_Node *node, string *c_file)
 			case type_assignment:
 			{
 				if(node->assignment.is_declaration)
-					write_to_file(c_file, node->assignment.variable.type.identifier);
+					write_to_file(c_file, node->assignment.decl_type.identifier);
 
-				write_formated(c_file, " %s =", node->assignment.variable.identifier.name);
-				write_expression(c_file, node->assignment.expression);
+				write_formated(c_file, " %s =", node->assignment.err_token.identifier);
+				write_expression(c_file, node->assignment.rhs);
 				write_to_file(c_file, ";");
 			} break;
 
@@ -256,7 +257,8 @@ atom_to_str(string *c_file, Ast_Node *expression)
 		{
 			case type_func_call:
 			{
-				write_formated(c_file, "%s( ", expression->func_call.identifier.name);
+				// @TODO: write operand
+				//write_formated(c_file, "%s( ", expression->func_call.identifier.name);
 				int arg_count = SDCount(expression->func_call.arguments);	
 				for(int i = 0; i < arg_count; ++i)
 				{
@@ -279,7 +281,8 @@ atom_to_str(string *c_file, Ast_Node *expression)
 			} break;
 			case type_index:
 			{
-				write_formated(c_file, "%s[ ", expression->index.identifier.name);
+				// @TODO: indexing
+				// write_formated(c_file, "%s[ ", expression->index.identifier.name);
 				write_expression(c_file, expression->index.expression);
 				write_to_file(c_file, " ]");
 			} break;
@@ -299,7 +302,7 @@ atom_to_str(string *c_file, Ast_Node *expression)
 			case type_selector:
 			{
 				write_to_file(c_file, ".");
-				write_to_file(c_file, expression->selector.selected->identifier.name);
+				// @TODO: fix selecting
 			} break;
 			case type_postfix:
 			{

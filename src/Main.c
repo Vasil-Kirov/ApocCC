@@ -10,7 +10,9 @@
 #include <Analyzer.h>
 #include <Stack.h>
 #include <Errors.h>
+
 #include <C_Backend.h>
+#include <LLVM_Backend.h>
 
 #include <platform/platform.h>
 
@@ -34,13 +36,12 @@ extern inline void *_stack_pop(Stack *s);
 
 extern inline void *_stack_peek(Stack *s);
 
-extern inline b32 is_alpha(char c);
-extern inline b32 is_alnum(char c);
-extern inline b32 is_non_special_char(char c);
-extern inline b32 is_number(char c);
-extern inline b32 is_number(char c);
-extern inline b32 is_whitespace(char c);
-extern inline b32 is_alnum(char c);
+extern inline b32 is_alpha(u8 c);
+extern inline b32 is_alnum(u8 c);
+extern inline b32 is_non_special_char(u8 c);
+extern inline b32 is_number(u8 c);
+extern inline b32 is_whitespace(u8 c);
+extern inline b32 is_alnum(u8 c);
 #endif
 
 #ifdef _WIN32
@@ -52,11 +53,13 @@ extern inline b32 is_alnum(char c);
 
 int main(int argc, char *argv[])
 {
+	File_Contents *f = AllocatePermanentMemory(sizeof(File_Contents));
+
 	initialize_logger();
 	platform_initialize();
 	initialize_memory();
-	initialize_compiler();
-	initialize_analyzer();
+	initialize_compiler(f);
+	initialize_analyzer(f);
 
 	if(argc < 2)
 	{
@@ -64,7 +67,7 @@ int main(int argc, char *argv[])
 	}
 
 	LG_INFO("Lexing...");
-	File_Contents *f = lex_file(argv[1]);
+	lex_file(f, argv[1]);
 	LG_INFO("Done.");
 	
 	LG_INFO("Parsing...");
@@ -72,11 +75,11 @@ int main(int argc, char *argv[])
 	LG_INFO("Done.");
 	
 	LG_INFO("Performing semantic analysis...");
-	analyze(ast_tree);
+	analyze(f, ast_tree);
 	LG_INFO("Done.");
 
 	LG_INFO("Generating code...");
-	c_backend_generate(ast_tree, type_table, scopes);
+	llvm_backend_generate(f, ast_tree);
 	LG_INFO("Done.");
 	
 	ResetCompileMemory();

@@ -2,6 +2,8 @@
 #include <Log.h>
 #include <stdlib/std.h>
 #include <Memory.h>
+#include <Type.h>
+#include <Errors.h>
 
 void
 initialize_analyzer(File_Contents *f)
@@ -53,13 +55,13 @@ add_type(File_Contents *f, Ast_Node *structure)
 		Symbol member_symbol = {.tag = S_STRUCT_MEMBER, .s_member.index = i,
 			.identifier = s.members[i].identifier.name, .type = s.members[i].type,
 			.node = structure};
-		add_symbol(f, member_symbol, &s.members[i].identifier);
+		add_symbol(f, member_symbol);
 		
 	}
 	
 	if(shgeti(f->type_table, structure->structure.struct_id.name) != -1)
 	{
-		raise_semantic_error("Redifinition of symbol", structure->structure.struct_id.token);
+		raise_semantic_error(f, "Redifinition of symbol", structure->structure.struct_id.token);
 	}
 	shput(f->type_table, structure->structure.struct_id.name, type_info);
 }
@@ -87,13 +89,13 @@ pop_scope(File_Contents *f, Token_Iden scope_tok)
 {
 	if(is_scope_stack_empty(f))
 	{
-		raise_semantic_error("Found a closing scope with no matching openning one", scope_tok);
+		raise_semantic_error(f, "Found a closing scope with no matching openning one", scope_tok);
 	}
 
 	Scope_Info saved_scopes[4096] = {};
 	size_t last_scope = 0;
 	Scope_Info popped = stack_pop(f->scope_stack, Scope_Info);
-	popped.end_line = get_line_tracker();
+	popped.end_line = scope_tok.line;
 	Symbol *popped_table = popped.symbol_table;
 	size_t symbol_table_size = SDCount(popped_table);
 	while(!is_scope_stack_empty(f))
@@ -113,7 +115,7 @@ pop_scope(File_Contents *f, Token_Iden scope_tok)
 				{
 					char *error = AllocateCompileMemory(2048);
 					vstd_sprintf(error, "Redifinition of symbol %s", a.identifier);
-					raise_semantic_error(error, b.token);
+					raise_semantic_error(f, error, b.token);
 				}
 			}
 		}
@@ -128,23 +130,22 @@ pop_scope(File_Contents *f, Token_Iden scope_tok)
 }
 
 void
-add_symbol(File_Contents *f, Symbol symbol, Ast_Identifier *identifier)
+add_symbol(File_Contents *f, Symbol symbol)
 {
 	Scope_Info stack_top = stack_peek(f->scope_stack, Scope_Info);
 	Symbol *symbol_table = stack_top.symbol_table;
 	SDPush(symbol_table, symbol);
-	identifier->symbol_spot = &symbol_table[SDCount(symbol_table) - 1];
 }
 
 void
-raise_formated_semantic_error(Token_Iden token, const char *format, ...)
+raise_formated_semantic_error(File_Contents *f, Token_Iden token, const char *format, ...)
 {
 	char *error = AllocateCompileMemory(4096);
 	va_list args;
 	va_start(args, format);
 	vstd_vsnsprintf(error, strlen(format), format, args);
 	va_end(args);
-	raise_semantic_error(error, token);
+	raise_semantic_error(f, error, token);
 }
 
 void
@@ -157,39 +158,39 @@ analyze(File_Contents *f, Ast_Node *ast_tree)
 		LG_INFO("Symbol: %s\n\n", symbol.identifier);
 	}
 	*/
-	Scope_Info scope_info = {.file = (const char *)get_file_name(), .start_line = 1};
+	Scope_Info scope_info = {.file = (const char *)f->path, .start_line = 1};
 	push_scope(f, scope_info);
-	analyze_file_level_statement(ast_tree);
-	
+	analyze_file_level_statement(f, ast_tree);
+	// @Check: maybe pop_scope()?
 }
 
 void
-analyze_file_level_statement(Ast_Node *node)
+analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 {
 	if(node == NULL) return;
 	switch(node->type)
 	{
 		case type_struct:
 		{
-			verify_struct(node);
-			analyze_file_level_statement(node->left);
+			verify_struct(f, node);
+			analyze_file_level_statement(f, node->left);
 		}break;
 		case type_func:
 		{
-			verify_func(node);
+			verify_func(f, node);
 			Ast_Node *next_node = NULL;
 			if(node->left->type == type_scope_start)
 				next_node = node->left->left;
 			else
 				next_node = node->left;
-			analyze_file_level_statement(next_node);
+			analyze_file_level_statement(f, next_node);
 		}break;
 		default:
 		{
 			LG_WARN("File level statement of type %s (id: %d) not analyzed",
 					type_to_str(node->type), node->type);
 			if(node->left != NULL)
-				analyze_file_level_statement(node->left);
+				analyze_file_level_statement(f, node->left);
 		}
 	}
 	return;
@@ -205,28 +206,28 @@ verify_func(File_Contents *f, Ast_Node *node)
 	for (size_t i = 0; i < arg_count; i++)
 	{
 		if(node->function.arguments[i]->variable.type.type == T_DETECT && i != arg_count - 1)
-			raise_semantic_error("Variable length arguments must be last in the function signature", node->function.identifier.token);
+			raise_semantic_error(f, "Variable length arguments must be last in the function signature", node->function.identifier.token);
 	}
 	
 	if(node->function.type.type == T_INVALID)
 	{
 		char error_msg[1024] = {};
 		vstd_sprintf(error_msg, "Undeclared type [%s]", node->function.type.identifier);
-		raise_semantic_error(error_msg, type_error_token);
+		raise_semantic_error(f, error_msg, type_error_token);
 	}
 	
 	if(node->left->type == type_scope_start)
 	{
 		Token_Iden scope_tok = node->left->scope_desc.token;
 		Scope_Info new_scope = {.file = scope_tok.file, .start_line = scope_tok.line};
-		push_scope(new_scope);
+		push_scope(f, new_scope);
 		
-		verify_func_level_statement(node->left->right, node);
+		verify_func_level_statement(f, node->left->right, node);
 	}	
 }
 
 void
-verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
+verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_node)
 {
 	if(node == NULL) return;
 	switch(node->type)
@@ -235,18 +236,18 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 		{
 			if(node->for_loop.type == F_STANDARD)
 			{
-				Type_Info expression = get_expression_type(node->for_loop.expr2, node->for_loop.token, NULL);
+				Type_Info expression = get_expression_type(f, node->for_loop.expr2, node->for_loop.token, NULL);
 				if(expression.type != T_BOOLEAN)
 				{
-					raise_formated_semantic_error(node->for_loop.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(expression));
+					raise_formated_semantic_error(f, node->for_loop.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(expression));
 				}
 			}
 			else
 			{
-				Type_Info expression = get_expression_type(node->for_loop.expr1, node->for_loop.token, NULL);
+				Type_Info expression = get_expression_type(f, node->for_loop.expr1, node->for_loop.token, NULL);
 				if(expression.type != T_BOOLEAN)
 				{
-					raise_formated_semantic_error(node->for_loop.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(expression));
+					raise_formated_semantic_error(f, node->for_loop.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(expression));
 				}
 			}
 		} break;
@@ -255,48 +256,49 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 			Ast_Variable var = node->variable;
 			Symbol symbol = {.identifier = var.identifier.name,
 				.type =var.type, .node = node, .token = var.identifier.token, .tag = S_VARIABLE};
-			add_symbol(symbol, &node->variable.identifier);
+			add_symbol(f, symbol);
 		}break;
 		case type_if:
 		{
-			Type_Info if_type = get_expression_type(node->condition, node->left->scope_desc.token, NULL);
+			Type_Info if_type = get_expression_type(f, node->condition, node->left->scope_desc.token, NULL);
 			if(if_type.type != T_BOOLEAN)
 			{
-				raise_formated_semantic_error(node->left->scope_desc.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(if_type));
+				raise_formated_semantic_error(f, node->left->scope_desc.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(if_type));
 			}
 		} break;
 		case type_assignment:
 		{
-			verify_assignment(node);
+			verify_assignment(f, node);
 		} break;
 		case type_func_call:
 		{
-			verify_func_call(node, node->func_call.identifier.token);
+			// @TODO: implement
+			verify_func_call(f, node, node->func_call.token);
 		} break;
 		case type_scope_end:
 		{
-			Scope_Info this_scope = stack_pop(scope_stack, Scope_Info);
-			if(scope_stack.top == 0)
+			Scope_Info this_scope = stack_pop(f->scope_stack, Scope_Info);
+			if(f->scope_stack.top == 0)
 			{
 				if(!this_scope.has_return)
 				{
-					raise_semantic_error("Not all paths lead to a return statement", node->scope_desc.token);
+					raise_semantic_error(f, "Not all paths lead to a return statement", node->scope_desc.token);
 				}
 			}
-			stack_push(scope_stack, this_scope);
-			pop_scope(node->scope_desc.token);
+			stack_push(f->scope_stack, this_scope);
+			pop_scope(f, node->scope_desc.token);
 			return;
 		} break;
 		case type_scope_start:
 		{
 			Token_Iden scope_tok = node->scope_desc.token;
 			Scope_Info new_scope = {.file = scope_tok.file, .start_line = scope_tok.line};
-			push_scope(new_scope);
-			verify_func_level_statement(node->right, func_node);
+			push_scope(f, new_scope);
+			verify_func_level_statement(f, node->right, func_node);
 		} break;
 		case type_return:
 		{
-			Type_Info return_type = get_expression_type(node->right, node->holder.token, NULL);
+			Type_Info return_type = get_expression_type(f, node->right, node->holder.token, NULL);
 		
 			if(type_is_invalid(return_type))
 				return_type = (Type_Info){.type = T_VOID, .identifier = (u8 *)"void"};
@@ -309,11 +311,11 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 							 var_type_to_name(return_type),
 							 func_node->function.identifier.name,
 							 var_type_to_name(func_node->function.type));
-				raise_semantic_error(error, node->holder.token);
+				raise_semantic_error(f, error, node->holder.token);
 			}
-			Scope_Info scope = stack_pop(scope_stack, Scope_Info);
+			Scope_Info scope = stack_pop(f->scope_stack, Scope_Info);
 			scope.has_return = true;
-			stack_push(scope_stack, scope);
+			stack_push(f->scope_stack, scope);
 
 		} break;
 		default:
@@ -322,102 +324,54 @@ verify_func_level_statement(Ast_Node *node, Ast_Node *func_node)
 					type_to_str(node->type), node->type);
 		}
 	}
-	verify_func_level_statement(node->left, func_node);
+	verify_func_level_statement(f, node->left, func_node);
 }
 
 
 void
-verify_assignment(Ast_Node *node)
+verify_assignment(File_Contents *f, Ast_Node *node)
 {
 	if(node->type != type_assignment)
 	{
 		LG_FATAL("Compiler bug in file %s at line %d, expected node type_assignment, got %s (id: %d)",
 				 __FILE__, __LINE__, type_to_str(node->type), node->type);
 	}
-	Type_Info expression_type = get_expression_type(node->assignment.expression,
-													node->assignment.token, NULL);
+	Type_Info expression_type = get_expression_type(f, node->assignment.rhs,
+													node->assignment.err_token, NULL);
 	if(!node->assignment.is_declaration)
 	{
-		node->assignment.variable.type = get_symbol_spot(node->assignment.token)->type;
+		node->assignment.decl_type = get_symbol_spot(f, node->assignment.err_token)->type;
 	}
 	if(type_is_invalid(expression_type))
 	{
-		raise_semantic_error("Invalid expression", node->assignment.token);
+		raise_semantic_error(f, "Invalid expression", node->assignment.err_token);
 	}
 	
-	if(node->assignment.variable.type.type == T_DETECT)
+	if(node->assignment.decl_type.type == T_DETECT)
 	{
 		if(is_untyped(expression_type))
 		{
 			expression_type = untyped_to_type(expression_type);
 			expression_type.identifier = (u8 *)"i64";
 		}
-		node->assignment.variable.type = expression_type;
+		node->assignment.decl_type = expression_type;
 	}
-	else if(!check_type_compatibility(node->assignment.variable.type, expression_type))
+	else if(!check_type_compatibility(node->assignment.decl_type, expression_type))
 	{
 		char *error = AllocateCompileMemory(2048);
 		vstd_sprintf(error, "Tried to assign %s to variable of type %s",
 					 var_type_to_name(expression_type),
-					 var_type_to_name(node->assignment.variable.type));
-		raise_semantic_error(error, node->assignment.token);
+					 var_type_to_name(node->assignment.decl_type));
+		raise_semantic_error(f, error, node->assignment.err_token);
 	}
 	
 	if(node->assignment.is_declaration)
 	{
-		Symbol this_symbol = {.token = node->assignment.token, .node = node,
-			.identifier = node->assignment.variable.identifier.name,
-			.type = node->assignment.variable.type, .tag = S_VARIABLE};
-		add_symbol(this_symbol, &node->assignment.variable.identifier);
+		Symbol this_symbol = {.token = node->assignment.err_token, .node = node,
+			.identifier = node->assignment.err_token.identifier,
+			.type = node->assignment.decl_type, .tag = S_VARIABLE};
+		add_symbol(f, this_symbol);
 	}
-}
-
-Type_Info
-verify_selector(Type_Info left_type, Ast_Node *selected, Token_Iden error_tok)
-{
-	if(!is_accessible(left_type))
-	{
-		raise_semantic_error("Primitive variable has no members to be accessed with '.'", error_tok);
-	}
-	
-	Token_Iden selected_tok = {};
-	if(selected->type == type_identifier)
-	{
-		selected_tok = selected->identifier.token;
-	}
-	else if (selected->type == type_func_call)
-	{
-		selected_tok = selected->func_call.identifier.token;
-	}
-	else
-	{
-		raise_semantic_error("Improper struct accessing", error_tok);
-	}
-	
-	u8 *selected_id = selected_tok.identifier;
-	
-	Assert(left_type.identifier);
-	Type_Info structure = left_type;
-	size_t member_count = structure.structure->structure.member_count;
-	for(size_t i = 0; i < member_count; ++i)
-	{
-		if(vstd_strcmp((char *)selected_id, 
-					   (char *)structure.structure->structure.members[i].identifier.name))
-		{
-			/*if(structure.maybe_members[i].type.is_primitive == false)
-			{
-			}*/
-			return structure.structure->structure.members[i].type;
-		}
-	}
-
-	{
-		char *error = AllocateCompileMemory(2048);
-		vstd_sprintf(error, "Accessing non existant member of struct (Type %s, Member %s)",
-					 structure.structure->structure.struct_id.name, selected_id);
-		raise_semantic_error(error, selected_tok);
-	}
-	return (Type_Info){T_INVALID};
 }
 
 Type_Info
@@ -443,14 +397,14 @@ untyped_to_type(Type_Info type)
 }
 
 Type_Info
-get_binary_expr_type(Ast_Node *expr, Type_Info left, Type_Info right)
+get_binary_expr_type(File_Contents *f, Ast_Node *expr, Type_Info left, Type_Info right)
 {
 	Assert(expr->type == type_binary_expr);
 	if(!check_type_compatibility(left, right))
 	{
 		char *error = AllocateCompileMemory(4096);
 		vstd_sprintf(error, "Types %s and %s are incompatible", var_type_to_name(left), var_type_to_name(right));
-		raise_semantic_error(error, expr->binary_expr.token);
+		raise_semantic_error(f, error, expr->binary_expr.token);
 	}
 	switch(expr->binary_expr.op)
 	{
@@ -484,123 +438,256 @@ is_bits_op(Token op)
 }
 
 Type_Info
-get_expression_type(Ast_Node *expression, Token_Iden desc_token, Type_Info *previous)
+get_atom_expression_type(File_Contents *f, Ast_Node *expression)
+{
+	// @TODO: chaining
+	switch ((int)expression->type)
+	{
+		case type_identifier:
+		{
+			Symbol *symbol = get_symbol_spot(f, expression->identifier.token);
+			return symbol->type;
+		} break;
+		case type_struct_init:
+		{
+			return verify_struct_init(f, expression);
+		} break;
+		case type_index:
+		{
+			Type_Info operand_type = fix_type(f, get_expression_type(f,
+				expression->index.operand, expression->index.token, NULL));
+			if(operand_type.type != T_ARRAY && operand_type.type != T_POINTER)
+			{
+				raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
+			}
+			Type_Info index_type = fix_type(f, get_expression_type(f,
+				expression->index.expression, expression->index.token, NULL));
+			if(!is_integer(index_type))
+			{
+				raise_semantic_error(f, "Non integer used for indexing", expression->index.token);
+			}
+			if(operand_type.type == T_ARRAY)
+			{
+				return *operand_type.array.type;
+			}
+			else
+			{
+				return  *operand_type.pointer.type;
+			}
+		} break;
+		case type_func_call:
+		{
+			return verify_func_call(f, expression, expression->func_call.token);
+		} break;
+		case type_selector:
+		{
+			Type_Info operand_type = fix_type(f, get_expression_type(f, expression->selector.operand, expression->selector.dot_token, NULL));
+			if(!is_accessible(operand_type))
+			{
+				raise_formated_semantic_error(f, expression->selector.dot_token,
+										"Expression of type %s is not selectable", var_type_to_name(operand_type));
+			}
+			
+			Ast_Struct structure = operand_type.structure->structure;
+			u8 *name = expression->selector.identifier->identifier.name;
+			for(size_t i = 0; i < structure.member_count; ++i)
+			{
+				if(vstd_strcmp((char *)name, (char *)structure.members[i].identifier.name))
+				{
+					return structure.members[i].type;
+				}
+			}
+			raise_formated_semantic_error(f, expression->selector.dot_token,
+									 "Accessed member %s of structure %s doesn't exist",
+									name, structure.struct_id.name);
+			
+		} break;
+		case type_postfix:
+		{
+			Type_Info expr_type = fix_type(f, get_expression_type(f, expression->postfix.operand, expression->postfix.token, NULL));
+
+			if (!is_integer(expr_type) && !is_float(expr_type) && expr_type.type != T_POINTER)
+			{
+				raise_formated_semantic_error(f, expression->postfix.token,
+											  "Cannot apply postfix operator to expression of type %s",
+											  var_type_to_name(expr_type));
+			}
+			return expr_type;
+		} break;
+		case type_literal:
+		{
+			return number_to_untyped_type(expression->atom.identifier.name);
+		} break;
+		case type_const_str:
+		{
+			return (Type_Info) {.type = T_STRING};
+		} break;
+	}
+	return (Type_Info){.type = T_INVALID};
+}
+
+Type_Info
+get_unary_expression_type(File_Contents *f, Ast_Node *expression)
+{
+	if(expression->type == type_unary_expr)
+	{
+		Ast_Unary_Expr unary_expr = expression->unary_expr;
+		const char *postfix_name = "++";
+		switch((int)unary_expr.op.type)
+		{
+			case tok_bits_xor:
+			case tok_bits_and:
+			case tok_bits_not:
+			{
+				Type_Info expr_type = get_expression_type(f, unary_expr.expression, unary_expr.op, NULL);
+				if(!is_integer(expr_type))
+				{
+					raise_formated_semantic_error(f, unary_expr.op,
+					"Cannot use bitwise operator %c on expression of type %s",
+					unary_expr.op.type, var_type_to_name(expr_type));
+				}
+				return expr_type;
+			} break;
+			case '@':
+			{
+				if(unary_expr.expression->type != tok_identifier)
+				{
+					raise_semantic_error(f, "@ of opperand needs to be used on an identifier", 
+											unary_expr.op);
+				}
+				Type_Info expr_type = get_expression_type(f, unary_expr.expression, unary_expr.op, NULL);
+				Type_Info *expr_ptr = AllocateCompileMemory(sizeof(Type_Info));
+				memcpy(expr_ptr, &expr_type, sizeof(Type_Info));
+				Type_Info result_type = {
+					.type = T_POINTER,
+					.pointer.type = expr_ptr,
+				};
+				return result_type;
+			} break;
+			case '*':
+			{
+				Type_Info expr_type = get_expression_type(f, unary_expr.expression, unary_expr.op, NULL);
+				if(expr_type.type != T_POINTER)
+				{
+					raise_semantic_error(f, "Cannot derefrence something that isn't a pointer", unary_expr.op);
+				}
+				return *expr_type.pointer.type;
+			} break;
+			case tok_not:
+			{
+				Type_Info expr_type = get_expression_type(f, unary_expr.expression, unary_expr.op, NULL);
+				if(expr_type.type != T_BOOLEAN)
+				{
+					raise_semantic_error(f, "Cannot use ! operator on a non boolean expression", unary_expr.op);
+				}
+				return expr_type;
+			} break;
+			case tok_minus:
+			{
+				Type_Info expr_type = get_expression_type(f, unary_expr.expression, unary_expr.op, NULL);
+				if(!is_integer(expr_type) && !is_float(expr_type))
+				{
+					raise_formated_semantic_error(f, unary_expr.op, "Cannot use - operator on an %s", 
+													var_type_to_name(expr_type));
+				}
+				if(expr_type.primitive.size >= ubyte1 && expr_type.primitive.size <= ubyte8)
+				{
+					raise_semantic_error(f, "Cannot use - operator on an unsigned integer", unary_expr.op);
+				}
+				return expr_type;
+			} break;
+			case tok_minusminus:
+			postfix_name = "--";
+			case tok_plusplus:
+			{
+				Type_Info expr_type = get_expression_type(f, unary_expr.expression, unary_expr.op, NULL);
+				if(!is_integer(expr_type) && !is_float(expr_type) && expr_type.type != T_POINTER)
+				{
+					raise_formated_semantic_error(f, unary_expr.op,
+					"Cannot apply %s operator to expression of type %s",
+					postfix_name, var_type_to_name(expr_type));
+				}
+				return expr_type;
+			} break;
+			default:
+			{
+				raise_semantic_error(f, "Unexpected unary exprsesion", unary_expr.op);
+				
+				// @Unreachable
+				return (Type_Info){.type = T_INVALID};
+			} break;
+		}
+	}
+	else if(expression->type == type_cast)
+	{
+		Type_Info cast_type = fix_type(f, expression->cast.type);
+		Type_Info casted = get_expression_type(f, expression->cast.expression, expression->cast.token, NULL);
+		if(!is_castable(casted, cast_type))
+		{
+			raise_formated_semantic_error(f, expression->cast.token, "Cannot cast type %s to %s",
+										  var_type_to_name(casted), var_type_to_name(cast_type));
+		}
+		return cast_type;
+	}
+	else
+		return get_atom_expression_type(f, expression);
+}
+
+void
+check_types_error(File_Contents *f, Token_Iden token, Type_Info a, Type_Info b)
+{
+	if(!check_type_compatibility(a, b))
+	{
+		raise_formated_semantic_error(f, token, "Types %s and %s are incompatible", 
+								var_type_to_name(a), var_type_to_name(b));
+	}
+}
+
+Type_Info
+get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Type_Info *previous)
 {
 	if(expression == NULL)
 		return (Type_Info){.type = T_INVALID};
 
-	Type_Info result = {.type = T_INVALID};
-	if(expression->type == type_identifier)
+	
+	Type_Info operand_type = get_unary_expression_type(f, expression);
+	
+	Type_Info left = get_expression_type(f, expression->left, desc_token, NULL);
+	Type_Info right = get_expression_type(f, expression->right, desc_token, NULL);
+	if(expression->type == type_binary_expr)
 	{
-			if(expression->identifier.symbol_spot)
-					result = expression->identifier.symbol_spot->type;
-			else
+		if(!type_is_invalid(operand_type))
+		{
+			if(!type_is_invalid(left))
 			{
-					result = get_symbol_spot(expression->identifier.token)->type;
+				check_types_error(f, desc_token, operand_type, left);
 			}
-	}
-	else if(expression->type == type_selector)
-	{
-			if(previous == NULL)
-					raise_semantic_error("Used  [.] operator on an invalid expression", desc_token);
-			*previous = verify_selector(*previous, expression->selector.selected, 
-							expression->identifier.token);
-	}
-	else if(expression->type == type_func_call)
-	{
-		result = verify_func_call(expression, desc_token);
-	}
-	else if(expression->type == type_struct_init)
-	{
-		result = verify_struct_init(expression, desc_token);
-	}
-	else if(expression->type == type_literal)
-	{
-		result = number_to_untyped_type(expression->atom.identifier.name); 
-	}
-	else if(expression->type == type_const_str)
-	{
-		result.type = T_STRING;
-		result.identifier = (u8 *)"string";
-		result.v_string.content = &(expression->atom.identifier);
-	}
-	else if(expression->type == type_unary_expr)
-	{
-		result = get_expression_type(expression->unary_expr.expression, desc_token, &result);
-	}
-	else result = (Type_Info){T_INVALID};
-
-	result = fix_type(result);	
-	Type_Info left_type = fix_type(get_expression_type(expression->left, desc_token, &result));
-	Type_Info right_type = fix_type(get_expression_type(expression->right, desc_token, &result));
-
-	if(expression->type == type_cast)
-	{
-		Type_Info cast_type = fix_type(expression->cast.type);
-		if(!is_castable(right_type, cast_type))
-		{
-			raise_formated_semantic_error(expression->cast.token, "Cannot cast type %s to %s",
-											var_type_to_name(right_type), var_type_to_name(cast_type));
-		}
-		result = cast_type; 
-		right_type = cast_type;
-		expression->cast.type = cast_type;
-	}
-	else if(expression->type == type_binary_expr)
-	{
-		if(is_bits_op(expression->binary_expr.op))
-		{
-			if(is_float(left_type) || is_float(right_type))
-				raise_semantic_error("Cannot perform a bitwise operation on a floating point number", expression->binary_expr.token);
-		}
-		if(!type_is_invalid(left_type) && !type_is_invalid(right_type))
-			return get_binary_expr_type(expression, left_type, right_type);
-	}
-	else if(expression->type == type_unary_expr)
-	{
-		if(expression->unary_expr.op == tok_not)
-		{
-			if(right_type.type != T_BOOLEAN)
+			if(!type_is_invalid(right))
 			{
-				raise_semantic_error("Cannot use [ ! ] operator not a non boolean expression", desc_token);
+				check_types_error(f, desc_token, operand_type, right);
 			}
 		}
-	}
-	if(!type_is_invalid(left_type))
-	{
-		if(type_is_invalid(result))
-			result = left_type;
-			
-		if(!are_op_compatible(left_type, result))
+		if(!type_is_invalid(left) && !type_is_invalid(operand_type))
 		{
-			char *error = AllocateCompileMemory(2048);
-			vstd_sprintf(error, "You can't perform an operation with types %s and %s",
-						 var_type_to_name(result), var_type_to_name(left_type));
-			raise_semantic_error(error, desc_token);
+			check_types_error(f, desc_token, left, right);
 		}
 	}
-
-	if(!type_is_invalid(right_type))
-	{
-		if(type_is_invalid(result))
-			result = left_type;
-		
-		if(!type_is_invalid(result) && !are_op_compatible(right_type, result))
-		{
-			char *error = AllocateCompileMemory(2048);
-			vstd_sprintf(error, "You can't perform an operation with types %s and %s",
-						 var_type_to_name(result), var_type_to_name(right_type));
-			raise_semantic_error(error, desc_token);
-		}
-	}
-	return result;
+	return fix_type(f, operand_type);
 }
 
 Type_Info
-verify_func_call(Ast_Node *func_call, Token_Iden expr_token)
+verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token)
 {
+
 	b32 has_va_args = false;
-	Symbol *func_sym = get_symbol_spot(func_call->func_call.identifier.token);
+	// @TODO: function pointers
+	if (func_call->func_call.operand->type != type_identifier)
+	{
+		raise_semantic_error(f, "Function caller is not an identifier",
+							 func_call->func_call.token);
+	}
+	Symbol *func_sym = get_symbol_spot(f, func_call->func_call.operand->identifier.token);
+	
 	Ast_Node **func_args = func_sym->node->function.arguments;
 	Ast_Node **passed_expr = func_call->func_call.arguments;
 	size_t expr_count = SDCount(passed_expr);
@@ -609,8 +696,8 @@ verify_func_call(Ast_Node *func_call, Token_Iden expr_token)
 	size_t j = 0;
 	for(size_t i = 0; i < expr_count; ++i)
 	{
-		Type_Info expr_type = get_expression_type(passed_expr[i], expr_token, NULL);
-		Type_Info arg_type = func_args[j]->variable.type;
+		Type_Info expr_type = fix_type(f, get_expression_type(f, passed_expr[i], expr_token, NULL));
+		Type_Info arg_type = fix_type(f, func_args[j]->variable.type);
 		if(arg_type.type == T_DETECT)
 		{
 			has_va_args = true;
@@ -624,7 +711,7 @@ verify_func_call(Ast_Node *func_call, Token_Iden expr_token)
 						 var_type_to_name(expr_type),
 						 j + 1,
 						 var_type_to_name(arg_type));
-			raise_semantic_error(error, func_call->func_call.identifier.token);
+			raise_semantic_error(f, error, func_call->func_call.token);
 		}
 		if(!has_va_args)
 			j++;
@@ -633,27 +720,26 @@ verify_func_call(Ast_Node *func_call, Token_Iden expr_token)
 	{
 		char *error = AllocateCompileMemory(2048);
 		vstd_sprintf(error, "Incorrect number of arguments, passed %d, function required %d", expr_count, args_count);
-		raise_semantic_error(error, func_call->func_call.identifier.token);
+		raise_semantic_error(f, error, func_call->func_call.token);
 	}	
 	return func_sym->type;
 }
 
 Type_Info
-verify_struct_init(Ast_Node *struct_init, Token_Iden error_token)
+verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 {
-	if(struct_init->type != type_struct_init)
+	if(struct_init->struct_init.operand->type != type_identifier)
 	{
-		raise_semantic_error("Incorrect name of struct used for struct initialization", error_token);
+		raise_semantic_error(f, "expected struct identifier", struct_init->struct_init.token);
 	}
-	
-	Token_Iden init_token = struct_init->struct_init.id_token;
-	u8 *struct_id = init_token.identifier;
+	Token_Iden error_token = struct_init->struct_init.token;	
+	u8 *struct_id = struct_init->struct_init.operand->identifier.name;
 	Ast_Node **expressions = struct_init->struct_init.expressions;
-	Type_Info struct_type = get_type(struct_id);
+	Type_Info struct_type = get_type(f, struct_id);
 	
 	if(struct_type.type != T_STRUCT)
 	{
-		raise_semantic_error("Incorrect identifier used for struct initialization", init_token);
+		raise_semantic_error(f, "Incorrect identifier used for struct initialization", error_token);
 	}
 	Ast_Variable *members = struct_type.structure->structure.members;
 	int member_count = struct_type.structure->structure.member_count;
@@ -662,17 +748,17 @@ verify_struct_init(Ast_Node *struct_init, Token_Iden error_token)
 	{
 		char *error = AllocateCompileMemory(4 * (vstd_strlen((char *)struct_id) + 16));
 		vstd_sprintf(error, "Struct %s doesn't exist, error in struct initializer", struct_id);
-		raise_semantic_error(error, init_token);
+		raise_semantic_error(f, error, error_token);
 	}
 	if(SDCount(expressions) > member_count)
 	{
-		raise_semantic_error("Too many expressions in struct initialization", init_token);
+		raise_semantic_error(f, "Too many expressions in struct initialization", error_token);
 	}
 	
 	for(size_t i = 0; i < SDCount(expressions); ++i)
 	{
-		members[i].type = fix_type(members[i].type);
-		Type_Info expr_type = get_expression_type(expressions[i], init_token, NULL);
+		members[i].type = fix_type(f, members[i].type);
+		Type_Info expr_type = get_expression_type(f, expressions[i], error_token, NULL);
 		Type_Info member_type = members[i].type;
 		if(!check_type_compatibility(member_type, expr_type))
 		{
@@ -683,14 +769,14 @@ verify_struct_init(Ast_Node *struct_init, Token_Iden error_token)
 						 var_type_to_name(expr_type),
 						 i + 1,
 						 var_type_to_name(member_type));
-			raise_semantic_error(error, init_token);
+			raise_semantic_error(f, error, error_token);
 		}
 	}
 	return struct_type;
 }
 
 Symbol *
-get_symbol_spot(Token_Iden token)
+get_symbol_spot(File_Contents *f, Token_Iden token)
 {
 	Symbol *result = NULL;
 	u8 *identifier = token.identifier;
@@ -699,9 +785,9 @@ get_symbol_spot(Token_Iden token)
 	Scope_Info saved_scopes[4096] = {};
 	size_t last_scope = 0;
 
-	while(!is_stack_empty(scope_stack))
+	while(!is_stack_empty(f->scope_stack))
 	{
-		Scope_Info to_scan = stack_pop(scope_stack, Scope_Info);
+		Scope_Info to_scan = stack_pop(f->scope_stack, Scope_Info);
 		size_t scan_size = SDCount(to_scan.symbol_table);
 		Symbol *scanning_table = to_scan.symbol_table;
 
@@ -718,16 +804,16 @@ get_symbol_spot(Token_Iden token)
 	
 	for(signed int i = last_scope - 1; i >= 0; --i)
 	{
-		stack_push(scope_stack, saved_scopes[i]);
+		stack_push(f->scope_stack, saved_scopes[i]);
 	}
 
 	// NOTE(Vasko): Loops to check for function definitions
 	if(result == NULL)
 	{
-		size_t scan_size = SDCount(scopes);
+		size_t scan_size = SDCount(f->scopes);
 		for(size_t i = 0; i < scan_size; ++i)
 		{
-			Scope_Info scope = scopes[i];
+			Scope_Info scope = f->scopes[i];
 			size_t table_size = SDCount(scope.symbol_table);
 			for(size_t j = 0; j < table_size; ++j)
 			{
@@ -746,7 +832,7 @@ get_symbol_spot(Token_Iden token)
 		char *error = AllocateCompileMemory(1024 * 1024);
 		memset(error, 0, 1024 * 1024);
 		vstd_sprintf(error, "Use of undeclared symbol \"%s\"", identifier);
-		raise_semantic_error(error, token);
+		raise_semantic_error(f, error, token);
 	}
 
 	return result;
@@ -811,18 +897,18 @@ check_type_compatibility(Type_Info a, Type_Info b)
 }
 
 void
-verify_struct(Ast_Node *struct_node)
+verify_struct(File_Contents *f, Ast_Node *struct_node)
 {
 	Ast_Variable *members = struct_node->structure.members;
 	int member_count = struct_node->structure.member_count;
 
-	Type_Info struct_type = get_type(struct_node->structure.struct_id.name);
+	Type_Info struct_type = get_type(f, struct_node->structure.struct_id.name);
 	for(size_t i = 0; i < member_count; ++i)
 	{
 		if(struct_type.type == T_STRUCT && members[i].type.type == T_STRUCT && 
 		   vstd_strcmp((char *)members[i].type.identifier, (char *)struct_type.identifier))
 		{
-			raise_semantic_error("You can't put a struct as it's own member variable, use a pointer",
+			raise_semantic_error(f, "You can't put a struct as it's own member variable, use a pointer",
 								 members[i].identifier.token);
 		}
 	}

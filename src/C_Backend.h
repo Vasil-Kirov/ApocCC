@@ -11,7 +11,7 @@ extern "C" {
 #include <Parser.h>
 
 void
-c_backend_generate(Ast_Node *ast_root, Type_Table *type_table, Scope_Info *scopes);
+c_backend_generate(File_Contents *f, Ast_Node *ast_root);
 
 
 #ifdef __cplusplus

@@ -96,37 +96,37 @@ vstd_str_to_double(char *str)
 }
 
 inline b32
-is_special_char(char c)
+is_special_char(u8 c)
 {
 	return ((c >= '!' && '/' <= c) || (c >= ':' && '@' <= c) || (c >= '[' && c <= '`') || (c >= '{' && c <= '~'));
 }
 
 inline b32
-is_alnum(char c)
+is_alnum(u8 c)
 {
 	return ( is_alpha(c) || is_number(c) );
 }
 
 inline b32
-is_alpha(char c)
+is_alpha(u8 c)
 {
 	return ( (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') );
 }
 
 inline b32
-is_non_special_char(char c)
+is_non_special_char(u8 c)
 {
 	return (c == '_');
 }
 
 inline b32
-is_whitespace(char c)
+is_whitespace(u8 c)
 {
 	return (c == ' ' || c == '\r' || c == '\v' || c == '\n' || c == '\t');
 }
 
 inline b32
-is_number(char c)
+is_number(u8 c)
 {
 	return (c >= '0' && c <= '9');
 }

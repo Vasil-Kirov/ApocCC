@@ -7,7 +7,7 @@ struct _Token_Iden;
 typedef struct _File_Contents File_Contents;
 
 void
-raise_semantic_error(const char *error_msg, struct _Token_Iden token);
+raise_semantic_error(File_Contents *f, const char *error_msg, struct _Token_Iden token);
 
 void
 raise_parsing_unexpected_token(const char *expected_tok, File_Contents *f);

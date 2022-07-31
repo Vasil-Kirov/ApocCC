@@ -37,19 +37,19 @@ void
 vstd_stepout_dir(char *path);
 
 b32
-is_whitespace(char c);
+is_whitespace(u8 c);
 
 b32
-is_non_special_char(char c);
+is_non_special_char(u8 c);
 
 b32
-is_alpha(char c);
+is_alpha(u8 );
 
 b32
-is_alnum(char c); 
+is_alnum(u8 c); 
 
 b32
-is_number(char c);
+is_number(u8 c);
 
 f64
 vstd_str_to_double(char *str);
