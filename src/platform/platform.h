@@ -3,11 +3,6 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 #include <Basic.h>
 #include <Log.h>
 
@@ -61,6 +56,19 @@ platform_output_string(char *String, log_level Level);
 void
 platform_exit(i32 ExitCode);
 
+
+char *
+platform_relative_to_absolute_path(char *path);
+
+char *
+platform_path_to_file_name(char *path);
+
+wchar_t *
+platform_relative_to_absolute_pathw(wchar_t *path);
+
+wchar_t *
+platform_path_to_file_namew(wchar_t *path);
+
 u64
 platform_get_file_size(char *Path);
 
@@ -96,9 +104,5 @@ platform_read_entire_file(void *Data, u64 *Size, char *Path);
 
 void
 platform_call(const char *command);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif //PLATFORM_H

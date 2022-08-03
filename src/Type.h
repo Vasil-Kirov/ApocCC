@@ -20,7 +20,7 @@ typedef enum
 	ubyte8 = 8,
 	real32 = 9,
 	real64 = 10,
-	empty  = 11,
+	empty_void  = 11,
 	logical_bit = 12,
 	detect // @TODO: Remove
 } Var_Size;
@@ -39,7 +39,7 @@ typedef enum
 	T_VOID            = 1 << 9,
 	T_STRING          = 1 << 10,
 	T_BOOLEAN		  = 1 << 11,
-} Type;
+} Type_Type;
 
 typedef enum
 {
@@ -49,7 +49,7 @@ typedef enum
 
 typedef struct _Type_Info
 {
-	Type type;
+	Type_Type type;
 	Token_Iden token;
 	union
 	{
@@ -79,6 +79,9 @@ Type_Info
 fix_type(File_Contents *f, Type_Info type);
 
 b32
+is_signed(Type_Info type);
+
+b32
 is_type_primitive(Type_Info type);
 
 b32
@@ -98,5 +101,6 @@ is_rhs_valid(Type_Info type);
 
 b32
 is_pointer_rhs_compatible(Type_Info type);
+
 
 #endif //_TYPE_H

@@ -3,11 +3,6 @@
 #ifndef _PARSER_H
 #define _PARSER_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 #define REASONABLE_MAXIMUM 256
 
 
@@ -17,7 +12,7 @@ extern "C"
 #include <Type.h>
 
 //#define INVALID_TYPE (Var_Type){.is_primitive = true, .prim_repr = invalid_type}
-#define NO_EXPECT '\x18'
+#define NO_EXPECT ((Token)'\x18')
 	
 typedef struct _abstract_syntax_tree Ast_Node;
 
@@ -132,12 +127,15 @@ typedef struct
 {
 	Token_Iden op;
 	Ast_Node *expression;
+	Type_Info expr_type;
 } Ast_Unary_Expr;
 
 typedef struct
 {
 	Token op;
 	Token_Iden token;
+	Type_Info left;
+	Type_Info right;
 } Ast_Binary_Expr;
 	
 typedef struct
@@ -147,7 +145,7 @@ typedef struct
 	Ast_Node *lhs;
 	Ast_Node *rhs;
 	Token assign_type;
-	Token_Iden err_token;
+	Token_Iden token;
 	Type_Info decl_type;
 } Ast_Assignment;
 
@@ -215,6 +213,7 @@ typedef struct
 	Token_Iden token;
 	Type_Info type;
 	Ast_Node *expression;
+	Type_Info expr_type;
 } Ast_Cast;
 	
 typedef struct
@@ -255,34 +254,25 @@ struct _abstract_syntax_tree
 
 
 Ast_Node *
-parse_file_level_statement();
+parse_file_level_statement(File_Contents *f);
 
 Ast_Node *
-parse_identifier(Token_Iden name_token);
+parse_identifier(File_Contents *f, Token_Iden name_token);
 
 Ast_Node *
-parse_statement();
+parse_statement(File_Contents *f);
 
 Ast_Node *
 parse_expression(File_Contents *f, Token stop_at, b32 is_lhs);
 
-Ast_Variable
-parse_declaration_left(Token_Iden identifier);
-
-Ast_Node *
-parse_declaration_left_from_array(Token_Iden *tokens, int count);
-
 Ast_Node *
 parse_declaration_right();
-
-b32
-is_func_call(Token_Iden token, int check_ahead);
 
 Ast_Node *
 parse_func_call(File_Contents *f, Ast_Node *operand);
 
 Ast_Node *
-parse_struct();
+parse_struct(File_Contents *f);
 
 #include <Analyzer.h>
 
@@ -303,9 +293,5 @@ parse_func(File_Contents *f);
 
 void
 parser_eat(File_Contents *f, Token expected_token);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif //_PARSER_H

@@ -128,7 +128,7 @@ b32
 are_op_compatible(Type_Info a, Type_Info b);
 
 b32
-is_scope_stack_empty();
+is_scope_stack_empty(File_Contents *f);
 
 Type_Info
 untyped_to_type(Type_Info type);

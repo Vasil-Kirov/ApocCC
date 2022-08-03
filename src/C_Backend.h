@@ -2,11 +2,8 @@
 #ifndef _C_BACKEND
 #define _C_BACKEND
 
-#ifdef __cplusplus
 #include <string>
 using namespace std;
-extern "C" {
-#endif
 
 #include <Parser.h>
 
@@ -31,7 +28,4 @@ write_types(string *c_file, Type_Table *type_table);
 #endif
 
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
 #endif // _C_BACKEND

@@ -1,7 +1,6 @@
 #include <C_Backend.h>
 #include <platform/platform.h>
 #include <stdlib/std.h>
-#include <stb_ds.h>
 
 void
 c_backend_generate(Ast_Node *ast_root, Type_Table *type_table, Scope_Info *scopes)
@@ -223,7 +222,7 @@ code_from_statement(Ast_Node *node, string *c_file)
 				if(node->assignment.is_declaration)
 					write_to_file(c_file, node->assignment.decl_type.identifier);
 
-				write_formated(c_file, " %s =", node->assignment.err_token.identifier);
+				write_formated(c_file, " %s =", node->assignment.token.identifier);
 				write_expression(c_file, node->assignment.rhs);
 				write_to_file(c_file, ";");
 			} break;

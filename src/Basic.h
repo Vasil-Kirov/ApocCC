@@ -7,12 +7,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
-
-
-#ifndef __cplusplus
+#ifndef STB_DS_IMPLEMENTATION
 #define STB_DS_IMPLEMENTATION
-#include <stb_ds.h>
 #endif
+#include <stb_ds.h>
 
 
 typedef uint8_t u8;

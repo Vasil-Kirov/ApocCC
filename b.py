@@ -3,13 +3,13 @@ import os
 import time
 import subprocess
 
+
 start_time = time.time()
 
 os.system('cls')
 
 
-llvm_libs = ""
-llvm_include = ""
+llvm_flags = ""
 compiler_args = ""
 
 if len(sys.argv) == 1 or sys.argv[1] == 'debug':
@@ -18,46 +18,61 @@ if len(sys.argv) == 1 or sys.argv[1] == 'debug':
 
 elif sys.argv[1] == 'release':
 	print('--- RELEASE ---')
-	compiler_args = '-O3 -Wall -DRELEASE'
+	compiler_args = '-O3 -Wall'
 
 elif sys.argv[1] == 'bounds':
 	print('--- BOUNDS ---')
-	compiler_args = '-O0 -Wall -DDEBUG -fsanitize=address'
+	compiler_args = '-O0 -Wall -fsanitize=address'
 
 if len(sys.argv) == 3 and sys.argv[2].lower() == 'llvm_be':
 	print("Oh god what have you done")
-	llvm_libs = ""
-	with open('LLVM_LIBS.txt', "r") as f:
-		llvm_libs = f.read().replace('\n', ' ')
+	llvm_flags = r"-fno-exceptions -std=c++14 -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DUNICODE -D_UNICODE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
 
-	llvm_include = ' -IE:\\GitClone\\llvm-project\\llvm\\include'
+	#llvm_flags = r' -IE:/GitClone/llvm-project/llvm/include -IE:/GitClone/llvm-project/llvm/build/include -std=c++14 -fno-exceptions -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DUNICODE -D_UNICODE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS'
 
 linker_args = ""
 if sys.platform == "win32":
-	linker_args = "-luser32 -lShell32.lib" + llvm_libs
+	linker_args = "-luser32 -lShell32.lib -lpsapi.lib -lole32.lib -luuid.lib -ladvapi32.lib"
 elif sys.platform == "linux":
 	linker_args = llvm_libs
 else:
 	print(f'Unkown platform {sys.platform}')
 	exit(1)
-compiler_args = compiler_args + '-ffast-math -mavx -Wno-microsoft-enum-forward-reference -Wno-c99-extensions'
-includes='-I..\\src -I..\\include' + llvm_include
+compiler_args += ' -ffast-math -mavx -Wno-microsoft-enum-forward-reference -Wno-c99-extensions'
+compiler_args += ' -D_ITERATOR_DEBUG_LEVEL=0'
+includes='-I..\\src -I..\\include'
 backend_files = ''
-if len(llvm_include) > 0:
+if len(llvm_flags) > 0:
 	backend_files = '..\\src\\LLVM_Backend.cpp'
 else:
 	backend_files = '..\\src\\C_Backend.cpp'
 
+linker_args += r' -lE:/GitClone/llvm-project/llvm/build/Release/lib/*.lib'
+linker_args += r' -LE:/GitClone/llvm-project/llvm/build/Release/lib'
+includes += r' -IE:/GitClone/llvm-project/llvm/build/include'
+includes += r' -IE:/GitClone/llvm-project/llvm/include'
 
-cmd = ['clang', '-oapoc.exe', '../src/Main.c']
-cmd += linker_args.split(' ')
-cmd += includes.split(' ')
-cmd += backend_files.split(' ')
-cmd += compiler_args.split(' ')
+c_command = ['clang++', '-oapoc.exe', '../src/Main.cpp']
+c_command += linker_args.split(' ')
+c_command += includes.split(' ')
+c_command += compiler_args.split(' ')
 
+c_command += llvm_flags.split(' ')
+
+#cpp_command = ['clang++', '-oapoc_backend.lib', '-c']
+#cpp_command += backend_files.split(' ')
+#cpp_command += includes.split(' ')
+#cpp_command += compiler_args.split(' ')
+
+#if(len(llvm_flags) > 0):
+#	cpp_command += llvm_flags.split(' ')
 
 os.chdir('bin')
-process = subprocess.Popen(cmd)
 
-process.wait()
+#cpp_compile = subprocess.Popen(cpp_command)
+#cpp_compile.wait()
+
+c_compile = subprocess.Popen(c_command)
+c_compile.wait()
+
 print(f'Done, execution took {time.time() - start_time} seconds')

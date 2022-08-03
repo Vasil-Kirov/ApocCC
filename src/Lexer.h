@@ -3,15 +3,11 @@
 #ifndef _LEXER_H
 #define _LEXER_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 #include <Basic.h>
 #include <Errors.h>
-		
-typedef enum
+
+	typedef enum : signed short
 	{
 		tok_minus = '-',
 		tok_plus = '+',
@@ -19,7 +15,6 @@ typedef enum
 		tok_star = '*',
 		tok_equals = '=',
 
-	
 		tok_eof = -1,
 
 		// syntax commands
@@ -45,7 +40,6 @@ typedef enum
 		tok_logical_gequal = -17,
 		tok_logical_greater = '>',
 		tok_logical_lesser = '<',
-	
 
 		// bits
 		tok_bits_lshift = -18, // <<
@@ -89,10 +83,10 @@ typedef enum
 
 	} Token;
 
-typedef struct _str_hash_table
-{
-	u8 *key;
-	i64 value;
+	typedef struct _str_hash_table
+	{
+		u8 *key;
+		i64 value;
 } str_hash_table;
 
 typedef struct _Token_Iden 
@@ -101,7 +95,6 @@ typedef struct _Token_Iden
 	Token type;
 	u64 line;
 	u64 column;
-	char *location;
 	char *file;
 } Token_Iden;
 
@@ -112,17 +105,13 @@ Token_Iden get_token(File_Contents *f);
 void initialize_compiler();
 void lex_file(File_Contents *f, char *path);
 
-void save_token_position();
-void load_token_position();
-Token_Iden advance_token();
+void save_token_position(File_Contents *f);
+void load_token_position(File_Contents *f);
+Token_Iden advance_token(File_Contents *f);
 Token_Iden get_next_expecting(File_Contents *f, Token type, const char *error_msg);
 
 u8 *token_to_str(Token token);
 enum _Ast_Type;
 u8 *type_to_str(enum _Ast_Type type);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif //_LEXER_H

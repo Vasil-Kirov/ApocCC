@@ -1,5 +1,3 @@
-[FATAL] Test.apoc (12, 11):
-	Found unexpected token [tok_plus_equals], expected Correctly formated statement, like one of the following:
-a_float := 0
-a_float :: 0
-a_float = 0
+[ERROR] Statement of type type not implemented not handled in code generation
+[DEBUG] Initialize target: "AArch64".
+[DEBUG] Initialize target: "X86".
