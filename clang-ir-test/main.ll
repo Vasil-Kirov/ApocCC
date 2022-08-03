@@ -6,13 +6,23 @@ target triple = "x86_64-pc-windows-msvc19.32.31329"
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @main() #0 {
   %1 = alloca i32, align 4
-  %2 = alloca float, align 4
-  %3 = alloca double, align 8
+  %2 = alloca i32, align 4
+  %3 = alloca i32, align 4
   store i32 0, ptr %1, align 4
-  store float 1.000000e+01, ptr %2, align 4
-  %4 = load float, ptr %2, align 4
-  %5 = fpext float %4 to double
-  store double %5, ptr %3, align 8
+  store i32 1, ptr %2, align 4
+  store i32 1, ptr %3, align 4
+  %4 = load i32, ptr %2, align 4
+  %5 = load i32, ptr %3, align 4
+  %6 = icmp eq i32 %4, %5
+  br i1 %6, label %7, label %10
+
+7:                                                ; preds = %0
+  %8 = load i32, ptr %3, align 4
+  %9 = sub nsw i32 0, %8
+  store i32 %9, ptr %2, align 4
+  br label %10
+
+10:                                               ; preds = %7, %0
   ret i32 0
 }
 

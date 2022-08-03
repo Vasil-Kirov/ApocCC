@@ -54,7 +54,6 @@ generate_obj(File_Contents *f)
 	}
 	
     LG_DEBUG("Target Triple: %s\n", c_str_triplet);
-    LG_DEBUG("Features: %s\n", LLVMGetHostCPUFeatures());
 
 
 	const char *cpu = "generic";
@@ -69,7 +68,6 @@ generate_obj(File_Contents *f)
 	LLVMSetTarget(file_mod, c_str_triplet);
 	LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(machine);
 	char *data_layout_str = LLVMCopyStringRepOfTargetData(data_layout);
-	LG_DEBUG("Data Layout: %s", data_layout_str);
 	LLVMSetDataLayout(file_mod, data_layout_str);
 	LLVMDisposeMessage(data_layout_str);
 
@@ -77,7 +75,7 @@ generate_obj(File_Contents *f)
 	LLVMTargetMachineEmitToFile(machine, file_mod, obj_file, LLVMObjectFile, &error);
 	
 	std::error_code std_err;
-	raw_fd_ostream ir_dest("test.ir", std_err);
+	raw_fd_ostream ir_dest("test.ll", std_err);
 	backend.module->print(ir_dest, nullptr);
 }
 
@@ -148,6 +146,78 @@ generate_func_signature(File_Contents *f, Ast_Node *node)
 	return func;
 }
 
+llvm::BasicBlock *
+generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block, const char *block_name, BasicBlock *to_go)
+{
+	BasicBlock *body_block = NULL;
+	if(!passed_block)
+	{
+		body_block = BasicBlock::Create(*backend.context, block_name, func);
+		backend.builder->SetInsertPoint(body_block);
+	}
+	else
+		body_block = passed_block;
+	Ast_Node *to_switch = NULL;
+	int levels_up = 0;
+	while(true)
+	{
+		if(!node)
+			break;
+		switch((int)node->type)
+		{
+			case type_assignment:
+			{
+				generate_assignment(f, func, node);
+			} break;
+			case type_return:
+			{
+				backend.builder->CreateRet(generate_expression(f, node->right));
+			} break;
+			case type_if:
+			{
+				llvm::Value *evaluation = generate_expression(f, node->condition);
+				if(evaluation->getType() != Type::getInt1Ty(*backend.context))
+				{
+					Type_Info boolean_type = {};
+					boolean_type.type = T_BOOLEAN;
+
+					evaluation = backend.builder->CreateCast(Instruction::CastOps::Trunc, evaluation, apoc_type_to_llvm(boolean_type, backend), "boolean_expr");
+				}
+
+				auto if_false = generate_block(f, node->left->left, func, NULL, "if_false", NULL);
+				auto if_true = generate_block(f, node->left->right, func, NULL, "if_true", if_false);
+				backend.builder->SetInsertPoint(body_block);
+				backend.builder->CreateCondBr(evaluation, if_true, if_false);
+				goto RETURN_BLOCK;
+			} break;
+			case type_scope_start:
+			{
+				levels_up++;
+			} break;
+			case type_scope_end:
+			{
+				if(levels_up == 0)
+					goto RETURN_BLOCK;
+			} break;
+			default:
+			{
+				LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
+			} break;
+		}
+		if(to_switch)
+			node = to_switch;
+		else
+			node = node->left;
+		to_switch = NULL;
+	}
+	RETURN_BLOCK:;
+	
+	if(to_go)
+		backend.builder->CreateBr(to_go);
+
+	return body_block;
+}
+
 void
 generate_func(File_Contents *f, Ast_Node *node)
 {
@@ -166,50 +236,16 @@ generate_func(File_Contents *f, Ast_Node *node)
 			backend.builder->CreateStore(&arg, variable);
 		}
 	}
-	b32 loop = true;
 	node = node->left;
 	Assert(node->type == type_scope_start);
 	node = node->right;
+	generate_block(f, node, func, body_block, "", NULL);
 
-	Ast_Node *to_switch = NULL;
-	int scope_up_count = 0;
-	while(loop)
+	std::error_code error_code;
+	raw_fd_ostream std_out_fd("-", error_code);
+	if (verifyFunction(*func, &std_out_fd))
 	{
-		if(!node)
-			break;
-		switch((int)node->type)
-		{
-			case type_assignment:
-			{
-				generate_assignment(f, func, node);
-			} break;
-			case type_return:
-			{
-				backend.builder->CreateRet(generate_expression(f, node->right));
-			} break;
-			case type_scope_start: scope_up_count++;
-			case type_scope_end:
-			{
-				if(scope_up_count == 0)
-				{
-					std::error_code error_code;
-					raw_fd_ostream std_out_fd("-", error_code);
-					if(verifyFunction(*func, &std_out_fd))
-					{
-						LG_FATAL("Incorrect function");
-					}
-				}
-			} break;
-			default:
-			{
-				LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
-			} break;
-		}
-		if(to_switch)
-			node = to_switch;
-		else
-			node = node->left;
-		to_switch = NULL;
+		LG_FATAL("Incorrect function");
 	}
 }
 
@@ -340,8 +376,69 @@ generate_expression(File_Contents *f, Ast_Node *node)
 {
 	if(node->type == type_binary_expr)
 	{
+		b32 has_casted = false;
+		b32 should_cast = true;
+		// @TODO: potential u64
+		Type_Info untyped_int_type = {T_INTEGER};
+		untyped_int_type.primitive.size = byte8;
+		Type_Info untyped_float_type = {T_FLOAT};
+		untyped_float_type.primitive.size = real64;
 		llvm::Value *left = generate_expression(f, node->left);
 		llvm::Value *right = generate_expression(f, node->right);
+
+		Instruction::CastOps to_cast;
+		Type_Info from_cast = {};
+
+		/*
+		if(is_logical_op(node->binary_expr.op))
+		{
+			Type_Info boolean_type = {};
+			boolean_type.type = T_BOOLEAN;
+			
+			to_cast = get_cast_type(boolean_type, node->binary_expr.left, &should_cast);
+			left = backend.builder->CreateCast(to_cast, left, apoc_type_to_llvm(boolean_type, backend), "bool1");
+			to_cast = get_cast_type(boolean_type, node->binary_expr.right, &should_cast);
+			right = backend.builder->CreateCast(to_cast, right, apoc_type_to_llvm(boolean_type, backend), "bool1");
+		}
+		*/
+
+		if(is_untyped(node->binary_expr.left))
+		{
+			has_casted = true;
+			if(is_untyped(node->binary_expr.right))
+				goto END_UNTYPED_CAST;
+			if(is_float(node->binary_expr.left))
+			{
+				from_cast = untyped_float_type;
+			}
+			else
+			{
+				from_cast = untyped_int_type;
+			}
+			to_cast = get_cast_type(node->binary_expr.right, from_cast, &should_cast);
+
+			if(should_cast)
+				left = backend.builder->CreateCast(to_cast, left, apoc_type_to_llvm(node->binary_expr.right, backend), "left_cast");
+		}
+
+		if(is_untyped(node->binary_expr.right))
+		{
+			has_casted = true;
+			if(is_float(node->binary_expr.right))
+			{
+				from_cast = untyped_float_type;
+			}
+			else
+			{
+				from_cast = untyped_int_type;
+			}
+			to_cast = get_cast_type(node->binary_expr.left, from_cast, &should_cast);
+
+			if(should_cast)
+				right = backend.builder->CreateCast(to_cast, right, apoc_type_to_llvm(node->binary_expr.left, backend), "right_cast");
+		}
+		END_UNTYPED_CAST:;
+
 		llvm::Value *result = NULL;
 		switch ((int)node->binary_expr.op)
 		{
@@ -432,6 +529,29 @@ generate_expression(File_Contents *f, Ast_Node *node)
 			} break;
 		}
 		Assert(result);
+		if(is_logical_op(node->binary_expr.op))
+		{
+			Type_Info boolean_type = {};
+			boolean_type.type = T_BOOLEAN;
+
+			result = backend.builder->CreateCast(Instruction::CastOps::Trunc, result, apoc_type_to_llvm(boolean_type, backend), "boolean_expr");
+		}
+		else if(has_casted)
+		{
+			Type_Info to = {};
+			Instruction::CastOps result_cast;
+			if(is_untyped(node->binary_expr.left))
+			{
+				if(is_untyped(node->binary_expr.right))
+					return result;
+				to = node->binary_expr.right;
+			}
+			else
+				to = node->binary_expr.left;
+			result_cast = get_cast_type(to, from_cast, &should_cast);
+			result = backend.builder->CreateCast(result_cast, result, apoc_type_to_llvm(to, backend), "result_cast");
+		}
+
 		return result;
 	}
 	else

@@ -133,4 +133,7 @@ is_scope_stack_empty(File_Contents *f);
 Type_Info
 untyped_to_type(Type_Info type);
 
+b32
+is_logical_op(Token op);
+
 #endif

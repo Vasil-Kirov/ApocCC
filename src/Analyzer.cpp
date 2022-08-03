@@ -338,6 +338,59 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 	verify_func_level_statement(f, node->left, func_node);
 }
 
+Ast_Node *
+get_assign_type_expression(File_Contents *f, Ast_Node *node)
+{
+	Ast_Node *result = alloc_node();
+	result->type = type_binary_expr;
+	result->right = node->assignment.rhs;
+	result->left = node->assignment.lhs;
+	result->binary_expr.token = node->assignment.token;
+	switch((int)node->assignment.assign_type)
+	{
+		case tok_plus_equals:
+		{
+			result->binary_expr.op = tok_plus;
+		} break;
+		case tok_minus_equals:
+		{
+			result->binary_expr.op = tok_minus;
+		} break;
+		case tok_mult_equals:
+		{
+			result->binary_expr.op = tok_star;
+		} break;
+		case tok_div_equals:
+		{
+			result->binary_expr.op = (Token)'/';
+		} break;
+		case tok_mod_equals:
+		{
+			result->binary_expr.op = (Token)'%';
+		} break;
+		case tok_and_equals:
+		{
+			result->binary_expr.op = tok_bits_and;
+		} break;
+		case tok_xor_equals:
+		{
+			result->binary_expr.op = tok_bits_xor;
+		} break;
+		case tok_or_equals:
+		{
+			result->binary_expr.op = tok_bits_or;
+		} break;
+		case tok_lshift_equals:
+		{
+			result->binary_expr.op = tok_bits_lshift;
+		} break;
+		case tok_rshift_equals:
+		{
+			result->binary_expr.op = tok_bits_rshift;
+		} break;
+	}
+	return result;
+}
 
 void
 verify_assignment(File_Contents *f, Ast_Node *node)
@@ -347,6 +400,13 @@ verify_assignment(File_Contents *f, Ast_Node *node)
 		LG_FATAL("Compiler bug in file %s at line %d, expected node type_assignment, got %s (id: %d)",
 				 __FILE__, __LINE__, type_to_str(node->type), node->type);
 	}
+
+	if(node->assignment.assign_type != '=')
+	{
+		node->assignment.rhs = get_assign_type_expression(f, node);
+		
+	}
+
 	Type_Info expression_type = get_expression_type(f, node->assignment.rhs,
 													node->assignment.token, NULL);
 	if(!node->assignment.is_declaration)
@@ -357,6 +417,8 @@ verify_assignment(File_Contents *f, Ast_Node *node)
 	{
 		raise_semantic_error(f, "Invalid expression", node->assignment.token);
 	}
+
+	
 	
 	if(node->assignment.decl_type.type == T_DETECT)
 	{
@@ -439,6 +501,12 @@ get_binary_expr_type(File_Contents *f, Ast_Node *expr, Type_Info left, Type_Info
 		} break;
 	
 	}
+}
+
+b32
+is_logical_op(Token op)
+{
+	return (op >= tok_logical_gequal && op <= tok_logical_or) || op == tok_logical_greater || op == tok_logical_lesser;	
 }
 
 b32
@@ -686,6 +754,12 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_toke
 			raise_semantic_error(f, "Cannot use the bitwise operators with floating point numbers",
 				expression->binary_expr.token);
 		}
+	}
+	else if(is_logical_op(expression->binary_expr.op))
+	{
+		Type_Info boolean_type = {};
+		boolean_type.type = T_BOOLEAN;
+		return boolean_type;
 	}
 
 	return fix_type(f, left);

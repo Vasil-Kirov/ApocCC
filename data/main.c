@@ -1,10 +1,15 @@
 #include <stdio.h>
-extern double add_nums(float a, float b);
+#include <stdint.h>
+
+extern uint8_t increment_u8(int8_t a);
 
 
 int main()
 {
-	double sum = add_nums(10.324f, 34.27f);	
-	printf("%f", sum);
+	uint8_t a = 0;
+	a = increment_u8(a);
+	a = increment_u8(a);
+	a = increment_u8(a);
+	printf("%d", a);
 	return 0;	
 }

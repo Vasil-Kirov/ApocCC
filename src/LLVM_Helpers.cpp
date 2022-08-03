@@ -29,6 +29,10 @@ apoc_type_to_llvm(Type_Info type, Backend_State backend)
 		else if(type.primitive.size == real64) return llvm::Type::getDoubleTy(*backend.context);
 		Assert(false);
 	}
+	else if (type.type == T_BOOLEAN)
+	{
+		return llvm::Type::getInt1Ty(*backend.context);
+	}
 	else if (type.type == T_STRING)
 	{
 		llvm::Type *u8_type = llvm::Type::getInt8Ty(*backend.context);
@@ -41,7 +45,7 @@ apoc_type_to_llvm(Type_Info type, Backend_State backend)
 	}
 	else if (type.type == T_STRUCT)
 	{
-
+		// @TODO: implement
 	}
 	Assert(false);
 	return NULL;

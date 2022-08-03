@@ -1,2 +1,7 @@
 @ECHO OFF
-bin\apoc.exe Test.apoc
+
+pushd data
+call ..\bin\apoc.exe ..\Test.apoc
+call b.bat
+call a.exe
+popd

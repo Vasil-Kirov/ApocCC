@@ -134,7 +134,7 @@ platform_is_thread_over(Platform_Thread Thread)
 }
 
 void
-platform_output_string(char *InString, log_level Level)
+platform_output_string(char *String, log_level Level)
 {
     //		MAGIC NUMBERS! (ored rgb)
 	//		13 = r | b | intense
@@ -148,12 +148,11 @@ platform_output_string(char *InString, log_level Level)
 	//		WARN = 2
 	//		INFO = 4
 	
-	wchar_t *String = platform_ascii_to_wchar(InString);
 	u16 Attrib = Colors[Level];
 	SetConsoleTextAttribute(STDOUT, Attrib);
-	OutputDebugString(String); 
+	//OutputDebugStringA(String); 
 	unsigned long written = 0;
-	WriteFile(STDOUT, String, vstd_strlen((char *)InString) * sizeof(wchar_t), &written, 0);
+	WriteFile(STDOUT, String, vstd_strlen((char *)String), &written, 0);
 	SetConsoleTextAttribute(STDOUT, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
 }
 

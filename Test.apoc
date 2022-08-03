@@ -1,6 +1,8 @@
 
-func add_nums(a: f32, b: f32) -> f64 
+func increment_u8(a: u8) -> u8
 {
-	ret_val: f64= #f64(a + b);
-	-> ret_val;
+	if a != 2 {
+		a += 1;
+	}
+	-> a;
 }

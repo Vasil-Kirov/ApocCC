@@ -5,6 +5,7 @@
 static b32 reached_eof;
 static Token_Iden last_read_token;
 static const char *expected;
+static const Token_Iden invalid_token = {};
 
 #define parse_expect(func, str) \
 	func();                     \
@@ -230,14 +231,19 @@ parse_file_level_statement(File_Contents *f)
 }
 
 Ast_Node *
-parse_body(File_Contents *f, b32 is_func)
+parse_body(File_Contents *f, b32 is_func, Token_Iden opt_tok)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_scope_start;
-	result->scope_desc.token = *f->curr_token;
+	
+	if(opt_tok.file == NULL) {
+		result->scope_desc.token = *f->curr_token;
+		parser_eat(f, (Token)'{');
+	} else {
+		result->scope_desc.token = opt_tok;
+	}
 	Scope_Info new_scope = {false, (unsigned int)f->curr_token->line, 0, (char *)f->path, NULL};
 	push_scope(f, new_scope);
-	advance_token(f);
 	result->right = parse_statement(f);
 	if(is_func)
 		result->left = parse_file_level_statement(f);
@@ -288,9 +294,9 @@ parse_identifier_statement(File_Contents *f)
 		case tok_lshift_equals:
 		case tok_rshift_equals:
 		{
-			advance_token(f);
+			Token_Iden assign_type = advance_token(f);
 			Ast_Node *rhs = parse_expression(f, (Token)';', false);
-			return ast_assignment(lhs, rhs, f->curr_token->type, identifier_token);
+			return ast_assignment(lhs, rhs, assign_type.type, identifier_token);
 		} break;
 		case tok_const:
 		is_const = true;
@@ -336,14 +342,14 @@ parse_statement(File_Contents *f)
 	}break;
 	case '{':
 	{
-		return parse_body(f, false);
+		return parse_body(f, false, invalid_token);
 	} break;
 	case tok_if:
 	{
 		advance_token(f);
 		result->type = type_if;
 		result->condition = parse_expression(f, (Token)'{', false);
-		result->left = parse_body(f, false);
+		result->left = parse_body(f, false, last_read_token);
 	} break;
 	case tok_for:
 	{
@@ -379,7 +385,7 @@ parse_statement(File_Contents *f)
 	} break;
 	default:
 	{
-		raise_parsing_unexpected_token("}", f);
+		raise_parsing_unexpected_token("[ '}' ]", f);
 	}
 	}
 	return result;
@@ -939,7 +945,7 @@ parse_func(File_Contents *f)
 			arg_symbol.type = arg.type;
 			add_symbol(f, arg_symbol);
 		}
-		result->left = parse_body(f, true);
+		result->left = parse_body(f, true, invalid_token);
 	}
 	else if(body.type == ';')
 		result->left = parse_file_level_statement(f);
@@ -956,4 +962,5 @@ void parser_eat(File_Contents *f, Token expected_token)
 	{
 		raise_parsing_unexpected_token((const char *)token_to_str(expected_token), f);
 	}
+	last_read_token = got_token;
 }
