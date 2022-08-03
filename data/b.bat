@@ -1,0 +1,1 @@
+clang -g main.c test.o

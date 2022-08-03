@@ -15,7 +15,6 @@
  } while(0)
 
 
-
 static Backend_State backend;
 
 typedef enum 
@@ -45,71 +44,41 @@ generate_obj(File_Contents *f)
 	auto target_triple = sys::getDefaultTargetTriple();
 	backend.module->setTargetTriple(target_triple);
 
-	auto c_str_target = target_triple.c_str();
+	const char *c_str_triplet = target_triple.c_str();
 
-#if 1
 	char *error = NULL;
 	LLVMTargetRef c_target = NULL;
-	if (LLVMGetTargetFromTriple(c_str_target, &c_target, &error) != 0)
+	if (LLVMGetTargetFromTriple(c_str_triplet, &c_target, &error) != 0)
 	{
 		LG_FATAL("Target not found %s", error);
 	}
-	LG_INFO("worked");
-
-	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(c_target, c_str_target, "generic", LLVMGetHostCPUFeatures(),
-		LLVMCodeGenLevelAggressive, LLVMRelocDefault, LLVMCodeModelDefault);
-
-	//LLVMSetTarget(/*module*/, c_str_target);
 	
-	//LLVMSetTarget(backend.module.)
-	LG_INFO("a");
-#else
-	std::string error;
-	auto target = TargetRegistry::lookupTarget(target_triple, error);
-	if(!target)
-	{
-		LG_FATAL("Invalid target, llvm is probably not initialized correctly, %s", error.c_str());
-	}
+    LG_DEBUG("Target Triple: %s\n", c_str_triplet);
+    LG_DEBUG("Features: %s\n", LLVMGetHostCPUFeatures());
+
+
+	const char *cpu = "generic";
+
+	// @TODO: optimization flag
+	LLVMTargetMachineRef machine = LLVMCreateTargetMachine(c_target, c_str_triplet, cpu, LLVMGetHostCPUFeatures(),
+		LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
 	
-	auto cpu = "generic";
-	auto features = "";
+	LLVMContextRef context = llvm::wrap(backend.context);
+	LLVMModuleRef file_mod = llvm::wrap(backend.module);
 
-	TargetOptions opt;
-	auto reloc_model = Optional<Reloc::Model>();
-	auto target_machine = target->createTargetMachine(target_triple, cpu, features, opt, reloc_model);
-	backend.module->setDataLayout(target_machine->createDataLayout());
-	backend.module->setTargetTriple(target_triple);
+	LLVMSetTarget(file_mod, c_str_triplet);
+	LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(machine);
+	char *data_layout_str = LLVMCopyStringRepOfTargetData(data_layout);
+	LG_DEBUG("Data Layout: %s", data_layout_str);
+	LLVMSetDataLayout(file_mod, data_layout_str);
+	LLVMDisposeMessage(data_layout_str);
 
-	char *file_name = platform_path_to_file_name((char *)f->path);
-	size_t file_len = vstd_strlen(file_name);
-	char *obj_file = (char *)AllocateCompileMemory(file_len + 3);
-	char *scanner = file_name;
-	while(*scanner != '.') scanner++;
-	memcpy(obj_file, file_name, scanner - file_name);
-	char *ext = obj_file + (scanner - file_name);
-	*ext++ = '.';
-	*ext++ = 'o';
-	*ext++ = 'b';
-	*ext++ = 'j';
-
-	std::error_code error_code;
-	raw_fd_ostream dest(obj_file, error_code, sys::fs::OF_None);
-	if(error_code)
-	{
-		LG_FATAL("Couldn't create object file", error_code.message().c_str());
-	}
+	char *obj_file = change_file_extension(platform_path_to_file_name((char *)f->path), (char *)"o");
+	LLVMTargetMachineEmitToFile(machine, file_mod, obj_file, LLVMObjectFile, &error);
 	
-	legacy::PassManager pass;
-	auto file_type = CGFT_ObjectFile;
-
-	if(target_machine->addPassesToEmitFile(pass, dest, NULL, file_type))
-	{
-		LG_FATAL("Couldn't emit object file");
-	}
-
-	pass.run(*backend.module);
-	dest.flush();
-	#endif
+	std::error_code std_err;
+	raw_fd_ostream ir_dest("test.ir", std_err);
+	backend.module->print(ir_dest, nullptr);
 }
 
 void
@@ -194,6 +163,7 @@ generate_func(File_Contents *f, Ast_Node *node)
 			auto arg_string = arg.getName().str();
 			auto variable = allocate_variable(func, (u8 *)arg_string.c_str(), node->function.arguments[arg_index++]->variable.type, backend);
 			backend.named_values[arg_string] = variable;
+			backend.builder->CreateStore(&arg, variable);
 		}
 	}
 	b32 loop = true;
@@ -202,6 +172,7 @@ generate_func(File_Contents *f, Ast_Node *node)
 	node = node->right;
 
 	Ast_Node *to_switch = NULL;
+	int scope_up_count = 0;
 	while(loop)
 	{
 		if(!node)
@@ -214,7 +185,20 @@ generate_func(File_Contents *f, Ast_Node *node)
 			} break;
 			case type_return:
 			{
-				ReturnInst *return_inst = ReturnInst::Create(*backend.context, generate_expression(f, node->right), body_block);
+				backend.builder->CreateRet(generate_expression(f, node->right));
+			} break;
+			case type_scope_start: scope_up_count++;
+			case type_scope_end:
+			{
+				if(scope_up_count == 0)
+				{
+					std::error_code error_code;
+					raw_fd_ostream std_out_fd("-", error_code);
+					if(verifyFunction(*func, &std_out_fd))
+					{
+						LG_FATAL("Incorrect function");
+					}
+				}
 			} break;
 			default:
 			{
@@ -342,7 +326,7 @@ generate_unary(File_Contents *f, Ast_Node *node)
 		if (should_cast)
 		{
 			llvm::Value *cast_value = backend.builder->CreateCast(llvm_cast, cast_expr,
-																  apoc_type_to_llvm(cast_type, backend));
+																  apoc_type_to_llvm(cast_type, backend), "cast");
 			return cast_value;
 		}
 		else

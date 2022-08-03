@@ -22,7 +22,7 @@ void initialize_logger();
 #define LG_INFO(Format, ...) Log(LOG_INFO, Format, ##__VA_ARGS__)
 
 #if defined(DEBUG)
-#define LG_DEBUG(Format, ...) Log(LOG_DEBUG, Format, #__VA_ARGS__)
+#define LG_DEBUG(Format, ...) Log(LOG_DEBUG, Format, ##__VA_ARGS__)
 #else
 #define LG_DEBUG(Format, ...)
 #endif

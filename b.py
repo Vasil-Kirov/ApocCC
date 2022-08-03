@@ -28,8 +28,6 @@ if len(sys.argv) == 3 and sys.argv[2].lower() == 'llvm_be':
 	print("Oh god what have you done")
 	llvm_flags = r"-fno-exceptions -std=c++14 -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DUNICODE -D_UNICODE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
 
-	#llvm_flags = r' -IE:/GitClone/llvm-project/llvm/include -IE:/GitClone/llvm-project/llvm/build/include -std=c++14 -fno-exceptions -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DUNICODE -D_UNICODE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS'
-
 linker_args = ""
 if sys.platform == "win32":
 	linker_args = "-luser32 -lShell32.lib -lpsapi.lib -lole32.lib -luuid.lib -ladvapi32.lib"
@@ -38,6 +36,7 @@ elif sys.platform == "linux":
 else:
 	print(f'Unkown platform {sys.platform}')
 	exit(1)
+
 compiler_args += ' -ffast-math -mavx -Wno-microsoft-enum-forward-reference -Wno-c99-extensions'
 compiler_args += ' -D_ITERATOR_DEBUG_LEVEL=0'
 includes='-I..\\src -I..\\include'
@@ -59,18 +58,7 @@ c_command += compiler_args.split(' ')
 
 c_command += llvm_flags.split(' ')
 
-#cpp_command = ['clang++', '-oapoc_backend.lib', '-c']
-#cpp_command += backend_files.split(' ')
-#cpp_command += includes.split(' ')
-#cpp_command += compiler_args.split(' ')
-
-#if(len(llvm_flags) > 0):
-#	cpp_command += llvm_flags.split(' ')
-
 os.chdir('bin')
-
-#cpp_compile = subprocess.Popen(cpp_command)
-#cpp_compile.wait()
 
 c_compile = subprocess.Popen(c_command)
 c_compile.wait()

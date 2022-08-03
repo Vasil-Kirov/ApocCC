@@ -669,12 +669,12 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 		} break;
 		case '(':
 		{
+			advance_token(f);
 			if(is_lhs)
 			{
-				advance_token(f);
 				raise_parsing_unexpected_token("left-handside of statement", f);
 			}
-			result = parse_expression(f, (Token)stop_at, false);
+			result = parse_expression(f, (Token)')', false);
 		} break;
 	}
 	return result;

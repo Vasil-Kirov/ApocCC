@@ -26,7 +26,7 @@ apoc_type_to_llvm(Type_Info type, Backend_State backend)
 	else if (is_float(type))
 	{
 		if(type.primitive.size == real32) return llvm::Type::getFloatTy(*backend.context);
-		else if(type.primitive.size == real64) return llvm::Type::getFloatTy(*backend.context);
+		else if(type.primitive.size == real64) return llvm::Type::getDoubleTy(*backend.context);
 		Assert(false);
 	}
 	else if (type.type == T_STRING)

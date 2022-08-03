@@ -57,4 +57,20 @@ typedef struct _entire_file
 #include <stdlib/std.h>
 #include <Log.h>
 
+#include <Memory.h>
+inline char *
+change_file_extension(char *file_name, char *new_extension)
+{
+	size_t len = vstd_strlen(file_name);
+	size_t new_ext_len = vstd_strlen(new_extension);
+	char *scanner = file_name + len;
+	while(*scanner != '.') scanner--;
+	size_t name_len = scanner - file_name;
+	char *result = (char *)AllocatePermanentMemory(name_len + 1 + new_ext_len);
+	memcpy(result, file_name, name_len);
+	*(result + name_len) = '.';
+	memcpy(result + name_len + 1, new_extension, new_ext_len);
+	return result;
+}
+
 #endif //_BASIC_H
