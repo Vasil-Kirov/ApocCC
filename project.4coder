@@ -3,6 +3,7 @@ version(1);
 project_name = "Compiler";
 
 patterns = {
+	"*.apoc",
 	"*.c",
 	"*.cpp",
 	"*.h",
@@ -33,7 +34,7 @@ command_list = {
 		.footer_panel = true,
 		.save_dirty_files = true,
 		.cursor_at_end = false,
-		.cmd = { { "build", .os = "win" } }
+		.cmd = { { "b", .os = "win" } }
 	},
 	{
 		.name = "run",
@@ -41,7 +42,7 @@ command_list = {
 		.footer_panel = false,
 		.save_dirty_files = true,
 		.cursor_at_end = false,
-		.cmd = { { "bin\apoc.exe Test.apoc", .os = "win" } }
+		.cmd = { { "r", .os = "win" } }
 	},
 	{
 		.name = "visual_studio",

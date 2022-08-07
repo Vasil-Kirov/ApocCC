@@ -66,7 +66,7 @@ change_file_extension(char *file_name, char *new_extension)
 	char *scanner = file_name + len;
 	while(*scanner != '.') scanner--;
 	size_t name_len = scanner - file_name;
-	char *result = (char *)AllocatePermanentMemory(name_len + 1 + new_ext_len);
+	char *result = (char *)AllocatePermanentMemory(name_len + 1 + new_ext_len + 1);
 	memcpy(result, file_name, name_len);
 	*(result + name_len) = '.';
 	memcpy(result + name_len + 1, new_extension, new_ext_len);

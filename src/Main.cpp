@@ -31,6 +31,8 @@
 #include <LLVM_Helpers.cpp>
 #include <LLVM_Backend.cpp>
 
+#include <chrono>
+
 // I don't like linux
 #if defined(DEBUG)
 extern inline Stack _stack_allocate(int type_size);
@@ -56,37 +58,198 @@ extern inline b32 is_alnum(u8 c);
 #endif
 
 
+File_Contents *
+append_token_streams(File_Contents **files)
+{
+	Token_Iden *complete_buffer = SDCreate(Token_Iden);
+	for(int i = 0; i < SDCount(files); ++i)
+	{
+		File_Contents *f = files[i];
+		Token_Iden *buffer = f->token_buffer;
+		size_t token_count = SDCount(buffer);
+		for(int j = 0; j < token_count; ++j)
+		{
+			SDPush(complete_buffer, buffer[j]);
+		}
+		SDFree(buffer);
+	}
+	File_Contents *result = files[0];
+	result->token_buffer = complete_buffer;
+	result->curr_token = complete_buffer;
+	return result;
+}
+
+// @NOTE: too complicated
+#if 0
+void
+sync_symbols(File_Contents **files, size_t file_count)
+{
+	for(size_t i = 0; i < file_count; ++i)
+	{
+		for(size_t j = 0; j < file_count; ++j)
+		{
+			if(i == j)
+				break;
+			File_Contents *f1 = files[i];
+			File_Contents *f2 = files[j];
+			
+			Type_Info *f1_to_add = SDCreate(Type_Info);
+			size_t f1_type_count = shlen(f1->type_table);
+			size_t f2_type_count = shlen(f2->type_table);
+			size_t to_add_count = 0;
+			for(size_t type_i = 0; type_i < f1_type_count; ++type_i)
+			{
+				Type_Info to_add = f1->type_table[type_i].value;
+				if(!is_type_primitive(to_add))
+				{
+					to_add_count++;
+					SDPush(f1_to_add, f1->type_table[type_i].value);
+				}
+			}
+			for(size_t type_i = 0; type_i < f2_type_count; ++type_i)
+			{
+				Type_Info to_add = f2->type_table[type_i].value;
+				if(!is_type_primitive(to_add))
+					add_type(f1, f2->type_table[type_i].value.structure);
+			}
+			for(size_t type_i = 0; type_i < to_add_count; ++type_i)
+			{
+				add_type(f2, f1_to_add[type_i].structure);
+			}
+			SDFree(f1_to_add);
+			
+			size_t scope1_count = SDCount(f1->scopes);
+			size_t scope2_count = SDCount(f2->scopes);
+			
+			Symbol *sym_f1_to_add = SDCreate(Symbol);
+			size_t to_add_sym_count = 0;
+			for(size_t scope_i = 0; scope_i < scope1_count; ++scope_i)
+			{
+				Scope_Info scope = f1->scopes[scope_i];
+				Symbol *sym_table = scope.symbol_table;
+				if(!sym_table)
+					continue;
+				size_t sym_count = SDCount(sym_table);
+				for(size_t sym_i = 0; sym_i < sym_count; ++sym_i)
+				{
+					Symbol sym = sym_table[sym_i];
+					if(sym.tag == S_FUNCTION)
+					{
+						SDPush(sym_f1_to_add, sym);
+						to_add_sym_count++;	
+					}	
+				}
+
+			}
+			for(size_t scope_i = 0; scope_i < scope2_count; ++scope_i)
+			{
+				Scope_Info scope = f1->scopes[scope_i];
+				Symbol *sym_table = scope.symbol_table;
+				if(!sym_table)
+					continue;
+				size_t sym_count = SDCount(sym_table);
+				for(size_t sym_i = 0; sym_i < sym_count; ++sym_i)
+				{
+					Symbol sym = sym_table[sym_i];
+					if(sym.tag == S_FUNCTION)
+						SDPush(f1->scopes[0].symbol_table, sym);
+				}
+				
+			}
+			for(size_t sym_i = 0; sym_i < to_add_sym_count; ++sym_i)
+			{
+				Symbol sym = sym_f1_to_add[sym_i];
+				SDPush(f2->scopes[0].symbol_table, sym);
+			}
+			SDFree(sym_f1_to_add);
+			
+		}
+	}
+	
+}
+#endif
+
+struct Timers
+{
+	double lexing;
+	double parsing;
+	double analysis;
+	double codegen;
+	double linking;
+	double syncing;
+	double total;
+	std::chrono::time_point<std::chrono::high_resolution_clock> lex_clock;
+	std::chrono::time_point<std::chrono::high_resolution_clock> parse_clock;
+	std::chrono::time_point<std::chrono::high_resolution_clock> analysis_clock;
+	std::chrono::time_point<std::chrono::high_resolution_clock> codegen_clock;
+	std::chrono::time_point<std::chrono::high_resolution_clock> linking_clock;
+	std::chrono::time_point<std::chrono::high_resolution_clock> syncing_clock;
+	std::chrono::time_point<std::chrono::high_resolution_clock> total_clock;
+	
+	std::chrono::duration<double> diff_track;
+};
+
+#define TIME_FUNC(TIMERS, FUNC_CALL, CLOCK_KIND, STORE_KIND) \
+TIMERS.CLOCK_KIND = std::chrono::high_resolution_clock::now();                     \
+FUNC_CALL;                                                                         \
+TIMERS.diff_track = std::chrono::high_resolution_clock::now() - TIMERS.CLOCK_KIND; \
+TIMERS.STORE_KIND += timers.diff_track.count()
+
+
 int main(int argc, char *argv[])
 {
-
+	Timers timers = {};
+	timers.total_clock = std::chrono::high_resolution_clock::now();
+	
 	initialize_memory();
 	initialize_logger();
 	platform_initialize();
 
-	File_Contents *f = (File_Contents *)AllocatePermanentMemory(sizeof(File_Contents));
-	initialize_compiler(f);
-	initialize_analyzer(f);
-
 	if(argc < 2)
 	{
-		LG_FATAL("apoc [file]");	
+		LG_FATAL("apoc [files]");	
 	}
-
-	LG_INFO("Lexing...");
-	lex_file(f, argv[1]);
-	LG_INFO("Done.");
 	
-	LG_INFO("Parsing...");
-	Ast_Node *ast_tree = parse(f);
-	LG_INFO("Done.");
+	File_Contents **files = SDCreate(File_Contents *);
+	for(size_t i = 1; i < argc; ++i)
+	{
+		File_Contents *f = (File_Contents *)AllocatePermanentMemory(sizeof(File_Contents));
+		f->build_commands.debug_info = false;
+		initialize_compiler(f);
+		initialize_analyzer(f);
+		
+		TIME_FUNC(timers, lex_file(f, argv[i]), lex_clock, lexing);
+		SDPush(files, f);
+	}
+	size_t file_count = SDCount(files);
+	TIME_FUNC(timers, File_Contents *f = append_token_streams(files), syncing_clock, syncing);
 	
-	LG_INFO("Performing semantic analysis...");
-	analyze(f, ast_tree);
-	LG_INFO("Done.");
-
-	LG_INFO("Generating code...");
-	llvm_backend_generate(f, ast_tree);
-	LG_INFO("Done.");
+	TIME_FUNC(timers, f->ast_root = parse(f), parse_clock, parsing);
+	TIME_FUNC(timers, analyze(f, f->ast_root), analysis_clock, analysis);
+	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root), codegen_clock, codegen);
+	
+	// @TODO: Linux linker
+	// @TODO: arguments
+	std::string linker_command = std::string("LINK /nologo");
+	linker_command += " ";
+	linker_command += f->obj_name;
+	linker_command += " kernel32.lib user32.lib legacy_stdio_definitions.lib UCRT.LIB " 
+		"vcruntime.lib /entry:_apoc_init /INCREMENTAL:NO";
+	
+	TIME_FUNC(timers, platform_call_and_wait(linker_command.c_str()),
+			  linking_clock, linking);
+	
+	timers.diff_track = std::chrono::high_resolution_clock::now() - timers.total_clock; \
+	timers.total += timers.diff_track.count();
+		
+	
+	LG_INFO("Lexing:            %f.4s", timers.lexing);
+	LG_INFO("Parsing:           %f.4s", timers.parsing);
+	LG_INFO("Semantic Analysis: %f.4s", timers.analysis);
+	LG_INFO("Linking:           %f.4s", timers.linking);
+	LG_INFO("Syncing Files:     %f.4s", timers.syncing);
+	LG_INFO("Code Generation:   %f.4s", timers.codegen);
+	LG_INFO("Total:             %f.4s", timers.total);
 	
 	ResetCompileMemory();
 	return 0;

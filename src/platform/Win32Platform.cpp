@@ -31,12 +31,13 @@ platform_ascii_to_wchar(const char *ascii)
 }
 
 void
-platform_call(const char *command)
+platform_call_and_wait(const char *command)
 {
 	STARTUPINFO st = {};
 	PROCESS_INFORMATION pc = {};
 	wchar_t *w_command = platform_ascii_to_wchar(command);
 	CreateProcess(NULL, w_command, NULL, NULL, true, 0, NULL, NULL, &st, &pc);
+	WaitForSingleObject(pc.hProcess, INFINITE);
 }
 
 void
@@ -141,7 +142,8 @@ platform_output_string(char *String, log_level Level)
 	//		4 = r
 	//		6 = r | g
 	//		8 = intense
-    u8 Colors[] = {13, 4, 6, FOREGROUND_GREEN | FOREGROUND_INTENSITY, 8};
+    u8 Colors[] = {13, 4, 6, FOREGROUND_GREEN | FOREGROUND_INTENSITY, 
+	FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE};
 	HANDLE STDOUT = GetStdHandle(STD_OUTPUT_HANDLE);
 	//		FATAL = 0
 	//		ERROR = 1

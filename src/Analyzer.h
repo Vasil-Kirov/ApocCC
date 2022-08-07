@@ -46,6 +46,19 @@ typedef struct
 	Symbol *symbol_table;
 } Scope_Info;
 
+enum Optimization_Level
+{
+	OPT_NONE,
+	OPT_SOME,
+	OPT_MAX
+};
+
+typedef struct
+{
+	b32 debug_info;
+	Optimization_Level optimization;
+} Build_Commands;
+
 typedef struct _File_Contents
 {
 	Token_Iden *prev_token;
@@ -60,9 +73,15 @@ typedef struct _File_Contents
 	u8         *file_data;
 	u8         *at;
 	u8         *path;
+	char       *obj_name;
 	u64 current_line;
 	u64 current_column;
+	Ast_Node   *ast_root;
+	Build_Commands build_commands;
 } File_Contents;
+
+Type_Info
+number_to_untyped_type(u8 *number);
 
 void
 push_scope(File_Contents *f, Scope_Info current_scope);

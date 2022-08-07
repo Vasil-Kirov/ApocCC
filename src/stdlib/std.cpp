@@ -237,7 +237,7 @@ str_to_i64(const char *string)
 	}
 	for(; scan[i] != 0; ++i)
 	{
-		result = scan[i] - '0';
+		result += scan[i] - '0';
 		if(scan[i+1] != 0)
 			result *= 10;
 	}
@@ -264,25 +264,35 @@ str_to_u64(const char *string)
 void
 _vstd_FloatToStr(float num, char *arr_to_fill)
 {
-	int array_index = 0;
+	char *to_put = arr_to_fill; 
 	if(num < 0.0f)
 	{
-		arr_to_fill[array_index++] = '-';
-		num *= -1;
+		*to_put++ = '-';
+		num = -num;
 	}
-	int whole_number = (int)num;
+	int decimal = (int)num;
+	num -= decimal;
+	if(decimal == 0)
+		*to_put++ = '0';
+	else
+		_vstd_IntToStr(decimal, to_put);
+	while(*to_put != 0) to_put++;
+	*to_put++ = '.';
 	
-	int decimal_part = (int)((num-(float)whole_number) * 1000000.0f);
-	char whole_number_str[100] = {0};
-	_vstd_IntToStr(whole_number, whole_number_str);
-    
-	char decimal_part_str[100] = {0};
-	_vstd_IntToStr(decimal_part, decimal_part_str);
-	
-	vstd_strcat(arr_to_fill, whole_number_str);
-	vstd_strcat(arr_to_fill, ".");
-	vstd_strcat(arr_to_fill, decimal_part_str);
+	int zeroes_to_append = 0;
+	while((int)num != num)
+	{
+		num *= 10;
+		if((int)num == 0)
+			zeroes_to_append++;
+	}
+	for(int i = 0; i < zeroes_to_append; ++i)
+	{
+		*to_put++ = '0';
+	}
+	_vstd_IntToStr((int)num, to_put);
 }
+
 
 // TODO: test 
 char*
@@ -412,14 +422,51 @@ FormatString(char *Buffer, const char *Format, i32 FormatSize, va_list args)
 				}break;
 				case 'f':
 				{
-					float Number = (float)va_arg(args, double);
+					int digits_after_dot = 0;
+					if (Format[FormatIndex + 1] == '.' && 
+						is_number(Format[FormatIndex + 2]))
+					{
+						char *str = (char *)(Format + FormatIndex + 2);
+						char *scan = str;
+						while(is_number(*scan))
+						{
+							FormatIndex++;
+							scan++;
+						}
+						char save = *scan;
+						*scan = 0;
+						digits_after_dot = str_to_u64(str);
+						*scan = save;
+						FormatIndex++;
+					}
+					double Number = (float)va_arg(args, double);
 					char Arr[100] = {0};
 					char *ToCopy = Arr;
-                    _vstd_FloatToStr(Number, ToCopy);
-					while (*ToCopy != 0)
+					_vstd_FloatToStr(Number, Arr);
+					if(digits_after_dot != 0)
 					{
-						Buffer[BufferIndex++] = *ToCopy;
-						++ToCopy;
+						b32 found_dot = false;
+						int at_after_dot = 0;
+						while(*ToCopy != 0)
+						{
+							if(*ToCopy == '.')
+								found_dot = true;
+							
+							if(found_dot)
+								at_after_dot++;
+							Buffer[BufferIndex++] = *ToCopy;
+							++ToCopy;
+							if(at_after_dot == digits_after_dot + 1)
+								break;
+						}
+					}
+					else
+					{
+						while (*ToCopy != 0)
+						{
+							Buffer[BufferIndex++] = *ToCopy;
+							++ToCopy;
+						}
 					}
 				}break;
 				case 'c':

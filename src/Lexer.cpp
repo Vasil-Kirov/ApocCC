@@ -46,43 +46,46 @@ void
 initialize_compiler(File_Contents *f)
 {
 	// NOTE(Vasko): Add keywords to string hash table
-	shput(keyword_table, "func", tok_func);
-	shput(keyword_table, "extern", tok_extern);
-	shput(keyword_table, "struct", tok_struct);
-	shput(keyword_table, "import", tok_import);
-	shput(keyword_table, "cast", tok_cast);
-	shput(keyword_table, "if", tok_if);
-	shput(keyword_table, "for", tok_for);
-	shput(keyword_table, "switch", tok_switch);
-	shput(keyword_table, "case", tok_case);
-	shput(keyword_table, "as", tok_as);
-	shput(keyword_table, "break", tok_break);
-	shput(keyword_table, "else", tok_else);
+	if(!keyword_table)
+	{
+		shput(keyword_table, "func", tok_func);
+		shput(keyword_table, "extern", tok_extern);
+		shput(keyword_table, "struct", tok_struct);
+		shput(keyword_table, "import", tok_import);
+		shput(keyword_table, "cast", tok_cast);
+		shput(keyword_table, "if", tok_if);
+		shput(keyword_table, "for", tok_for);
+		shput(keyword_table, "switch", tok_switch);
+		shput(keyword_table, "case", tok_case);
+		shput(keyword_table, "as", tok_as);
+		shput(keyword_table, "break", tok_break);
+		shput(keyword_table, "else", tok_else);
+		
+		shput(keyword_table, "->", tok_arrow);
+		shput(keyword_table, "--", tok_minusminus);
+		shput(keyword_table, "++", tok_plusplus);
+		shput(keyword_table, "||", tok_logical_or);
+		shput(keyword_table, "==", tok_logical_is);
+		shput(keyword_table, "!=", tok_logical_isnot);
+		shput(keyword_table, "&&", tok_logical_and);
+		shput(keyword_table, "::", tok_const);
+		shput(keyword_table, "<<", tok_bits_lshift);
+		shput(keyword_table, ">>", tok_bits_rshift);
+		shput(keyword_table, ">=", tok_logical_gequal);
+		shput(keyword_table, "<=", tok_logical_lequal);
+		shput(keyword_table, "+=", tok_plus_equals);
+		shput(keyword_table, "-=", tok_minus_equals);
+		shput(keyword_table, "*=", tok_mult_equals);
+		shput(keyword_table, "/=", tok_div_equals);
+		shput(keyword_table, "%=", tok_mod_equals);
+		shput(keyword_table, "&=", tok_and_equals);
+		shput(keyword_table, "^=", tok_xor_equals);
+		shput(keyword_table, "|=", tok_or_equals);
+		shput(keyword_table, "<<=", tok_lshift_equals);
+		shput(keyword_table, ">>=", tok_rshift_equals);
+		shput(keyword_table, "...", tok_var_args);
+	}
 	
-	shput(keyword_table, "->", tok_arrow);
-	shput(keyword_table, "--", tok_minusminus);
-	shput(keyword_table, "++", tok_plusplus);
-	shput(keyword_table, "||", tok_logical_or);
-	shput(keyword_table, "==", tok_logical_is);
-	shput(keyword_table, "!=", tok_logical_isnot);
-	shput(keyword_table, "&&", tok_logical_and);
-	shput(keyword_table, "::", tok_const);
-	shput(keyword_table, "<<", tok_bits_lshift);
-	shput(keyword_table, ">>", tok_bits_rshift);
-	shput(keyword_table, ">=", tok_logical_gequal);
-	shput(keyword_table, "<=", tok_logical_lequal);
-	shput(keyword_table, "+=", tok_plus_equals);
-	shput(keyword_table, "-=", tok_minus_equals);
-	shput(keyword_table, "*=", tok_mult_equals);
-	shput(keyword_table, "/=", tok_div_equals);
-	shput(keyword_table, "%=", tok_mod_equals);
-	shput(keyword_table, "&=", tok_and_equals);
-	shput(keyword_table, "^=", tok_xor_equals);
-	shput(keyword_table, "|=", tok_or_equals);
-	shput(keyword_table, "<<=", tok_lshift_equals);
-	shput(keyword_table, ">>=", tok_rshift_equals);
-	shput(keyword_table, "...", tok_var_args);
-
 	// NOTE(Vasko): Add basic types to string hash table
 	add_primitive_type(f, "i8",   byte1);
 	add_primitive_type(f, "i16",  byte2);
@@ -98,7 +101,7 @@ initialize_compiler(File_Contents *f)
 	add_primitive_type(f, "f64",  real64);
 
 	add_primitive_type(f, "void", empty_void);
-	add_primitive_type(f, "b32", logical_bit);
+	add_primitive_type(f, "bool", logical_bit);
 }
 
 void
@@ -115,8 +118,8 @@ Token_Iden
 advance_token(File_Contents *f) 
 {
 	f->curr_token++;
-	f->prev_token++;
-	f->next_token++;
+	f->prev_token = f->curr_token - 1;
+	f->next_token = f->curr_token + 1;
 	return *f->prev_token;
 }
 
@@ -164,8 +167,8 @@ lex_file(File_Contents *f, char *path)
 		f->current_line, f->current_column, (char *)f->path};
 	SDPush(f->token_buffer, eof_token);
 	f->curr_token = f->token_buffer;
-	f->prev_token = f->token_buffer - 1;
-	f->next_token = f->token_buffer + 1;
+	f->prev_token = NULL; 
+	f->next_token = NULL;
 }
 
 Token_Iden get_token(File_Contents *f)
@@ -178,7 +181,7 @@ Token_Iden get_token(File_Contents *f)
 	char last_char = *f->at;
 	u8 *string_start = f->at;
 	
-	if(is_alpha(last_char))
+	if(is_alpha(last_char) || is_non_special_char(last_char))
 	{
 	    u64 start_col = f->current_column;
 		u64 start_line = f->current_line;
@@ -255,7 +258,8 @@ Token_Iden get_token(File_Contents *f)
 				advance_buffer(f);
 			}
 			advance_buffer(f);
-			u64 num_size = f->at - string_start + 1;
+			string_start++;
+			u64 num_size = f->at - string_start;
 			u8 *number_string = (u8 *)AllocateCompileMemory(num_size);
 			memcpy(number_string, string_start, num_size);
 			number_string[num_size-1] = '\0';
@@ -263,6 +267,23 @@ Token_Iden get_token(File_Contents *f)
 
 			Token_Iden result = {number_string, tok_const_str,
 									start_line, start_col, (char *)f->path};
+			return result;
+		}
+		else if(*f->at == '\'')
+		{
+			advance_buffer(f);
+			char c = *f->at;
+			advance_buffer(f);
+			if(*f->at != '\'')
+			{
+				raise_token_syntax_error(f, "character literal contains more than 1 character", 
+										 (char *)f->path, start_line, start_col);
+			}
+			advance_buffer(f);
+			u8 *identifier = (u8 *)AllocateCompileMemory(2);
+			identifier[0] = c;
+			identifier[1] = 0;
+			Token_Iden result = {identifier, tok_char, start_line, start_col, (char *)f->path};
 			return result;
 		}
 		else

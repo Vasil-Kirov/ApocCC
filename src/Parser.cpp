@@ -217,6 +217,11 @@ parse_file_level_statement(File_Contents *f)
 			raise_parsing_unexpected_token(expected, f);
 		}
 	} break;
+	case tok_identifier:
+	{
+		result = parse_identifier_statement(f, (Token)';');
+		result->left = parse_file_level_statement(f);
+	} break;
 	case tok_eof:
 	{
 		reached_eof = true;
@@ -224,6 +229,7 @@ parse_file_level_statement(File_Contents *f)
 	}break;
 	default:
 	{
+		advance_token(f);
 		raise_parsing_unexpected_token("top level statement", f);
 	} break;
 	}
@@ -255,23 +261,38 @@ parse_body(File_Contents *f, b32 is_func, Token_Iden opt_tok)
 Token_Iden *
 find_identifier(Ast_Node *expr)
 {
-	if(expr->type == type_identifier)
+	switch(expr->type)
 	{
-		return &expr->identifier.token;
-	}
-	else if(expr->type == type_unary_expr)
-	{
-		return find_identifier(expr->unary_expr.expression);
-	}
-	else if(expr->type == type_index)
-	{
-		return find_identifier(expr->index.expression);
+		case type_identifier:
+		{
+			return &expr->identifier.token;
+		} break;
+		case type_unary_expr:
+		{
+			return find_identifier(expr->unary_expr.expression);
+		} break;
+		case type_index:
+		{
+			return find_identifier(expr->index.operand);
+		} break;
+		case type_selector:
+		{
+			return find_identifier(expr->selector.operand);
+		} break;
+		case type_func_call:
+		{
+			return find_identifier(expr->func_call.operand);
+		} break;
+		default:
+		{
+			return NULL;
+		} break;
 	}
 	return NULL;
 }
 
 Ast_Node *
-parse_identifier_statement(File_Contents *f)
+parse_identifier_statement(File_Contents *f, Token ends_with)
 {
 	Ast_Node *lhs = parse_expression(f, NO_EXPECT, true);
 	Token_Iden *identifier_token = find_identifier(lhs);
@@ -295,7 +316,7 @@ parse_identifier_statement(File_Contents *f)
 		case tok_rshift_equals:
 		{
 			Token_Iden assign_type = advance_token(f);
-			Ast_Node *rhs = parse_expression(f, (Token)';', false);
+			Ast_Node *rhs = parse_expression(f, ends_with, false);
 			return ast_assignment(lhs, rhs, assign_type.type, identifier_token);
 		} break;
 		case tok_const:
@@ -309,14 +330,19 @@ parse_identifier_statement(File_Contents *f)
 				assign_type.type = T_DETECT;	
 			else
 				assign_type = parse_type(f);
+			if(f->curr_token->type == ';')
+			{
+				advance_token(f);
+				return ast_assignment_from_decl(lhs, NULL, assign_type, identifier_token, is_const);
+			}
 			parser_eat(f, (Token)'=');
-			Ast_Node *rhs = parse_expression(f, (Token)';', false);
+			Ast_Node *rhs = parse_expression(f, ends_with, false);
 			return ast_assignment_from_decl(lhs, rhs, assign_type, identifier_token, is_const);
 		} break;
 		default:
 		{
-			advance_token(f);
-			raise_parsing_unexpected_token("declaration or assignment", f);
+			parser_eat(f, ends_with);
+			return lhs;
 		} break;
 	}
 	return NULL;
@@ -325,8 +351,28 @@ parse_identifier_statement(File_Contents *f)
 Ast_Node *
 parse_for_statement(File_Contents *f)
 {
-	// @TODO: implement
-	return NULL;
+	Token_Iden token = *f->curr_token;
+	parser_eat(f, tok_for);
+
+	Ast_Node *result = alloc_node();
+	result->type = type_for;
+	if(f->curr_token->type != ';')
+		result->for_loop.expr1 = parse_identifier_statement(f, (Token)';');
+	else
+		advance_token(f);
+	
+	// @TODO: Make optional
+	result->for_loop.expr2 = parse_expression(f, (Token)';', false);
+
+	if(f->curr_token->type != '{')
+		result->for_loop.expr3 = parse_expression(f, (Token)'{', false);
+	else
+		advance_token(f);
+
+	result->left = parse_body(f, false, last_read_token);
+
+	result->for_loop.token = token;
+	return result;
 }
 
 Ast_Node *
@@ -358,15 +404,15 @@ parse_statement(File_Contents *f)
 	case tok_star:
 	case tok_identifier:
 	{
-		result = parse_identifier_statement(f);
+		result = parse_identifier_statement(f, (Token)';');
 		result->left = parse_statement(f);
 	} break;
 	case tok_arrow:
 	{
 		advance_token(f);
 		result->type = type_return;
-		result->holder.token = *f->curr_token;
-		result->right = parse_expression(f, (Token)';', false);
+		result->ret.token = *f->curr_token;
+		result->ret.expression = parse_expression(f, (Token)';', false);
 		result->left = parse_statement(f);
 	} break;
 	case tok_break:
@@ -421,7 +467,7 @@ delimited(File_Contents *f, char start, char stop, char seperator, Ast_Node *(*p
 }
 
 int
-get_precedence(Token op, b32 is_lhs)
+get_precedence(Token op, b32 on_left, b32 is_lhs)
 {
 	switch ((int)op)
 	{
@@ -429,44 +475,43 @@ get_precedence(Token op, b32 is_lhs)
 	case tok_minusminus:
 	case '(':
 	case '[':
-		return is_lhs ? 35 : 34;
+		return on_left ? 35 : 34;
 
 	case '*':
 	case '/':
 	case '%':
-		return is_lhs ? 33 : 32;
+		return on_left ? 33 : 32;
 
 	case '+':
 	case '-':
-		return is_lhs ? 31 : 30;
+		return on_left ? 31 : 30;
 
 	case tok_bits_lshift:
 	case tok_bits_rshift:
-		return is_lhs ? 29 : 28;
+		return on_left ? 29 : 28;
 
 	case '>':
 	case '<':
 	case tok_logical_gequal:
 	case tok_logical_lequal:
-		return is_lhs ? 27 : 26;
+		return on_left ? 27 : 26;
 
 	case tok_logical_is:
 	case tok_logical_isnot:
-		return is_lhs ? 25 : 24;
+		return on_left ? 25 : 24;
 
 	case tok_bits_and:
-		return is_lhs ? 23 : 22;
+		return on_left ? 23 : 22;
 	case tok_bits_xor:
-		return is_lhs ? 21 : 20;
+		return on_left ? 21 : 20;
 	case tok_bits_or:
-		return is_lhs ? 19 : 18;
+		return on_left ? 19 : 18;
 	case tok_logical_and:
-		return is_lhs ? 17 : 16;
+		return on_left ? 17 : 16;
 	case tok_logical_or:
-		return is_lhs ? 15 : 14;
+		return on_left ? 15 : 14;
 
 // @TODO: look more into if and how these should be handled here
-/*
 	case tok_equals:
 	case tok_plus_equals:
 	case tok_minus_equals:
@@ -478,8 +523,10 @@ get_precedence(Token op, b32 is_lhs)
 	case tok_and_equals:
 	case tok_xor_equals:
 	case tok_or_equals:
-		return is_lhs ? 10 : 11;
-*/
+		if(is_lhs)
+			return 0;
+		return on_left ? 10 : 11;
+
 	}
 	return 0;
 }
@@ -624,8 +671,10 @@ parse_atom_expression(File_Contents *f, Ast_Node *operand, char stop_at, b32 is_
 			} break;
 			case '.':
 			{
-				operand = ast_selector(advance_token(f), operand,
-									   ast_identifier(f, advance_token(f)));
+				Token_Iden dot_token = advance_token(f);
+				Token_Iden identifier_token = advance_token(f);
+				operand = ast_selector(dot_token, operand,
+									   ast_identifier(f, identifier_token));
 			} break;
 			case tok_plusplus:
 			case tok_minusminus:
@@ -650,6 +699,22 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 		case tok_identifier:
 		{
 			result = ast_identifier(f, advance_token(f));
+		} break;
+		case tok_char:
+		{
+			if(is_lhs)
+			{
+				advance_token(f);
+				raise_parsing_unexpected_token("left-handside of statement", f);
+			}
+			result = alloc_node();
+			result->type = type_literal;
+			Token_Iden char_tok = advance_token(f);
+			int as_num = char_tok.identifier[0];
+			char *num_str = (char *)AllocateCompileMemory(8);
+			_vstd_IntToStr(as_num, num_str);
+			Ast_Identifier ast_id = {char_tok, (u8 *)num_str, NULL};
+			result->atom.identifier = ast_id;
 		} break;
 		case tok_number:
 		{
@@ -744,8 +809,8 @@ parse_binary_expression(File_Contents *f, Token stop_at, int min_bp, b32 is_lhs)
 	{
 		current = *f->curr_token;
 		
-		int l_bp = get_precedence(current.type, true);
-		int r_bp = get_precedence(current.type, false);
+		int l_bp = get_precedence(current.type, true, is_lhs);
+		int r_bp = get_precedence(current.type, false, is_lhs);
 
 		if(current.type == stop_at || l_bp < min_bp)
 			break;		
@@ -902,6 +967,14 @@ parse_func(File_Contents *f)
 	Ast_Node *func_id = ast_identifier(f, advance_token(f));
 	this_func.identifier = func_id->identifier;
 	this_func.arguments = delimited(f, '(', ')', ',', parse_func_arg);
+	size_t arg_count = SDCount(this_func.arguments);
+	for(size_t i = 0; i < arg_count; ++i)
+	{
+		if(this_func.arguments[i]->variable.type.type == T_DETECT)
+			this_func.has_var_args = true;
+	}
+	
+	
 	parser_eat(f, tok_arrow);
 
 	Type_Info func_type = {};
@@ -934,21 +1007,13 @@ parse_func(File_Contents *f)
 
 	if(body.type == '{')
 	{
-		// TODO(Vasko): move this to analyzer to add symbols on scope stack
-		for(size_t i = 0; i < SDCount(result->function.arguments); ++i)
-		{
-			Ast_Variable arg = result->function.arguments[i]->variable;
-			Symbol arg_symbol = {S_FUNC_ARG};
-			arg_symbol.token = func_id->identifier.token;
-			arg_symbol.node = result->function.arguments[i];
-			arg_symbol.identifier = arg.identifier.name;
-			arg_symbol.type = arg.type;
-			add_symbol(f, arg_symbol);
-		}
 		result->left = parse_body(f, true, invalid_token);
 	}
 	else if(body.type == ';')
+	{
+		parser_eat(f, (Token)';');
 		result->left = parse_file_level_statement(f);
+	}
 	else
 		raise_parsing_unexpected_token("'{' or ';'", f);
 

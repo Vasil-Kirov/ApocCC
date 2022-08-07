@@ -7,7 +7,6 @@ u8 *get_error_segment(File_Contents *f, Token_Iden error_token)
 {
 
 	u8 *scanner = f->file_data;
-	i32 column = 1;
 	i32 row = 1;
 	while(true)
 	{
@@ -15,11 +14,9 @@ u8 *get_error_segment(File_Contents *f, Token_Iden error_token)
 			return (u8 *)"";
 
 		scanner++;
-		column++;
 		if(*scanner == '\n')
 		{
 			row++;
-			column = 1;
 		}
 		if(row == error_token.line - 1)
 			break;
@@ -34,8 +31,13 @@ u8 *get_error_segment(File_Contents *f, Token_Iden error_token)
 	while(true)
 	{
 		if (*scanner == 0)
+		{
+			scanner--;
+			if(counter != 0)
+				break;
 			return (u8 *)"";
-
+		}
+		
 		if(counter == 1) {
 			if(*scanner == '\t')
 				SDPush(white_space, tab);
@@ -54,16 +56,19 @@ u8 *get_error_segment(File_Contents *f, Token_Iden error_token)
 		scanner++;
 	}
 	u8 *end = scanner;
-	size_t len = end - start + 2;
+	size_t len = end - start + 1;
+	
 	// @NOTE: + 10 for safety
 	u8 *result = (u8 *)AllocateCompileMemory(len + last_line_columns + 10);
-	memcpy(result, start, len - 1);
-	*(result + len - 1) = '\n';
-	scanner = result + len;
+	memcpy(result, start, len);
+	*(result + len) = '\n';
+	scanner = result + len + 1;
 	i32 tick_counter = 0;
 	i32 white_space_it = 0;
-	while(tick_counter != error_token.column)
+	while(tick_counter != error_token.column + 1)
 	{
+		if(white_space_it == SDCount(white_space))
+			white_space_it = 0;
 		*scanner = white_space[white_space_it++];
 		scanner++;
 		tick_counter++;
@@ -95,7 +100,12 @@ void raise_token_syntax_error(File_Contents *f, const char *error_msg, char *fil
 
 void raise_parsing_unexpected_token(const char *expected_tok, File_Contents *f)
 {
-	Token_Iden token = *f->prev_token;
+	Token_Iden token;
+	
+	if(f->prev_token)
+		token = *f->prev_token;
+	else
+		token = *f->curr_token;
 	
 	u8 *error_location = get_error_segment(f, token);
 	if(token.type == tok_identifier)

@@ -57,7 +57,11 @@ typedef struct _Type_Info
 		{
 			Var_Size size;
 		} primitive;
-		Ast_Node *structure;
+		struct 
+		{
+			Ast_Node *structure;
+			b32 is_packed;
+		};
 		struct
 		{
 			struct _Type_Info *type;
@@ -75,8 +79,17 @@ typedef struct _Type_Info
 	u8 *identifier;
 } Type_Info;
 
+int
+get_type_size(Type_Info type);
+
 Type_Info
 fix_type(File_Contents *f, Type_Info type);
+
+b32
+is_string_pointer(Type_Info type);
+
+b32
+is_castable(Type_Info castee, Type_Info cast_type);
 
 b32
 is_signed(Type_Info type);

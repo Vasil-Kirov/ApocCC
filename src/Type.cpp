@@ -2,6 +2,32 @@
 #include <Basic.h>
 #include <Analyzer.h>
 
+int
+get_type_size(Type_Info type)
+{
+	if(is_integer(type))
+	{
+		int byte_size = type.primitive.size;
+		if(!is_signed(type))
+			byte_size -= 4;
+		return byte_size;
+	}
+	else if(is_float(type))
+	{
+		if(type.primitive.size == real32)
+			return 4;
+		if(type.primitive.size == real64)
+			return 8;
+		Assert(false);
+	}
+	else if(type.type == T_POINTER || type.type == T_ARRAY || type.type == T_STRING)
+		return sizeof(size_t);
+	else if(type.type == T_BOOLEAN)
+		return 1;
+	Assert(false);
+	return 0;
+}
+
 b32
 is_signed(Type_Info type)
 {
@@ -40,6 +66,8 @@ is_castable(Type_Info type, Type_Info cast)
 	}
 	if(is_integer(type) || is_float(type))
 	{
+		if(cast.type == T_POINTER && is_integer(type))
+			return true;
 		if(cast.type == T_INTEGER || cast.type == T_FLOAT)
 			return true;
 		return false;
@@ -63,7 +91,17 @@ Type_Info
 fix_type(File_Contents *f, Type_Info type)
 {
 	Type_Info result = type;
-	if(type_is_invalid(type) && type.identifier)
+	if(result.type == T_POINTER)
+	{
+		auto pointed = fix_type(f, *result.pointer.type);
+		Type_Info *to_store = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		memcpy(to_store, &pointed, sizeof(Type_Info));
+		result.pointer.type = to_store;
+		return result;
+	}
+	else if(!type_is_invalid(result))
+		return result;
+	else if(type.identifier)
 	{
 		result = get_type(f, type.identifier);
 	}

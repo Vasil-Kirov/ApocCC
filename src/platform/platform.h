@@ -103,6 +103,6 @@ b32
 platform_read_entire_file(void *Data, u64 *Size, char *Path);
 
 void
-platform_call(const char *command);
+platform_call_and_wait(const char *command);
 
 #endif //PLATFORM_H

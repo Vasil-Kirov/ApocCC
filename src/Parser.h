@@ -111,16 +111,20 @@ typedef struct
     Ast_Identifier identifier;
 } Ast_Atom;
 
-typedef struct 
+typedef struct
 {
+	Ast_Node *expression;
 	Token_Iden token;
-} Ast_Token_Holder;
+	Type_Info expression_type; // @NOTE: after analysis
+	Type_Info func_type; // @NOTE: after analysis
+} Ast_Return;
 
 typedef struct
 {
 	Type_Info type;
 	Ast_Identifier identifier;
 	Ast_Node **arguments; // Simple DArray
+	b32 has_var_args;
 } Ast_Func;
 
 typedef struct
@@ -147,6 +151,7 @@ typedef struct
 	Token assign_type;
 	Token_Iden token;
 	Type_Info decl_type;
+	Type_Info rhs_type;
 } Ast_Assignment;
 
 typedef struct
@@ -154,6 +159,8 @@ typedef struct
 	Ast_Node *operand;
 	Ast_Node **arguments; // Simple DArray of expressions
 	Token_Iden token;
+	Type_Info expr_types[REASONABLE_MAXIMUM];
+	Type_Info arg_types[REASONABLE_MAXIMUM];
 } Ast_Call;
 
 typedef enum
@@ -173,13 +180,16 @@ typedef struct
 	Ast_Node *operand;
 	Ast_Node **expressions; // Note(Vasko): SimpleDArray
 	Token_Iden token;
+	Type_Info type; // @NOTE: Only available after analysis
+	Type_Info expr_types[REASONABLE_MAXIMUM]; // @NOTE: after analysis
 } Ast_Struct_Init;
 
 typedef struct
 {
 	Ast_Node *operand;
 	Ast_Node *expression;
-	Token_Iden token;	
+	Token_Iden token;
+	Type_Info idx_type;
 } Ast_Indexing;
 
 typedef struct
@@ -193,15 +203,8 @@ typedef struct
 	Token_Iden token;
 } Scope_Desc;
 
-typedef enum
-{
-	F_STANDARD,
-	F_WHILE,
-} For_Type;
-
 typedef struct
 {
-	For_Type type;
 	Ast_Node *expr1;
 	Ast_Node *expr2;
 	Ast_Node *expr3;
@@ -218,9 +221,13 @@ typedef struct
 	
 typedef struct
 {
-	Token_Iden dot_token;
+
+	unsigned int selected_index; // @NOTE: only available after analysis
 	Ast_Node *operand;
 	Ast_Node *identifier;
+	Token_Iden dot_token;
+	Type_Info operand_type; // @NOTE: only available after analysis
+	Type_Info selected_type;
 } Ast_Selector;
 
 	
@@ -245,13 +252,15 @@ struct _abstract_syntax_tree
 		Ast_Struct_Init struct_init;
 		Ast_Indexing index;
 		Ast_Postfix postfix;
-		Ast_Token_Holder holder;
+		Ast_Return ret;
 		Scope_Desc scope_desc;
 	};
 	Ast_Node *left;
 	Ast_Node *right;
 };
 
+Ast_Node *
+parse_identifier_statement(File_Contents *f, Token ends_with);
 
 Ast_Node *
 parse_file_level_statement(File_Contents *f);
@@ -293,5 +302,8 @@ parse_func(File_Contents *f);
 
 void
 parser_eat(File_Contents *f, Token expected_token);
+
+Ast_Node *
+alloc_node();
 
 #endif //_PARSER_H
