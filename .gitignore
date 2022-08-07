@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+.vs
+bin\.vs
+
 # Object files
 *.o
 *.ko
