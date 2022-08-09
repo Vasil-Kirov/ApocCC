@@ -1,8 +1,40 @@
 
-func increment_u8(a: u8) -> u8
+func _apoc_init() -> i32 { -> main(); }
+
+func main() -> i32
 {
-	if a != 2 {
-		a += 1;
+	time := SYSTEMTIME{};
+	GetSystemTime(@time);
+	srand(#i32 time.wMilliseconds);
+	rand_num := rand() % 100;
+	chosen_num: i32;
+	printf("Pick a number: \n");
+	scanf("%d", @chosen_num);
+	guess_counter := 0;
+
+	array_count:[1024]u8 = {10, 23, 45};
+
+	for ; rand_num != chosen_num ; {
+		printf("Pick a number: ");
+		scanf("%d", @chosen_num);
+		if chosen_num < rand_num {
+			printf(" Higher ");
+		}
+		if chosen_num > rand_num {
+			printf(" Lower ");
+		}
+		guess_counter += 1;
 	}
-	-> a;
+	printf("You guessed it right, it was %d. It took you %d guesses", rand_num, guess_counter);
+	
+	-> 0;
 }
+
+
+
+
+
+
+
+
+

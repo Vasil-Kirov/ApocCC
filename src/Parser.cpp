@@ -34,6 +34,16 @@ alloc_node()
 }
 
 Ast_Node *
+ast_array_list(Token_Iden start_tok, Ast_Node **list)
+{
+	Ast_Node *result = alloc_node();
+	result->type = type_array_list;
+	result->array_list.token = start_tok;
+	result->array_list.list = list;
+	return result;
+}
+
+Ast_Node *
 ast_cast(Token_Iden token, Type_Info type, Ast_Node *expression)
 {
 	Ast_Node *result = alloc_node();
@@ -623,7 +633,10 @@ parse_struct_initialize(File_Contents *f, Ast_Node *operand)
 	while(true)
 	{
 		if(f->curr_token->type == '}')
-			break;
+		{
+			advance_token(f);
+			break;	
+		}
 		Ast_Node *expression = parse_expression(f, NO_EXPECT, false);
 		if(expression)
 			SDPush(result->struct_init.expressions, expression);
@@ -691,6 +704,12 @@ parse_atom_expression(File_Contents *f, Ast_Node *operand, char stop_at, b32 is_
 }
 
 Ast_Node *
+expression_list_parser(File_Contents *f)
+{
+	return parse_expression(f, NO_EXPECT, false);
+}
+
+Ast_Node *
 parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 {
 	Ast_Node *result = NULL;
@@ -747,6 +766,15 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 			}
 			result = parse_expression(f, (Token)')', false);
 		} break;
+		case '{':
+		{
+			Token_Iden start_tok = *f->curr_token;
+			if(stop_at == (Token)'}')
+			{
+				raise_parsing_unexpected_token("operand for an expression", f);
+			}
+			result = ast_array_list(start_tok, delimited(f, '{', '}', ',', expression_list_parser));
+		}
 	}
 	return result;
 }
@@ -895,6 +923,26 @@ parse_type(File_Contents *f)
 		// @Note: Invalid types are checked in analyzer
 		result = get_type(f, pointer_or_type.identifier);
 		advance_token(f);
+	}
+	else if(pointer_or_type.type == '[')
+	{
+		result.type = T_ARRAY;
+		result.token = advance_token(f);
+
+		// @NOTE: not implemented, should it even be implemented?
+		if(f->curr_token->type == ']')
+		{
+			result.array.array_type = ARR_DYNAMIC;
+			result.array.optional_expression = NULL;
+		}
+		else
+		{
+			result.array.array_type = ARR_STATIC;
+			result.array.optional_expression = parse_expression(f, (Token)']', false);
+		}
+		Type_Info arr_type = parse_type(f);
+		result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		memcpy(result.array.type, &arr_type, sizeof(Type_Info));
 	}
 	else
 	{

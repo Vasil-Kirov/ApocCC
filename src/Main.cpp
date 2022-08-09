@@ -11,6 +11,7 @@
 #include <Analyzer.h>
 #include <Stack.h>
 #include <Errors.h>
+#include <Interpret.h>
 
 
 #include <platform/platform.h>
@@ -24,6 +25,7 @@
 #include <SimpleDArray.cpp>
 #include <Analyzer.cpp>
 #include <Errors.cpp>
+#include <Interpret.cpp>
 
 #include <LLVM_Helpers.h>
 #include <LLVM_Backend.h>
@@ -62,6 +64,7 @@ File_Contents *
 append_token_streams(File_Contents **files)
 {
 	Token_Iden *complete_buffer = SDCreate(Token_Iden);
+	Token_Iden eof_tok = {};
 	for(int i = 0; i < SDCount(files); ++i)
 	{
 		File_Contents *f = files[i];
@@ -69,10 +72,14 @@ append_token_streams(File_Contents **files)
 		size_t token_count = SDCount(buffer);
 		for(int j = 0; j < token_count; ++j)
 		{
-			SDPush(complete_buffer, buffer[j]);
+			if(buffer[j].type == tok_eof)
+				eof_tok = buffer[j];
+			else
+				SDPush(complete_buffer, buffer[j]);
 		}
 		SDFree(buffer);
 	}
+	SDPush(complete_buffer, eof_tok);
 	File_Contents *result = files[0];
 	result->token_buffer = complete_buffer;
 	result->curr_token = complete_buffer;
@@ -131,7 +138,6 @@ int main(int argc, char *argv[])
 		TIME_FUNC(timers, lex_file(f, argv[i]), lex_clock, lexing);
 		SDPush(files, f);
 	}
-	size_t file_count = SDCount(files);
 	TIME_FUNC(timers, File_Contents *f = append_token_streams(files), syncing_clock, syncing);
 	
 	TIME_FUNC(timers, f->ast_root = parse(f), parse_clock, parsing);

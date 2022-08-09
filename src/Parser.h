@@ -20,6 +20,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_array_list   = -58,
 	type_cast         = -57,
 	type_else         = -56,
 	type_scope_end    = -55,
@@ -182,7 +183,15 @@ typedef struct
 	Token_Iden token;
 	Type_Info type; // @NOTE: Only available after analysis
 	Type_Info expr_types[REASONABLE_MAXIMUM]; // @NOTE: after analysis
+	b32 is_empty_init;
 } Ast_Struct_Init;
+
+typedef struct
+{
+	Token_Iden token;
+	Ast_Node **list;
+	Type_Info type;
+} Ast_Array_List;
 
 typedef struct
 {
@@ -236,6 +245,7 @@ struct _abstract_syntax_tree
 	Ast_Type type;
 	union
 	{
+		Ast_Array_List array_list;
 		Ast_Cast cast;
 		Ast_For for_loop;
 		Ast_Selector selector;

@@ -1,10 +1,19 @@
 
+typedef struct
+{
+	char a;
+	char b[3];
+} b_struct;
+
+typedef struct 
+{
+	int a;
+	int b;
+	b_struct c;
+} a_struct;
+
 int main()
 {
-	int a = 1;
-	int b = 1;
-	if (a == b)
-		a = -b;
-
-	return 0;
+	a_struct a = {};
+	return a.c.b[1];
 }

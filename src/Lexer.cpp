@@ -171,6 +171,26 @@ lex_file(File_Contents *f, char *path)
 	f->next_token = NULL;
 }
 
+char char_to_escaped(char c)
+{
+	switch(c)
+    {
+        case 'a':  return '\a'; break;
+        case 'b':  return '\b'; break;
+        case 'f':  return '\f'; break;
+        case 'n':  return '\n'; break;
+        case 'r':  return '\r'; break;
+        case 't':  return '\t'; break;
+        case 'v':  return '\v'; break;
+        case '\\': return '\\'; break;
+        case '\'': return '\''; break;
+        case '"':  return '\"'; break;
+        case '?':  return '\?'; break;
+		case '0':  return '\0'; break;
+		default: return 1;
+    }
+}
+
 Token_Iden get_token(File_Contents *f)
 {
 	while(is_whitespace(*f->at))
@@ -225,7 +245,7 @@ Token_Iden get_token(File_Contents *f)
 			{
 				if(found_dot)
 				{
-					raise_token_syntax_error(f, "Number has an extra dot", (char *)f->path, start_line,
+					raise_token_syntax_error(f, "Number has an extra decimal point", (char *)f->path, start_line,
 											 start_col);
 					return get_token(f);
 				}
@@ -251,6 +271,20 @@ Token_Iden get_token(File_Contents *f)
 			advance_buffer(f);
 			while(*f->at != '"')
 			{
+				if(*f->at == '\0')
+				{
+					raise_token_syntax_error(f, "Expected string literal end, got end of file", (char *)f->path, start_line, start_col);
+				}
+				if(*f->at == '\\')
+				{
+					memmove(f->at, f->at + 1, vstd_strlen((char *)f->at) + 1);
+					*f->at = char_to_escaped(*f->at);
+					if (*f->at == 1)
+					{
+						raise_token_syntax_error(f, "Incorrect escaped charracter", (char *)f->path, start_line, start_col);
+					}
+					f->file_size--;
+				}
 				if(*f->at == '\\')
 				{
 					advance_buffer(f);

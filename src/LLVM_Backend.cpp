@@ -1,3 +1,4 @@
+#include "llvm/ADT/ArrayRef.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
 #include <LLVM_Helpers.h>
@@ -19,11 +20,6 @@ static Backend_State backend;
 static Debug_Info debug;
 static Token_Iden emergency_token;
 
-typedef enum 
-{
-	AMD64,
-	UNSUPPORTED	
-} Arch;
 
 Backend_State
 llvm_initialize(File_Contents *f)
@@ -32,6 +28,21 @@ llvm_initialize(File_Contents *f)
 	backend.context = new LLVMContext();
 	backend.module = new Module(platform_path_to_file_name((char *)f->path), *backend.context);
 	backend.builder = new IRBuilder<>(*backend.context);
+
+
+	// Create a new pass manager attached to it.
+	backend.func_pass = new legacy::FunctionPassManager(backend.module);
+
+	// Do simple "peephole" optimizations and bit-twiddling optzns.
+	backend.func_pass->add(createInstructionCombiningPass());
+	// Reassociate expressions.
+	backend.func_pass->add(createReassociatePass());
+	// Eliminate Common SubExpressions.
+	backend.func_pass->add(createGVNPass());
+	// Simplify the control flow graph (deleting unreachable blocks, etc).
+	backend.func_pass->add(createCFGSimplificationPass());
+
+	backend.func_pass->doInitialization();
 
 	shdefault(backend.struct_types, 0);
 	
@@ -70,8 +81,20 @@ emit_location(unsigned int line, unsigned int col)
 }
 
 void
+do_passes()
+{
+	size_t func_count = shlen(backend.func_table);
+	for(size_t i = 0; i < func_count; ++i)
+	{
+		backend.func_pass->run(*backend.func_table[i].value);	
+	}
+}
+
+void
 generate_obj(File_Contents *f)
 {
+	if(f->build_commands.optimization != OPT_NONE)
+		do_passes();
 	llvm::Target a_target = {};
 
 	INITIALIZE_TARGET(AArch64);
@@ -316,17 +339,18 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *
 		generate_assignment(f, func, node->for_loop.expr1);
 
 
+	auto jmp_block = BasicBlock::Create(*backend.context, "for_true_jump", func);
+
+
 	auto evaluation = generate_boolean_expression(f, node->for_loop.expr2, func);
 	auto for_false = generate_block(f, node->left->left, func, NULL, "for_false", to_go);
-	auto for_true = generate_block(f, node->left->right, func, NULL, "for_true", NULL);
-	backend.builder->SetInsertPoint(for_true);
+	auto for_true = generate_block(f, node->left->right, func, NULL, "for_true", jmp_block);
+	backend.builder->SetInsertPoint(jmp_block);
 
 	if(node->for_loop.expr3)
 		generate_expression(f, node->for_loop.expr3, func);
 
 	auto inner_eval = generate_boolean_expression(f, node->for_loop.expr2, func);
-
-
 	backend.builder->CreateCondBr(inner_eval, for_true, for_false);
 
 	backend.builder->SetInsertPoint(block);
@@ -398,10 +422,11 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			{
 				llvm::Value *evaluation = generate_boolean_expression(f, node->condition, func);
 
-				auto if_false = generate_block(f, node->left->left, func, NULL, "if_false", NULL);
+				auto if_false = generate_block(f, node->left->left, func, NULL, "if_false", to_go);
 				auto if_true = generate_block(f, node->left->right, func, NULL, "if_true", if_false);
 				backend.builder->SetInsertPoint(body_block);
 				backend.builder->CreateCondBr(evaluation, if_true, if_false);
+				to_go = NULL;
 				goto RETURN_BLOCK;
 			} break;
 			case type_scope_start:
@@ -500,6 +525,7 @@ get_identifier(u8 *name)
 	return var_location;
 }
 
+
 llvm::Value *
 generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 {
@@ -585,24 +611,53 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			auto elem_ptr = backend.builder->CreateStructGEP(struct_type, operand, node->selector.selected_index, "struct_member_ptr");
 			return backend.builder->CreateLoad(apoc_type_to_llvm(node->selector.selected_type, backend), elem_ptr, "struct_member");
 		} break;
+		case type_array_list:
+		{
+			auto list = node->array_list.list;
+			size_t list_count = SDCount(list);
+			Value *values[list_count];
+			for(size_t i = 0; i < list_count; ++i)
+			{
+				values[i] = generate_expression(f, list[i], func);
+			}
+			auto array_loc = allocate_variable(func, (u8 *)"array_list",
+					node->array_list.type, backend);
+		
+			for(size_t i = 0; i < list_count; ++i)
+			{
+				auto element_ptr = backend.builder->CreateExtractElement(array_loc, i, "array_elem");
+				backend.builder->CreateStore(values[i], element_ptr);
+			}
+			
+			return array_loc;
+		} break;
 		case type_struct_init:
 		{
 			AllocaInst *struct_loc = allocate_variable(func, node->struct_init.operand->identifier.name, node->struct_init.type, backend);
-			//backend.named_values[std::string((char *)node->struct_init.operand->identifier.name)] = struct_loc;
 			StructType *type = shget(backend.struct_types, node->struct_init.operand->identifier.name);
-
-			size_t expr_count = SDCount(node->struct_init.expressions);
-			auto expressions = node->struct_init.expressions;
-
-			auto members = node->struct_init.type.structure->structure.members;
-
-			for(size_t i = 0; i < expr_count; ++i)
+			if(node->struct_init.is_empty_init)
 			{
-				llvm::Value *expr_val = generate_expression(f, expressions[i], func);
-				expr_val = create_cast(members[i].type, node->struct_init.expr_types[i], expr_val);
+				auto data_layout = backend.module->getDataLayout();
+				auto struct_layout = data_layout.getStructLayout(type);
+				auto u8_zero = backend.builder->getInt8(0);
+				backend.builder->CreateMemSet(struct_loc, u8_zero, struct_layout->getSizeInBytes()
+						,struct_layout->getAlignment()); 
+			}
+			else
+			{
+				size_t expr_count = SDCount(node->struct_init.expressions);
+				auto expressions = node->struct_init.expressions;
+
+				auto members = node->struct_init.type.structure->structure.members;
+
+				for(size_t i = 0; i < expr_count; ++i)
+				{
+					llvm::Value *expr_val = generate_expression(f, expressions[i], func);
+					expr_val = create_cast(members[i].type, node->struct_init.expr_types[i], expr_val);
 				
-				llvm::Value *member_loc = backend.builder->CreateStructGEP(type, struct_loc, i);
-				backend.builder->CreateStore(expr_val, member_loc);
+					llvm::Value *member_loc = backend.builder->CreateStructGEP(type, struct_loc, i);
+					backend.builder->CreateStore(expr_val, member_loc);
+				}
 			}
 			return struct_loc;
 		} break;
@@ -969,6 +1024,8 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 	}
 	else
 	{
+		Assert(node->assignment.is_declaration);
+		// @TODO: change to find identifier in case of use with arrays
 		backend.named_values[std::string((char *)node->assignment.token.identifier)] = (llvm::AllocaInst *)expression_value;
 	}
 /*

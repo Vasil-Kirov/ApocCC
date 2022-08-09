@@ -1,5 +1,4 @@
 -g
--std=gnu11
 -O0
 -Wall
 -DCM_LINUX
@@ -8,6 +7,13 @@
 -DDEBUG
 -lpthread
 --include-directory
-/home/vasko/Programming/Apocalypse/src
+./src
 --include-directory
-/home/vasko/Programming/Apocalypse/include
+./include
+-Wno-deprecated-non-prototype
+--include-directory
+E:/GitClone/llvm-project/llvm/build/include
+--include-directory
+E:/GitClone/llvm-project/llvm/include
+
+

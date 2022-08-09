@@ -24,15 +24,21 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root);
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
-#include <llvm/Support/Host.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/MC/TargetRegistry.h>
-#include <llvm/Target/TargetOptions.h>
-#include <llvm/Target/TargetMachine.h>
-#include <llvm/Support/FileSystem.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/DIBuilder.h>
+#include <llvm/Support/Host.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetOptions.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Pass.h>
 #include <map>
 
 #define DEBUG_INFO(x) if(f->build_commands.debug_info) { x }
@@ -60,6 +66,7 @@ struct Backend_State
 	std::map<std::string, GlobalVariable *> named_globals;
 	Struct_Table *struct_types;
 	Function_Table *func_table;
+	legacy::FunctionPassManager *func_pass;
 };
 
 struct Symbol_Info

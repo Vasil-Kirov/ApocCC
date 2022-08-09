@@ -1,4 +1,6 @@
+#include "llvm/IR/DerivedTypes.h"
 #include <LLVM_Backend.h>
+#include <LLVM_Helpers.h>
 #include <Type.h>
 #include <Memory.h>
 
@@ -73,6 +75,12 @@ apoc_type_to_llvm(Type_Info type, Backend_State backend)
 	{
 		auto struct_type = shget(backend.struct_types, type.identifier);
 		return struct_type;
+	}
+	else if (type.type == T_ARRAY)
+	{
+		Type *elem_type = apoc_type_to_llvm(*type.array.type, backend);
+		auto array_type = ArrayType::get(elem_type, type.array.elem_count);
+		return array_type;
 	}
 	else if (type.type == T_VOID)
 	{
@@ -172,7 +180,7 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 		if(vstd_strcmp((char *)to.identifier, (char *)from.identifier))
 		{
 			*should_cast = false;
-			return Instruction::CastOps::ZExt;
+			return Instruction::CastOps::CastOpsEnd;
 		}
 	}
 	if(is_untyped(to))
@@ -197,6 +205,20 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			from.primitive.size = real64;
 		}
 	}
+	if(to.type == T_STRING)
+	{
+		Type_Info u8_type = {T_INTEGER};
+		u8_type.primitive.size = ubyte1;
+		to.type = T_POINTER;
+		to.pointer.type = &u8_type;
+	}
+	if(from.type == T_STRING)
+	{
+		Type_Info u8_type = {T_INTEGER};
+		u8_type.primitive.size = ubyte1;
+		from.type = T_POINTER;
+		from.pointer.type = &u8_type;
+	}
 
 	if(is_float(to))
 	{
@@ -207,7 +229,7 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			if(from.primitive.size < to.primitive.size)
 				return Instruction::CastOps::FPExt;
 			*should_cast = false;
-			return Instruction::CastOps::ZExt;
+			return Instruction::CastOps::CastOpsEnd;
 		}
 		if(is_integer(from))
 		{
@@ -240,7 +262,7 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 					else
 					{
 						*should_cast = false;
-						return Instruction::CastOps::ZExt;
+						return Instruction::CastOps::CastOpsEnd;
 					}
 				}
 				else
@@ -290,7 +312,7 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 					else
 					{
 						*should_cast = false;
-						return Instruction::CastOps::ZExt;
+						return Instruction::CastOps::CastOpsEnd;
 					}
 				}
 				else
@@ -308,7 +330,7 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 					else
 					{
 						*should_cast = false;
-						return Instruction::CastOps::ZExt;
+						return Instruction::CastOps::CastOpsEnd;
 					}
 				}
 			}
@@ -324,10 +346,15 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 		Assert(to.type == T_POINTER);
 		if(is_integer(from))
 			return Instruction::CastOps::IntToPtr;
+		else if(from.type == T_POINTER)
+		{
+			*should_cast = false;
+			return Instruction::CastOps::CastOpsEnd;
+		}
 		
 		Assert(false);
 		*should_cast = false;
-		return Instruction::CastOps::ZExt;
+		return Instruction::CastOps::CastOpsEnd;
 	}
 	*should_cast = false;
 	return Instruction::CastOps::ZExt;

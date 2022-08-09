@@ -2,6 +2,7 @@
 
 #ifndef _TYPE_H
 #define _TYPE_H
+#include <Basic.h>
 
 struct _Ast_Identifier;
 struct _Type_Info;
@@ -66,6 +67,8 @@ typedef struct _Type_Info
 		{
 			struct _Type_Info *type;
 			Type_Array array_type;
+			size_t elem_count;
+			Ast_Node *optional_expression;
 		} array;
 		struct
 		{

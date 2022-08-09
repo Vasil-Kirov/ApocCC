@@ -29,10 +29,8 @@ add_primitive_type(File_Contents *f, const char *name, Var_Size size)
 	
 	Assert(type != T_INVALID);
 	
-	Type_Info type_info = {
-		.type = type,
-		.primitive.size = size,
-	};
+	Type_Info type_info = { type };
+	type_info.primitive.size = size;
 
 	if(shgeti(f->type_table, name) == -1)
 	{
@@ -483,6 +481,7 @@ verify_assignment(File_Contents *f, Ast_Node *node)
 	}
 	if(node->assignment.is_declaration && node->assignment.rhs == NULL)
 	{
+		node->assignment.decl_type = fix_type(f, node->assignment.decl_type);
 		if(node->assignment.decl_type.type == T_DETECT)
 		{
 			raise_semantic_error(f, "cannot automatically assign type without an expression", node->assignment.token);
@@ -521,7 +520,7 @@ verify_assignment(File_Contents *f, Ast_Node *node)
 			raise_semantic_error(f, error, node->assignment.token);
 		}
 		node->assignment.rhs_type = expression_type;
-	}	
+	}
 	if(node->assignment.is_declaration)
 	{
 		Symbol this_sym = {};
@@ -531,6 +530,21 @@ verify_assignment(File_Contents *f, Ast_Node *node)
 		this_sym.type = node->assignment.decl_type;
 		this_sym.tag = S_VARIABLE;
 		add_symbol(f, this_sym);
+
+		if(node->assignment.decl_type.type == T_ARRAY)
+		{
+			auto count_expr = node->assignment.decl_type.array.optional_expression;
+			auto type_token = node->assignment.decl_type.token;
+			if(!count_expr)
+			{
+				raise_semantic_error(f, "Expected an expression to declare array size", type_token);
+			}
+			Type_Info array_size_type = get_expression_type(f, count_expr, type_token, NULL);
+			if(array_size_type.type != T_UNTYPED_INTEGER)
+			{
+				raise_semantic_error(f, "Expected a constant integer expression", type_token);
+			}
+		}
 	}
 
 }
@@ -605,101 +619,154 @@ is_bits_op(Token op)
 }
 
 Type_Info
+verify_array_list(File_Contents *f, Ast_Node *node)
+{
+	Assert(node->type == type_array_list);
+	size_t list_count = SDCount(node->array_list.list);
+	Type_Info expr_types[list_count];
+	memset(expr_types, 0, sizeof(Type_Info) * list_count);
+	Ast_Array_List list = node->array_list;
+	for(size_t i = 0; i < list_count; ++i)
+	{
+		expr_types[i] = get_expression_type(f, list.list[i], list.token, NULL);
+	}
+
+	for (size_t i = 0; i < list_count; ++i)
+	{
+		for(size_t j = i + 1; j < list_count; ++j)
+		{
+			if(!check_type_compatibility(expr_types[i], expr_types[j]))
+			{
+				raise_formated_semantic_error(f, list.token,
+						"All expressions in an array list must be of compatible types, "
+						"but expression #%d is of type %s "
+						"which is incompatible with expression #%d of type %s", 
+						i, var_type_to_name(expr_types[i]),
+						j, var_type_to_name(expr_types[j]));
+			}
+		}
+	}
+
+	// @NOTE: idk lol
+	return expr_types[0];
+}
+
+Type_Info
 get_atom_expression_type(File_Contents *f, Ast_Node *expression)
 {
 	// @TODO: chaining
-	switch ((int)expression->type)
+	b32 loop = true;
+	while(loop)
 	{
-		case type_identifier:
+		switch ((int)expression->type)
 		{
-			Symbol *symbol = get_symbol_spot(f, expression->identifier.token);
-			if(symbol->tag == S_STRUCT_MEMBER || symbol->tag == S_FUNCTION)
+			case type_identifier:
 			{
-				raise_formated_semantic_error(f, expression->identifier.token,
-											  "Unkown identifier %s",
-											  expression->identifier.name);
-			}
-			return symbol->type;
-		} break;
-		case type_struct_init:
-		{
-			return verify_struct_init(f, expression);
-		} break;
-		case type_index:
-		{
-			Type_Info operand_type = fix_type(f, get_expression_type(f,
-				expression->index.operand, expression->index.token, NULL));
-			if(operand_type.type != T_ARRAY && operand_type.type != T_POINTER)
-			{
-				raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
-			}
-			Type_Info index_type = fix_type(f, get_expression_type(f,
-				expression->index.expression, expression->index.token, NULL));
-			if(!is_integer(index_type))
-			{
-				raise_semantic_error(f, "Non integer used for indexing", expression->index.token);
-			}
-			if(operand_type.type == T_ARRAY)
-			{
-				expression->index.idx_type = *operand_type.array.type;
-				return *operand_type.array.type;
-			}
-			else
-			{
-				expression->index.idx_type = *operand_type.pointer.type;
-				return  *operand_type.pointer.type;
-			}
-		} break;
-		case type_func_call:
-		{
-			return verify_func_call(f, expression, expression->func_call.token);
-		} break;
-		case type_selector:
-		{
-			Type_Info operand_type = fix_type(f, get_expression_type(f, expression->selector.operand, expression->selector.dot_token, NULL));
-			expression->selector.operand_type = operand_type;
-			if(!is_accessible(operand_type))
-			{
-				raise_formated_semantic_error(f, expression->selector.dot_token,
-										"Expression of type %s is not selectable", var_type_to_name(operand_type));
-			}
-			
-			Ast_Struct structure = operand_type.structure->structure;
-			u8 *name = expression->selector.identifier->identifier.name;
-			for(size_t i = 0; i < structure.member_count; ++i)
-			{
-				if(vstd_strcmp((char *)name, (char *)structure.members[i].identifier.name))
+				Symbol *symbol = get_symbol_spot(f, expression->identifier.token);
+				if(symbol->tag == S_STRUCT_MEMBER || symbol->tag == S_FUNCTION)
 				{
-					expression->selector.selected_type = structure.members[i].type;
-					expression->selector.selected_index = i;
-					return structure.members[i].type;
+					raise_formated_semantic_error(f, expression->identifier.token,
+							"Unkown identifier %s",
+							expression->identifier.name);
 				}
-			}
-			raise_formated_semantic_error(f, expression->selector.dot_token,
-									 "Accessed member [ %s ] of structure [ %s ] doesn't exist",
-									name, structure.struct_id.name);
-			
-		} break;
-		case type_postfix:
-		{
-			Type_Info expr_type = fix_type(f, get_expression_type(f, expression->postfix.operand, expression->postfix.token, NULL));
-
-			if (!is_integer(expr_type) && !is_float(expr_type) && expr_type.type != T_POINTER)
+				return symbol->type;
+			} break;
+			case type_struct_init:
 			{
-				raise_formated_semantic_error(f, expression->postfix.token,
-											  "Cannot apply postfix operator to expression of type %s",
-											  var_type_to_name(expr_type));
+				return verify_struct_init(f, expression);
+			} break;
+			case type_index:
+			{
+				Type_Info operand_type = fix_type(f, get_expression_type(f,
+							expression->index.operand, expression->index.token, NULL));
+				if(operand_type.type != T_ARRAY && operand_type.type != T_POINTER)
+				{
+					raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
+				}
+				Type_Info index_type = fix_type(f, get_expression_type(f,
+							expression->index.expression, expression->index.token, NULL));
+				if(!is_integer(index_type))
+				{
+					raise_semantic_error(f, "Non integer used for indexing", expression->index.token);
+				}
+				if(operand_type.type == T_ARRAY)
+				{
+					expression->index.idx_type = *operand_type.array.type;
+					return *operand_type.array.type;
+				}
+				else
+				{
+					expression->index.idx_type = *operand_type.pointer.type;
+					return  *operand_type.pointer.type;
+				}
+			} break;
+			case type_func_call:
+			{
+				return verify_func_call(f, expression, expression->func_call.token);
+			} break;
+			case type_selector:
+			{
+				Type_Info operand_type = fix_type(f, get_expression_type(f, expression->selector.operand, expression->selector.dot_token, NULL));
+				expression->selector.operand_type = operand_type;
+				if(!is_accessible(operand_type))
+				{
+					raise_formated_semantic_error(f, expression->selector.dot_token,
+							"Expression of type %s is not selectable", var_type_to_name(operand_type));
+				}
+
+				Ast_Struct structure = operand_type.structure->structure;
+				u8 *name = expression->selector.identifier->identifier.name;
+				for(size_t i = 0; i < structure.member_count; ++i)
+				{
+					if(vstd_strcmp((char *)name, (char *)structure.members[i].identifier.name))
+					{
+						expression->selector.selected_type = structure.members[i].type;
+						expression->selector.selected_index = i;
+						return structure.members[i].type;
+					}
+				}
+				raise_formated_semantic_error(f, expression->selector.dot_token,
+						"Accessed member [ %s ] of structure [ %s ] doesn't exist",
+						name, structure.struct_id.name);
+
+			} break;
+			case type_postfix:
+			{
+				Type_Info expr_type = fix_type(f, get_expression_type(f, expression->postfix.operand, expression->postfix.token, NULL));
+
+				if (!is_integer(expr_type) && !is_float(expr_type) && expr_type.type != T_POINTER)
+				{
+					raise_formated_semantic_error(f, expression->postfix.token,
+							"Cannot apply postfix operator to expression of type %s",
+							var_type_to_name(expr_type));
+				}
+				return expr_type;
+			} break;
+			case type_literal:
+			{
+				return number_to_untyped_type(expression->atom.identifier.name);
+			} break;
+			case type_const_str:
+			{
+				Type_Info str = {T_STRING};
+				str.v_string.content = &expression->atom.identifier;
+				return str;
+			} break;
+			case type_array_list:
+			{
+				Type_Info result = {};
+				result.type = T_ARRAY;
+				result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+				Type_Info array_type = verify_array_list(f, expression);
+				memcpy(result.array.type, &array_type, sizeof(Type_Info));
+				expression->array_list.type = result;
+				return result;
 			}
-			return expr_type;
-		} break;
-		case type_literal:
-		{
-			return number_to_untyped_type(expression->atom.identifier.name);
-		} break;
-		case type_const_str:
-		{
-			return (Type_Info) {.type = T_STRING, .v_string.content = &expression->atom.identifier};
-		} break;
+			default:
+			{
+				loop = false;
+			}break;
+		}
 	}
 	return (Type_Info){.type = T_INVALID};
 }
@@ -925,7 +992,8 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 {
 	if(struct_init->struct_init.operand->type != type_identifier)
 	{
-		raise_semantic_error(f, "expected struct identifier", struct_init->struct_init.token);
+		raise_semantic_error(f, "expected struct identifier", 
+							 struct_init->struct_init.token);
 	}
 	Token_Iden error_token = struct_init->struct_init.token;	
 	u8 *struct_id = struct_init->struct_init.operand->identifier.name;
@@ -936,7 +1004,8 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 	
 	if(struct_type.type != T_STRUCT)
 	{
-		raise_semantic_error(f, "Incorrect identifier used for struct initialization", error_token);
+		raise_semantic_error(f,"Incorrect identifier used for struct initialization", 
+							 error_token);
 	}
 	Ast_Variable *members = struct_type.structure->structure.members;
 	int member_count = struct_type.structure->structure.member_count;
@@ -944,31 +1013,67 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 	if(type_is_invalid(struct_type))
 	{
 		char *error = (char *)AllocateCompileMemory(4 * (vstd_strlen((char *)struct_id) + 16));
-		vstd_sprintf(error, "Struct %s doesn't exist, error in struct initializer", struct_id);
+		vstd_sprintf(error,
+					 "Struct %s doesn't exist, error in struct initializer", struct_id);
 		raise_semantic_error(f, error, error_token);
 	}
-	if(SDCount(expressions) > member_count)
+	if(SDCount(expressions) == 0)
 	{
-		raise_semantic_error(f, "Too many expressions in struct initialization", error_token);
-	}
-	
-	for(size_t i = 0; i < SDCount(expressions); ++i)
-	{
-		members[i].type = fix_type(f, members[i].type);
-		Type_Info expr_type = get_expression_type(f, expressions[i], error_token, NULL);
-		Type_Info member_type = members[i].type;
-		struct_init->struct_init.expr_types[i] = expr_type;
-		if(!check_type_compatibility(member_type, expr_type))
+		struct_init->struct_init.is_empty_init = true;
+		Type_Info untyped_int = {T_UNTYPED_INTEGER};
+		Token_Iden zero_tok = error_token;
+		zero_tok.identifier = (u8 *)"0";
+		for(size_t i = 0; i < member_count; ++i)
 		{
-			char *error = (char *)AllocateCompileMemory(2048);
-			vstd_sprintf(error, "Expression #%d in struct initialization is of type %s,"
-						 "\n\tmember #%d is of incompatible type %s. Try using a cast '#'",
-						 i + 1,
-						 var_type_to_name(expr_type),
-						 i + 1,
-						 var_type_to_name(member_type),
-						 var_type_to_name(member_type));
-			raise_semantic_error(f, error, error_token);
+			Ast_Node *result = alloc_node();
+			result->type = type_literal;
+			result->atom.identifier = pure_identifier(zero_tok);
+			SDPush(struct_init->struct_init.expressions, result);
+			struct_init->struct_init.expr_types[i] = untyped_int;
+		}
+	}
+	else
+	{
+		
+		if(SDCount(expressions) > member_count)
+		{
+			raise_semantic_error(f, "Too many expressions in struct initialization", 
+								 error_token);
+		}
+		
+		for(size_t i = 0; i < SDCount(expressions); ++i)
+		{
+			members[i].type = fix_type(f, members[i].type);
+			Type_Info expr_type = get_expression_type(f, expressions[i], error_token,
+													  NULL);
+			Type_Info member_type = members[i].type;
+			struct_init->struct_init.expr_types[i] = expr_type;
+			if(!check_type_compatibility(member_type, expr_type))
+			{
+				char *error = (char *)AllocateCompileMemory(2048);
+				vstd_sprintf(error, "Expression #%d in struct initialization is of type %s,"
+							 "\n\tmember #%d is of incompatible type %s. Try using a cast '#'",
+							 i + 1,
+							 var_type_to_name(expr_type),
+							 i + 1,
+							 var_type_to_name(member_type),
+							 var_type_to_name(member_type));
+				raise_semantic_error(f, error, error_token);
+			}
+		}
+		for(size_t i = SDCount(expressions); i < member_count; ++i)
+		{
+			Token_Iden zero_tok = error_token;
+			Type_Info untyped_int = {T_UNTYPED_INTEGER};
+			zero_tok.identifier = (u8 *)"0";
+			for(size_t i = 0; i < member_count; ++i)
+			{
+				Ast_Node *result = alloc_node();
+				result->type = type_literal;
+				result->atom.identifier = pure_identifier(zero_tok);
+				SDPush(struct_init->struct_init.expressions, result);
+				struct_init->struct_init.expr_types[i] = untyped_int;
+			}
 		}
 	}
 	return struct_type;
