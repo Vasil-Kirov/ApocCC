@@ -125,6 +125,16 @@ ast_indexing(Token_Iden token, Ast_Node *operand, Ast_Node *expression)
 }
 
 Ast_Node *
+ast_run(Token_Iden token, Ast_Node *to_run)
+{
+	Ast_Node *result = alloc_node();
+	result->type = type_run;
+	result->run.to_run = to_run;
+	result->run.token = token;
+	return result;
+}
+
+Ast_Node *
 ast_assignment(Ast_Node *lhs, Ast_Node *rhs, Token op, Token_Iden *error_token)
 {
 	Ast_Node *result = alloc_node();
@@ -719,6 +729,12 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 		{
 			result = ast_identifier(f, advance_token(f));
 		} break;
+		case tok_run:
+		{
+			Token_Iden token = advance_token(f);
+			Ast_Node *run_expr = parse_expression(f, NO_EXPECT, false);
+			result = ast_run(token, run_expr);
+		}
 		case tok_char:
 		{
 			if(is_lhs)
@@ -927,6 +943,7 @@ parse_type(File_Contents *f)
 	else if(pointer_or_type.type == '[')
 	{
 		result.type = T_ARRAY;
+		result.identifier = (u8 *)"array_list";
 		result.token = advance_token(f);
 
 		// @NOTE: not implemented, should it even be implemented?

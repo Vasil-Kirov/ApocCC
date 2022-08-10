@@ -121,6 +121,7 @@ int main(int argc, char *argv[])
 	initialize_memory();
 	initialize_logger();
 	platform_initialize();
+	initialize_interpreter();
 
 	if(argc < 2)
 	{

@@ -539,6 +539,10 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			return backend.builder->CreateLoad(value->getAllocatedType(),
 											value);
 		} break;
+		case type_run:
+		{
+			
+		} break;
 		case type_literal:
 		{
 			// @TODO: check size in case of uint64 sized integer
@@ -623,10 +627,31 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			auto array_loc = allocate_variable(func, (u8 *)"array_list",
 					node->array_list.type, backend);
 		
+			llvm::Type *array_type = apoc_type_to_llvm(node->array_list.type, backend);
+			llvm::Value *zero = ConstantInt::get(Type::getInt64Ty(*backend.context), 0);
 			for(size_t i = 0; i < list_count; ++i)
 			{
-				auto element_ptr = backend.builder->CreateExtractElement(array_loc, i, "array_elem");
+				llvm::Value *idx_list[2] = {
+					ConstantInt::get(Type::getInt64Ty(*backend.context), i),
+					zero
+				};
+				auto element_ptr = backend.builder->CreateGEP(array_type, 
+						array_loc, idx_list, "array_elem");
 				backend.builder->CreateStore(values[i], element_ptr);
+			}
+			auto arr_size = node->array_list.type.array.elem_count;
+
+			// @NOTE: fill the rest with 0
+			for(size_t i = list_count; i < arr_size; ++i)
+			{
+
+				llvm::Value *idx_list[2] = {
+					ConstantInt::get(Type::getInt64Ty(*backend.context), i),
+					ConstantInt::get(Type::getInt64Ty(*backend.context), 0)
+				};
+				auto element_ptr = backend.builder->CreateGEP(array_type, 
+						array_loc, idx_list, "array_elem");
+				backend.builder->CreateStore(zero, element_ptr);
 			}
 			
 			return array_loc;

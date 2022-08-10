@@ -84,6 +84,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "<<=", tok_lshift_equals);
 		shput(keyword_table, ">>=", tok_rshift_equals);
 		shput(keyword_table, "...", tok_var_args);
+		shput(keyword_table, "$run", tok_run);
 	}
 	
 	// NOTE(Vasko): Add basic types to string hash table
@@ -163,8 +164,8 @@ lex_file(File_Contents *f, char *path)
 			SDPush(f->token_buffer, to_put);
 	}
 	
-	Token_Iden eof_token = {0, tok_eof,
-		f->current_line, f->current_column, (char *)f->path};
+	Token_Iden eof_token = {0, (char *)f->path, f->file_data, tok_eof,
+		f->current_line, f->current_column};
 	SDPush(f->token_buffer, eof_token);
 	f->curr_token = f->token_buffer;
 	f->prev_token = NULL; 
@@ -226,12 +227,12 @@ Token_Iden get_token(File_Contents *f)
 			
 			token = tok_identifier;
 
-			Token_Iden result = {identifier, (Token)token,
-									start_line, start_col, (char *)f->path};
+			Token_Iden result = {identifier, (char *)f->path, f->file_data, (Token)token,
+									start_line, start_col};
 			return result;
 		}
-		Token_Iden result = {NULL, (Token)token,
-							 start_line, start_col, (char *)f->path};
+		Token_Iden result = {NULL, (char *)f->path, f->file_data, (Token)token,
+							 start_line, start_col};
 		return result;
 	}
 	else if(is_number(last_char))
@@ -258,8 +259,8 @@ Token_Iden get_token(File_Contents *f)
 		memcpy(number_string, string_start, num_size);
 		number_string[num_size] = '\0';
 
-		Token_Iden result = {number_string, tok_number,
-							 start_line, start_col, (char *)f->path};
+		Token_Iden result = {number_string, (char *)f->path, f->file_data, tok_number,
+							 start_line, start_col};
 		return result;
 	}
 	else
@@ -299,8 +300,8 @@ Token_Iden get_token(File_Contents *f)
 			number_string[num_size-1] = '\0';
 			
 
-			Token_Iden result = {number_string, tok_const_str,
-									start_line, start_col, (char *)f->path};
+			Token_Iden result = {number_string, (char *)f->path, f->file_data, tok_const_str,
+									start_line, start_col};
 			return result;
 		}
 		else if(*f->at == '\'')
@@ -317,7 +318,7 @@ Token_Iden get_token(File_Contents *f)
 			u8 *identifier = (u8 *)AllocateCompileMemory(2);
 			identifier[0] = c;
 			identifier[1] = 0;
-			Token_Iden result = {identifier, tok_char, start_line, start_col, (char *)f->path};
+			Token_Iden result = {identifier, (char *)f->path, f->file_data, tok_char, start_line, start_col};
 			return result;
 		}
 		else
@@ -335,8 +336,8 @@ Token_Iden get_token(File_Contents *f)
 			if(f->at - string_start == 1)
 			{
 
-				Token_Iden result = {NULL, (Token)string_start[0],
-									 start_line, start_col, (char *)f->path};
+				Token_Iden result = {NULL, (char *)f->path, f->file_data, (Token)string_start[0], 
+									 start_line, start_col};
 				return result;
 			}
 			
@@ -356,6 +357,7 @@ Token_Iden get_token(File_Contents *f)
 
 			Token_Iden result = {};
 			result.type = (Token)shget(keyword_table, symbol);
+			result.f_start = f->file_data;
 			result.line = start_line;
 			result.column = start_col;
 			result.file = (char *)f->path;

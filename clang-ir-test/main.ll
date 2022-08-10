@@ -3,21 +3,17 @@ source_filename = "main.c"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc19.32.31329"
 
-%struct.a_struct = type { i32, i32, %struct.b_struct }
-%struct.b_struct = type { i8, [3 x i8] }
-
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @main() #0 {
   %1 = alloca i32, align 4
-  %2 = alloca %struct.a_struct, align 4
+  %2 = alloca [1024 x i32], align 16
   store i32 0, ptr %1, align 4
-  call void @llvm.memset.p0.i64(ptr align 4 %2, i8 0, i64 12, i1 false)
-  %3 = getelementptr inbounds %struct.a_struct, ptr %2, i32 0, i32 2
-  %4 = getelementptr inbounds %struct.b_struct, ptr %3, i32 0, i32 1
-  %5 = getelementptr inbounds [3 x i8], ptr %4, i64 0, i64 1
-  %6 = load i8, ptr %5, align 1
-  %7 = sext i8 %6 to i32
-  ret i32 %7
+  call void @llvm.memset.p0.i64(ptr align 16 %2, i8 0, i64 4096, i1 false)
+  %3 = getelementptr inbounds [1024 x i32], ptr %2, i64 0, i64 3
+  store i32 5, ptr %3, align 4
+  %4 = getelementptr inbounds [1024 x i32], ptr %2, i64 0, i64 3
+  %5 = load i32, ptr %4, align 4
+  ret i32 %5
 }
 
 ; Function Attrs: argmemonly nocallback nofree nounwind willreturn writeonly

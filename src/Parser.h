@@ -1,5 +1,4 @@
 /* date = February 10th 2022 2:54 pm */
-
 #ifndef _PARSER_H
 #define _PARSER_H
 
@@ -10,6 +9,7 @@
 #include <Stack.h>
 #include <Basic.h>
 #include <Type.h>
+#include <Interpret.h>
 
 //#define INVALID_TYPE (Var_Type){.is_primitive = true, .prim_repr = invalid_type}
 #define NO_EXPECT ((Token)'\x18')
@@ -20,6 +20,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_run          = -59,
 	type_array_list   = -58,
 	type_cast         = -57,
 	type_else         = -56,
@@ -66,6 +67,13 @@ typedef struct
 	Ast_Node **nodes;
 	int count;
 } Ast_Node_Array;
+
+typedef struct
+{
+	Ast_Node *to_run;
+	Token_Iden token;
+	Interp_Val ran_val;
+} Ast_Run;
 
 typedef struct _Symbol Symbol;
 typedef struct _Ast_Identifier
@@ -155,7 +163,7 @@ typedef struct
 	Type_Info rhs_type;
 } Ast_Assignment;
 
-typedef struct
+typedef struct _Ast_Call
 {
 	Ast_Node *operand;
 	Ast_Node **arguments; // Simple DArray of expressions
@@ -245,6 +253,7 @@ struct _abstract_syntax_tree
 	Ast_Type type;
 	union
 	{
+		Ast_Run run;
 		Ast_Array_List array_list;
 		Ast_Cast cast;
 		Ast_For for_loop;

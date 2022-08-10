@@ -20,8 +20,16 @@ get_type_size(Type_Info type)
 			return 8;
 		Assert(false);
 	}
-	else if(type.type == T_POINTER || type.type == T_ARRAY || type.type == T_STRING)
+	else if(type.type == T_POINTER)
 		return sizeof(size_t);
+	else if(type.type == T_ARRAY)
+	{
+		return type.array.elem_count * get_type_size(*type.array.type);
+	}
+	else if(type.type == T_STRING)
+	{
+		return vstd_strlen((char *)type.v_string.content->name);
+	}
 	else if(type.type == T_BOOLEAN)
 		return 1;
 	Assert(false);

@@ -18,12 +18,11 @@ typedef struct _stack
 	i32 default_value;
 	i32 type_size;
 } Stack;
-
 #pragma pack(pop)
+
 #define STACK_INFO_SIZE sizeof(_internal_stack)
 
 
-#define ptrptr(of) (void **)&(of)
 
 #define stack_header(arr) ((_internal_stack *)( (u8 *)arr - STACK_INFO_SIZE))
 

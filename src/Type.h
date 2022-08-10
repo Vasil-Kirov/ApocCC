@@ -40,6 +40,7 @@ typedef enum
 	T_VOID            = 1 << 9,
 	T_STRING          = 1 << 10,
 	T_BOOLEAN		  = 1 << 11,
+	T_FUNC            = 1 << 12,
 } Type_Type;
 
 typedef enum
@@ -78,6 +79,7 @@ typedef struct _Type_Info
 		{
 			struct _Ast_Identifier *content;
 		} v_string;
+		Ast_Node *func;
 	};
 	u8 *identifier;
 } Type_Info;

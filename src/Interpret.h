@@ -5,9 +5,11 @@
 #include <Lexer.h>
 #include <Type.h>
 
-
+// @NOTE: pointer.type is not used, instead it's just the type of pointed here
 typedef struct
 {
+	Type_Info type;
+	void *location;
 	union
 	{
 		f32 tf32;
@@ -20,16 +22,26 @@ typedef struct
 		u16 tu16;
 		u32 tu32;
 		u64 tu64;
-		void *other;
+		void *pointed;
 	};
-	
-	Type_Info type;
-} Any_Val;
+} Interp_Val;
 
+typedef struct
+{
+	u8 *key;
+	Interp_Val value;
+} Interp_Table;
 
-Any_Val
-interpret_expression(Ast_Node *expr);
+typedef struct _Ast_Call Ast_Call;
 
+Interp_Val
+interpret_expression(Ast_Node *expr, b32 *failed);
+
+Interp_Val
+interpret_function(Interp_Val func, Ast_Call call, b32 *failed);
+
+void
+initialize_interpreter();
 
 
 #endif

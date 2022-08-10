@@ -61,7 +61,7 @@ typedef enum : signed short
 	
 	// compile time execution (preceeded by
 	tok_import = -26, // import
-	tok_run = -27,	  // run func at compile time
+	tok_run = -27,	  // run expression
 	tok_must = -28,	  // must handle return value of function
 	tok_any = -29,	  // must handle all possible switch statement values (will hold off on that one)
 	
@@ -92,10 +92,11 @@ typedef struct _str_hash_table
 typedef struct _Token_Iden 
 {
 	u8 *identifier;
+	char *file;
+	u8 *f_start;
 	Token type;
 	u64 line;
 	u64 column;
-	char *file;
 } Token_Iden;
 
 typedef struct _File_Contents File_Contents;

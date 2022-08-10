@@ -15,4 +15,7 @@ raise_parsing_unexpected_token(const char *expected_tok, File_Contents *f);
 void
 raise_token_syntax_error(File_Contents *f, const char *error_msg, char *file, u64 line, u64 column);
 
+void
+raise_interpret_error(const char *error_msg, struct _Token_Iden token);
+
 #endif // _ERRORS_H

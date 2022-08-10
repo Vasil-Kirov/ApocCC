@@ -4,6 +4,7 @@
 #include <Memory.h>
 #include <Type.h>
 #include <Errors.h>
+#include <Interpret.h>
 
 void
 initialize_analyzer(File_Contents *f)
@@ -540,9 +541,36 @@ verify_assignment(File_Contents *f, Ast_Node *node)
 				raise_semantic_error(f, "Expected an expression to declare array size", type_token);
 			}
 			Type_Info array_size_type = get_expression_type(f, count_expr, type_token, NULL);
-			if(array_size_type.type != T_UNTYPED_INTEGER)
+			if(!is_integer(array_size_type))
 			{
-				raise_semantic_error(f, "Expected a constant integer expression", type_token);
+				raise_semantic_error(f, "Expected an integer expression", type_token);
+			}
+			b32 failed = false;
+			Interp_Val count_val = interpret_expression(count_expr, &failed);
+			Assert(is_integer(count_val.type));
+			if(failed)
+			{
+				raise_semantic_error(f, "Expected a constant expression", type_token);
+			}
+			if(is_signed(count_val.type))
+			{
+				if(count_val.ti64 < 0)
+					raise_semantic_error(f, "Expression must evaluate to a value higher than 0",
+							type_token);
+				node->assignment.decl_type.array.elem_count = count_val.ti64;
+			}
+			else
+			{
+				node->assignment.decl_type.array.elem_count = count_val.tu64;
+			}
+
+			// @TODO: this is a hack
+			Ast_Node *arr_expr = node->assignment.rhs;
+			while(arr_expr)
+			{
+				if(arr_expr->type == type_array_list)
+					arr_expr->array_list.type = node->assignment.decl_type;
+				arr_expr = arr_expr->right;
 			}
 		}
 	}
@@ -654,118 +682,123 @@ verify_array_list(File_Contents *f, Ast_Node *node)
 Type_Info
 get_atom_expression_type(File_Contents *f, Ast_Node *expression)
 {
-	// @TODO: chaining
-	b32 loop = true;
-	while(loop)
+	switch ((int)expression->type)
 	{
-		switch ((int)expression->type)
+		case type_identifier:
 		{
-			case type_identifier:
+			Symbol *symbol = get_symbol_spot(f, expression->identifier.token);
+			if(symbol->tag == S_STRUCT_MEMBER || symbol->tag == S_FUNCTION)
 			{
-				Symbol *symbol = get_symbol_spot(f, expression->identifier.token);
-				if(symbol->tag == S_STRUCT_MEMBER || symbol->tag == S_FUNCTION)
-				{
-					raise_formated_semantic_error(f, expression->identifier.token,
-							"Unkown identifier %s",
-							expression->identifier.name);
-				}
-				return symbol->type;
-			} break;
-			case type_struct_init:
-			{
-				return verify_struct_init(f, expression);
-			} break;
-			case type_index:
-			{
-				Type_Info operand_type = fix_type(f, get_expression_type(f,
-							expression->index.operand, expression->index.token, NULL));
-				if(operand_type.type != T_ARRAY && operand_type.type != T_POINTER)
-				{
-					raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
-				}
-				Type_Info index_type = fix_type(f, get_expression_type(f,
-							expression->index.expression, expression->index.token, NULL));
-				if(!is_integer(index_type))
-				{
-					raise_semantic_error(f, "Non integer used for indexing", expression->index.token);
-				}
-				if(operand_type.type == T_ARRAY)
-				{
-					expression->index.idx_type = *operand_type.array.type;
-					return *operand_type.array.type;
-				}
-				else
-				{
-					expression->index.idx_type = *operand_type.pointer.type;
-					return  *operand_type.pointer.type;
-				}
-			} break;
-			case type_func_call:
-			{
-				return verify_func_call(f, expression, expression->func_call.token);
-			} break;
-			case type_selector:
-			{
-				Type_Info operand_type = fix_type(f, get_expression_type(f, expression->selector.operand, expression->selector.dot_token, NULL));
-				expression->selector.operand_type = operand_type;
-				if(!is_accessible(operand_type))
-				{
-					raise_formated_semantic_error(f, expression->selector.dot_token,
-							"Expression of type %s is not selectable", var_type_to_name(operand_type));
-				}
-
-				Ast_Struct structure = operand_type.structure->structure;
-				u8 *name = expression->selector.identifier->identifier.name;
-				for(size_t i = 0; i < structure.member_count; ++i)
-				{
-					if(vstd_strcmp((char *)name, (char *)structure.members[i].identifier.name))
-					{
-						expression->selector.selected_type = structure.members[i].type;
-						expression->selector.selected_index = i;
-						return structure.members[i].type;
-					}
-				}
-				raise_formated_semantic_error(f, expression->selector.dot_token,
-						"Accessed member [ %s ] of structure [ %s ] doesn't exist",
-						name, structure.struct_id.name);
-
-			} break;
-			case type_postfix:
-			{
-				Type_Info expr_type = fix_type(f, get_expression_type(f, expression->postfix.operand, expression->postfix.token, NULL));
-
-				if (!is_integer(expr_type) && !is_float(expr_type) && expr_type.type != T_POINTER)
-				{
-					raise_formated_semantic_error(f, expression->postfix.token,
-							"Cannot apply postfix operator to expression of type %s",
-							var_type_to_name(expr_type));
-				}
-				return expr_type;
-			} break;
-			case type_literal:
-			{
-				return number_to_untyped_type(expression->atom.identifier.name);
-			} break;
-			case type_const_str:
-			{
-				Type_Info str = {T_STRING};
-				str.v_string.content = &expression->atom.identifier;
-				return str;
-			} break;
-			case type_array_list:
-			{
-				Type_Info result = {};
-				result.type = T_ARRAY;
-				result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-				Type_Info array_type = verify_array_list(f, expression);
-				memcpy(result.array.type, &array_type, sizeof(Type_Info));
-				expression->array_list.type = result;
-				return result;
+				raise_formated_semantic_error(f, expression->identifier.token,
+						"Unkown identifier %s",
+						expression->identifier.name);
 			}
-			default:
+			return symbol->type;
+		} break;
+		case type_run:
+		{
+			b32 failed = false;
+
+			// @NOTE: verify expression
+			get_expression_type(f, expression->run.to_run, expression->run.token, NULL);
+			expression->run.ran_val = interpret_expression(expression->run.to_run, &failed);
+			if(failed)
 			{
-				loop = false;
-			}break;
+				raise_semantic_error(f, "Expression cannot be run at compile time",
+						expression->run.token);
+			}
+		}
+		case type_struct_init:
+		{
+			return verify_struct_init(f, expression);
+		} break;
+		case type_index:
+		{
+			Type_Info operand_type = fix_type(f, get_expression_type(f,
+						expression->index.operand, expression->index.token, NULL));
+			if(operand_type.type != T_ARRAY && operand_type.type != T_POINTER)
+			{
+				raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
+			}
+			Type_Info index_type = fix_type(f, get_expression_type(f,
+						expression->index.expression, expression->index.token, NULL));
+			if(!is_integer(index_type))
+			{
+				raise_semantic_error(f, "Non integer used for indexing", expression->index.token);
+			}
+			if(operand_type.type == T_ARRAY)
+			{
+				expression->index.idx_type = *operand_type.array.type;
+				return *operand_type.array.type;
+			}
+			else
+			{
+				expression->index.idx_type = *operand_type.pointer.type;
+				return  *operand_type.pointer.type;
+			}
+		} break;
+		case type_func_call:
+		{
+			return verify_func_call(f, expression, expression->func_call.token);
+		} break;
+		case type_selector:
+		{
+			Type_Info operand_type = fix_type(f, get_expression_type(f, expression->selector.operand, expression->selector.dot_token, NULL));
+			expression->selector.operand_type = operand_type;
+			if(!is_accessible(operand_type))
+			{
+				raise_formated_semantic_error(f, expression->selector.dot_token,
+						"Expression of type %s is not selectable", var_type_to_name(operand_type));
+			}
+
+			Ast_Struct structure = operand_type.structure->structure;
+			u8 *name = expression->selector.identifier->identifier.name;
+			for(size_t i = 0; i < structure.member_count; ++i)
+			{
+				if(vstd_strcmp((char *)name, (char *)structure.members[i].identifier.name))
+				{
+					expression->selector.selected_type = structure.members[i].type;
+					expression->selector.selected_index = i;
+					return structure.members[i].type;
+				}
+			}
+			raise_formated_semantic_error(f, expression->selector.dot_token,
+					"Accessed member [ %s ] of structure [ %s ] doesn't exist",
+					name, structure.struct_id.name);
+
+		} break;
+		case type_postfix:
+		{
+			Type_Info expr_type = fix_type(f, get_expression_type(f, expression->postfix.operand, expression->postfix.token, NULL));
+
+			if (!is_integer(expr_type) && !is_float(expr_type) && expr_type.type != T_POINTER)
+			{
+				raise_formated_semantic_error(f, expression->postfix.token,
+						"Cannot apply postfix operator to expression of type %s",
+						var_type_to_name(expr_type));
+			}
+			return expr_type;
+		} break;
+		case type_literal:
+		{
+			return number_to_untyped_type(expression->atom.identifier.name);
+		} break;
+		case type_const_str:
+		{
+			Type_Info str = {T_STRING};
+			str.v_string.content = &expression->atom.identifier;
+			return str;
+		} break;
+		case type_array_list:
+		{
+			Type_Info result = {};
+			result.type = T_ARRAY;
+			result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			result.identifier = (u8 *)"array_list";
+			Type_Info array_type = verify_array_list(f, expression);
+			memcpy(result.array.type, &array_type, sizeof(Type_Info));
+			expression->array_list.type = result;
+			return result;
 		}
 	}
 	return (Type_Info){.type = T_INVALID};
@@ -789,8 +822,8 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression)
 				if(!is_integer(expr_type))
 				{
 					raise_formated_semantic_error(f, unary_expr.op,
-					"Cannot use bitwise operator %c on expression of type %s",
-					unary_expr.op.type, var_type_to_name(expr_type));
+							"Cannot use bitwise operator %c on expression of type %s",
+							unary_expr.op.type, var_type_to_name(expr_type));
 				}
 				return expr_type;
 			} break;
@@ -799,7 +832,7 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression)
 				if(unary_expr.expression->type != type_identifier)
 				{
 					raise_semantic_error(f, "@ of opperand needs to be used on an identifier", 
-											unary_expr.op);
+							unary_expr.op);
 				}
 				Type_Info *expr_ptr = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 				memcpy(expr_ptr, &expr_type, sizeof(Type_Info));
@@ -830,7 +863,7 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression)
 				if(!is_integer(expr_type) && !is_float(expr_type))
 				{
 					raise_formated_semantic_error(f, unary_expr.op, "Cannot use - operator on an %s", 
-													var_type_to_name(expr_type));
+							var_type_to_name(expr_type));
 				}
 				if(expr_type.primitive.size >= ubyte1 && expr_type.primitive.size <= ubyte8)
 				{
@@ -845,15 +878,15 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression)
 				if(!is_integer(expr_type) && !is_float(expr_type) && expr_type.type != T_POINTER)
 				{
 					raise_formated_semantic_error(f, unary_expr.op,
-					"Cannot apply %s operator to expression of type %s",
-					postfix_name, var_type_to_name(expr_type));
+							"Cannot apply %s operator to expression of type %s",
+							postfix_name, var_type_to_name(expr_type));
 				}
 				return expr_type;
 			} break;
 			default:
 			{
 				raise_semantic_error(f, "Unexpected unary exprsesion", unary_expr.op);
-				
+
 				// @Unreachable
 				return (Type_Info){.type = T_INVALID};
 			} break;
@@ -867,7 +900,7 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression)
 		if(!is_castable(casted, cast_type))
 		{
 			raise_formated_semantic_error(f, expression->cast.token, "Cannot cast type %s to %s",
-										  var_type_to_name(casted), var_type_to_name(cast_type));
+					var_type_to_name(casted), var_type_to_name(cast_type));
 		}
 		return cast_type;
 	}
@@ -875,17 +908,17 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression)
 		return get_atom_expression_type(f, expression);
 }
 
-void
+	void
 check_types_error(File_Contents *f, Token_Iden token, Type_Info a, Type_Info b)
 {
 	if(!check_type_compatibility(a, b))
 	{
 		raise_formated_semantic_error(f, token, "Types %s and %s are incompatible", 
-								var_type_to_name(a), var_type_to_name(b));
+				var_type_to_name(a), var_type_to_name(b));
 	}
 }
 
-Type_Info
+	Type_Info
 get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Type_Info *previous)
 {
 	if(expression == NULL)
@@ -893,19 +926,19 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_toke
 
 	if(expression->type != type_binary_expr)	
 		return fix_type(f, get_unary_expression_type(f, expression));
-	
+
 	Type_Info left = get_expression_type(f, expression->left,  expression->binary_expr.token, NULL);
 	Type_Info right = get_expression_type(f, expression->right, expression->binary_expr.token, NULL);
-	
+
 	if(type_is_invalid(left) || type_is_invalid(right))
 		raise_semantic_error(f, "invalid type in expression", desc_token);
-		
+
 	check_types_error(f, desc_token, left, right);
 	if(!are_op_compatible(left, right))
 	{
 		raise_formated_semantic_error(f, expression->binary_expr.token,
-								"Cannot perform a binary operation with types %s and %s",
-										var_type_to_name(left), var_type_to_name(right));
+				"Cannot perform a binary operation with types %s and %s",
+				var_type_to_name(left), var_type_to_name(right));
 	}
 	expression->binary_expr.left = left;
 	expression->binary_expr.right = right;
@@ -915,7 +948,7 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_toke
 		if(is_float(left) || is_float(right))
 		{
 			raise_semantic_error(f, "Cannot use the bitwise operators with floating point numbers",
-				expression->binary_expr.token);
+					expression->binary_expr.token);
 		}
 	}
 	else if(is_logical_op(expression->binary_expr.op))
@@ -928,7 +961,7 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_toke
 	return fix_type(f, left);
 }
 
-Type_Info
+	Type_Info
 verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token)
 {
 
@@ -936,10 +969,10 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token)
 	if (func_call->func_call.operand->type != type_identifier)
 	{
 		raise_semantic_error(f, "Function caller is not an identifier",
-							 func_call->func_call.token);
+				func_call->func_call.token);
 	}
 	Symbol *func_sym = get_symbol_spot(f, func_call->func_call.operand->identifier.token);
-	
+
 	Ast_Node **func_args = func_sym->node->function.arguments;
 	Ast_Node **passed_expr = func_call->func_call.arguments;
 	size_t expr_count = SDCount(passed_expr);

@@ -3,10 +3,10 @@
 #include <Lexer.h>
 #include <Analyzer.h>
 
-u8 *get_error_segment(File_Contents *f, Token_Iden error_token)
+u8 *get_error_segment(Token_Iden error_token)
 {
 
-	u8 *scanner = f->file_data;
+	u8 *scanner = error_token.f_start;
 	i32 row = 1;
 	while(true)
 	{
@@ -80,9 +80,20 @@ u8 *get_error_segment(File_Contents *f, Token_Iden error_token)
 	return result;
 }
 
+void
+raise_interpret_error(const char *error_msg, struct _Token_Iden token)
+{
+	if(token.file)
+	{
+		u8 *error_location = get_error_segment(token);
+		LG_ERROR("%s (%d, %d):\n\tInterpretting error: %s\n\n%s",
+				token.file, token.line, token.column, error_msg, error_location);
+	}
+}
+
 void raise_semantic_error(File_Contents *f, const char *error_msg, struct _Token_Iden token)
 {
-	u8 *error_location = get_error_segment(f, token);
+	u8 *error_location = get_error_segment(token);
 	LG_FATAL("%s (%d, %d):\n\tSemantic error: %s\n\n%s",
 			 token.file, token.line, token.column, error_msg, error_location);
 }
@@ -94,7 +105,8 @@ void raise_token_syntax_error(File_Contents *f, const char *error_msg, char *fil
 	new_token.file = file;
 	new_token.column = column;
 	new_token.line = line;
-	u8 *error_location = get_error_segment(f, new_token);
+	new_token.f_start = f->file_data;
+	u8 *error_location = get_error_segment(new_token);
 	LG_FATAL("%s (%d, %d):\n\tAn error occured while tokenizing: %s\n\n%s", file, line, column, error_msg, error_location);
 }
 
@@ -107,7 +119,7 @@ void raise_parsing_unexpected_token(const char *expected_tok, File_Contents *f)
 	else
 		token = *f->curr_token;
 	
-	u8 *error_location = get_error_segment(f, token);
+	u8 *error_location = get_error_segment(token);
 	if(token.type == tok_identifier)
 	{
 		LG_FATAL("%s (%d, %d):\n\tFound unexpected token %s, expected %s, got [ \"%s\" ]\n\n%s",

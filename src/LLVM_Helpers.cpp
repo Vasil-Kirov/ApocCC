@@ -1,3 +1,4 @@
+#include "llvm/ADT/APFloat.h"
 #include "llvm/IR/DerivedTypes.h"
 #include <LLVM_Backend.h>
 #include <LLVM_Helpers.h>
@@ -31,6 +32,53 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State ba
 	{
 		return backend.builder->CreateAlloca(apoc_type_to_llvm(type, backend), 0, (char *)var_name);
 	}
+}
+
+
+llvm::Value *
+interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func)
+{
+	llvm::Value *result = NULL;
+	switch((int)val.type.type)
+	{
+		case T_UNTYPED_INTEGER:
+		case T_INTEGER:
+		{
+			if(is_signed(val.type))
+				result = backend.builder->getInt64(val.ti64);
+			else
+				result = backend.builder->getInt64(val.tu64);
+		} break;
+		case T_UNTYPED_FLOAT:
+		case T_FLOAT:
+		{
+			auto ap = APFloat(val.tf64);
+			result = ConstantFP::get(apoc_type_to_llvm(val.type, backend), ap);
+		} break;
+		case T_ARRAY:
+		{
+			auto location = allocate_variable(func, (u8 *)"comp_time_array", val.type, backend);
+			//Interp_Val *elem1 = (Interp_Val *)val.pointed;
+			//auto elem_type = apoc_type_to_llvm(elem1->type, backend);
+			auto array_type = apoc_type_to_llvm(val.type, backend);
+
+			size_t elem_count = val.type.array.elem_count;
+			llvm::Value *zero = ConstantInt::get(Type::getInt64Ty(*backend.context), 0);
+			for(size_t i = 0; i < elem_count; ++i)
+			{
+				llvm::Value *idx_list[2] = {
+					ConstantInt::get(Type::getInt64Ty(*backend.context), i),
+					zero
+				};
+				auto element_ptr = backend.builder->CreateGEP(array_type, 
+						location, idx_list, "array_elem");
+				Interp_Val *element = (Interp_Val *)val.pointed + i;
+				backend.builder->CreateStore(interp_val_to_llvm(*element, backend, func),
+						element_ptr);
+			}
+		} break;
+	}
+	return result;
 }
 
 llvm::Type *
