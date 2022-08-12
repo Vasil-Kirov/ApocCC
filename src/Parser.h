@@ -134,6 +134,7 @@ typedef struct
 	Ast_Identifier identifier;
 	Ast_Node **arguments; // Simple DArray
 	b32 has_var_args;
+	b32 is_interpret_only;
 } Ast_Func;
 
 typedef struct
@@ -207,6 +208,7 @@ typedef struct
 	Ast_Node *expression;
 	Token_Iden token;
 	Type_Info idx_type;
+	Type_Info operand_type;
 } Ast_Indexing;
 
 typedef struct

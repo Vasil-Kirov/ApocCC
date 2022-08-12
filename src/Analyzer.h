@@ -135,10 +135,10 @@ void
 verify_assignment(File_Contents *f, Ast_Node *node);
 
 Type_Info
-get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Type_Info *previous);
+get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Ast_Node *previous);
 
 Type_Info
-verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token);
+verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, Ast_Node *previous);
 
 Type_Info
 verify_struct_init(File_Contents *f, Ast_Node *struct_init);

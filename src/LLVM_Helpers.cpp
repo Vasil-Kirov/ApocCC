@@ -1,5 +1,7 @@
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instructions.h"
 #include <LLVM_Backend.h>
 #include <LLVM_Helpers.h>
 #include <Type.h>
@@ -25,29 +27,35 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State ba
 {
 	if(func)
 	{
+		auto alloc_type = apoc_type_to_llvm(type, backend);
 		IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
-		return temp_builder.CreateAlloca(apoc_type_to_llvm(type, backend), 0, (char *)var_name);
+		auto location = temp_builder.CreateAlloca(alloc_type, 0, (char *)var_name);
+		location->setAlignment(Align(get_type_alignment(type)));
+		return location;
 	}
 	else
 	{
-		return backend.builder->CreateAlloca(apoc_type_to_llvm(type, backend), 0, (char *)var_name);
+		auto location = backend.builder->CreateAlloca(apoc_type_to_llvm(type, backend), 0, (char *)var_name);
+		location->setAlignment(Align(get_type_alignment(type)));
+		return location;
 	}
 }
 
 
-llvm::Value *
+// @TODO: remove Function * argument
+llvm::Constant *
 interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func)
 {
-	llvm::Value *result = NULL;
+	llvm::Constant *result = NULL;
 	switch((int)val.type.type)
 	{
 		case T_UNTYPED_INTEGER:
 		case T_INTEGER:
 		{
 			if(is_signed(val.type))
-				result = backend.builder->getInt64(val.ti64);
+				result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val.ti64, true);
 			else
-				result = backend.builder->getInt64(val.tu64);
+				result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val.tu64, false);
 		} break;
 		case T_UNTYPED_FLOAT:
 		case T_FLOAT:
@@ -57,26 +65,19 @@ interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func)
 		} break;
 		case T_ARRAY:
 		{
-			auto location = allocate_variable(func, (u8 *)"comp_time_array", val.type, backend);
-			//Interp_Val *elem1 = (Interp_Val *)val.pointed;
-			//auto elem_type = apoc_type_to_llvm(elem1->type, backend);
 			auto array_type = apoc_type_to_llvm(val.type, backend);
 
 			size_t elem_count = val.type.array.elem_count;
-			llvm::Value *zero = ConstantInt::get(Type::getInt64Ty(*backend.context), 0);
-			for(size_t i = 0; i < elem_count; ++i)
+			Constant *array[elem_count];
+			for(size_t i = 0 ; i < elem_count; ++i)
 			{
-				llvm::Value *idx_list[2] = {
-					ConstantInt::get(Type::getInt64Ty(*backend.context), i),
-					zero
-				};
-				auto element_ptr = backend.builder->CreateGEP(array_type, 
-						location, idx_list, "array_elem");
-				Interp_Val *element = (Interp_Val *)val.pointed + i;
-				backend.builder->CreateStore(interp_val_to_llvm(*element, backend, func),
-						element_ptr);
+				Interp_Val *elem = (Interp_Val *)val.pointed + i;
+				array[i] = interp_val_to_llvm(*elem, backend, func);
 			}
+			result = ConstantArray::get((ArrayType *)array_type, makeArrayRef((Constant **)array, elem_count));
 		} break;
+		default:
+			Assert(false);
 	}
 	return result;
 }

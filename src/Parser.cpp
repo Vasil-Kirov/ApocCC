@@ -734,7 +734,7 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 			Token_Iden token = advance_token(f);
 			Ast_Node *run_expr = parse_expression(f, NO_EXPECT, false);
 			result = ast_run(token, run_expr);
-		}
+		} break;
 		case tok_char:
 		{
 			if(is_lhs)
@@ -956,6 +956,15 @@ parse_type(File_Contents *f)
 		{
 			result.array.array_type = ARR_STATIC;
 			result.array.optional_expression = parse_expression(f, (Token)']', false);
+			b32 failed = false;
+			Interp_Val count = interpret_expression(result.array.optional_expression, &failed);
+			if(failed || !is_integer(count.type))
+				raise_parsing_unexpected_token("constant integer expression", f);
+			
+			if(is_signed(count.type))
+				result.array.elem_count = count.ti64;
+			else
+				result.array.elem_count = count.tu64;
 		}
 		Type_Info arr_type = parse_type(f);
 		result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
@@ -1026,9 +1035,16 @@ parse_func_arg(File_Contents *f)
 Ast_Node *
 parse_func(File_Contents *f)
 {
+	b32 is_interpret_only = false;
 	parser_eat(f, tok_func);
+	if(f->curr_token->type == tok_interp)
+	{
+		is_interpret_only = true;
+		advance_token(f);
+	}
 
 	Ast_Func this_func = {};
+	this_func.is_interpret_only = is_interpret_only;
 	Ast_Node *func_id = ast_identifier(f, advance_token(f));
 	this_func.identifier = func_id->identifier;
 	this_func.arguments = delimited(f, '(', ')', ',', parse_func_arg);
@@ -1068,6 +1084,7 @@ parse_func(File_Contents *f)
 		this_symbol.identifier = this_func.identifier.name;
 		this_symbol.type = func_type;
 		add_symbol(f, this_symbol);
+		interpret_add_function(this_symbol);
 	}
 
 	if(body.type == '{')

@@ -139,10 +139,11 @@ int main(int argc, char *argv[])
 		TIME_FUNC(timers, lex_file(f, argv[i]), lex_clock, lexing);
 		SDPush(files, f);
 	}
-	TIME_FUNC(timers, File_Contents *f = append_token_streams(files), syncing_clock, syncing);
-	
+	TIME_FUNC(timers, File_Contents *f = append_token_streams(files), syncing_clock, syncing);	
 	TIME_FUNC(timers, f->ast_root = parse(f), parse_clock, parsing);
 	TIME_FUNC(timers, analyze(f, f->ast_root), analysis_clock, analysis);
+
+	f->build_commands.optimization = OPT_NONE;
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root), codegen_clock, codegen);
 	
 	// @TODO: Linux linker

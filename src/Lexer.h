@@ -59,28 +59,30 @@ typedef enum : signed short
 	tok_case = -24,	  // case in switch statement
 	tok_as = -25,	  // as, when importing libraries
 	
+	
+	tok_plus_equals = -26,
+	tok_minus_equals = -27,
+	tok_mult_equals = -28,
+	tok_div_equals = -29,
+	tok_mod_equals = -30,
+	tok_and_equals = -31,
+	tok_xor_equals = -32,
+	tok_or_equals = -33,
+	tok_lshift_equals = -35,
+	tok_rshift_equals = -36,
+	
+	tok_break = -37,
+	tok_else = -38,
+	
+	tok_var_args = -39,
+	tok_char = -40,
+
 	// compile time execution (preceeded by
-	tok_import = -26, // import
-	tok_run = -27,	  // run expression
-	tok_must = -28,	  // must handle return value of function
-	tok_any = -29,	  // must handle all possible switch statement values (will hold off on that one)
-	
-	tok_plus_equals = -30,
-	tok_minus_equals = -31,
-	tok_mult_equals = -32,
-	tok_div_equals = -33,
-	tok_mod_equals = -34,
-	tok_and_equals = -35,
-	tok_xor_equals = -36,
-	tok_or_equals = -37,
-	tok_lshift_equals = -38,
-	tok_rshift_equals = -39,
-	
-	tok_break = -40,
-	tok_else = -41,
-	
-	tok_var_args = -42,
-	tok_char = -43
+	tok_import = -41, // import
+	tok_run    = -42, // run expression
+	tok_must   = -43, // must handle return value of function
+	tok_any    = -44, // must handle all possible switch statement values
+	tok_interp = -45, // function can only be interpreted
 } Token;
 
 typedef struct _str_hash_table

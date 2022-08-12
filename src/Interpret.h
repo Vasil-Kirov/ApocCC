@@ -5,6 +5,8 @@
 #include <Lexer.h>
 #include <Type.h>
 
+typedef struct _Symbol Symbol;
+
 // @NOTE: pointer.type is not used, instead it's just the type of pointed here
 typedef struct
 {
@@ -39,6 +41,9 @@ interpret_expression(Ast_Node *expr, b32 *failed);
 
 Interp_Val
 interpret_function(Interp_Val func, Ast_Call call, b32 *failed);
+
+void
+interpret_add_function(Symbol func_sym);
 
 void
 initialize_interpreter();

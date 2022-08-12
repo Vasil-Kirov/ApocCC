@@ -97,6 +97,14 @@ struct Debug_Info
 };
 
 
+llvm::Value *
+generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
+			 llvm::Value *rhs, b32 is_decl, Type_Info decl_type);
+
+// @TODO: remove
+llvm::Constant *
+interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func);
+
 void
 generate_signatures(File_Contents *f);
 
@@ -117,6 +125,9 @@ generate_func_signature(File_Contents *f, Ast_Node *node);
 
 void
 generate_assignment(File_Contents *f, Function *func, Ast_Node *node);
+
+llvm::Value *
+create_cast(Type_Info to, Type_Info from, llvm::Value *castee);
 
 llvm::BasicBlock *
 generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block, const char *block_name, BasicBlock *to_go);

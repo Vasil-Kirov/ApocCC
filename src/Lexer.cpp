@@ -85,6 +85,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, ">>=", tok_rshift_equals);
 		shput(keyword_table, "...", tok_var_args);
 		shput(keyword_table, "$run", tok_run);
+		shput(keyword_table, "$interp", tok_interp);
 	}
 	
 	// NOTE(Vasko): Add basic types to string hash table
@@ -311,7 +312,7 @@ Token_Iden get_token(File_Contents *f)
 			advance_buffer(f);
 			if(*f->at != '\'')
 			{
-				raise_token_syntax_error(f, "character literal contains more than 1 character", 
+				raise_token_syntax_error(f, "Character literal contains more than 1 character", 
 										 (char *)f->path, start_line, start_col);
 			}
 			advance_buffer(f);
@@ -319,6 +320,36 @@ Token_Iden get_token(File_Contents *f)
 			identifier[0] = c;
 			identifier[1] = 0;
 			Token_Iden result = {identifier, (char *)f->path, f->file_data, tok_char, start_line, start_col};
+			return result;
+		}
+		else if(*f->at == '$')
+		{
+			// @NOTE: compiler directives
+			u64 start_col = f->current_column;
+			u64 start_line = f->current_line;
+			advance_buffer(f);
+			while(is_alnum(*f->at) || is_non_special_char(*f->at))
+			{
+				advance_buffer(f);
+			}
+
+			u64 identifier_size = f->at - string_start;
+		
+			char name[identifier_size+1];
+			memcpy(name, string_start, identifier_size);
+			name[identifier_size] = '\0';
+
+			Token_Iden result = {};
+			result.type = (Token)shget(keyword_table, name);
+			result.f_start = f->file_data;
+			result.line = start_line;
+			result.column = start_col;
+			result.file = (char *)f->path;
+			if(result.type == KEYWORD_ERROR)
+			{
+				raise_token_syntax_error(f, "Incorrect compiler directive", 
+										 (char *)f->path, start_line, start_col);
+			}
 			return result;
 		}
 		else

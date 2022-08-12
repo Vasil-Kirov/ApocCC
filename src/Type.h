@@ -85,6 +85,9 @@ typedef struct _Type_Info
 } Type_Info;
 
 int
+get_type_alignment(Type_Info type);
+
+int
 get_type_size(Type_Info type);
 
 Type_Info

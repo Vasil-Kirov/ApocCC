@@ -1,4 +1,8 @@
+#include "llvm-c/TargetMachine.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Instructions.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
 #include <LLVM_Helpers.h>
@@ -137,9 +141,11 @@ generate_obj(File_Contents *f)
 	{
 		debug.builder->finalize();
 	}
-	char *obj_file = change_file_extension(platform_path_to_file_name((char *)f->path), (char *)"o");
+	char *obj_file = change_file_extension(
+			platform_path_to_file_name((char *)f->path), (char *)"o");
 	f->obj_name = obj_file;
 	LLVMTargetMachineEmitToFile(machine, file_mod, obj_file, LLVMObjectFile, &error);
+	LLVMTargetMachineEmitToFile(machine, file_mod, "asm.s", LLVMAssemblyFile, &error);
 	
 	std::error_code std_err;
 	raw_fd_ostream ir_dest("test.ll", std_err);
@@ -231,17 +237,27 @@ generate_statement(File_Contents *f, Ast_Node *node)
 		{
 			case type_func:
 			{
-				if(node->left->type == type_scope_start)
+				if(!node->function.is_interpret_only && node->left->type == type_scope_start)
 					generate_func(f, node);
 
 				// Generate prototypes before
 			} break;
 			case type_assignment:
 			{
-				// @TODO: expression evaluation for initialization
-				ConstantInt* const_int_val = ConstantInt::get(backend.module->getContext(), APInt(32,0));
-				auto global_var = new GlobalVariable(*backend.module, apoc_type_to_llvm(node->assignment.decl_type, backend), node->assignment.is_const,
-													 GlobalValue::LinkageTypes::ExternalLinkage, const_int_val, "global_var");
+				b32 failed = false;
+				auto interp_val = interpret_expression(node->assignment.rhs, &failed);
+				if(failed)
+				{
+					raise_interpret_error("Global decleration must be constant",
+							node->assignment.token);
+					LG_FATAL(".");
+				}
+				Constant* const_val = interp_val_to_llvm(interp_val, backend, NULL);
+				auto global_type = apoc_type_to_llvm(node->assignment.decl_type, backend);
+				auto global_var = new GlobalVariable(
+						*backend.module, global_type, node->assignment.is_const,
+						GlobalValue::LinkageTypes::ExternalLinkage,
+						const_val, "global_var");
 				backend.named_globals[std::string((char *)node->assignment.token.identifier)] = global_var;
 			} break;
 			case type_struct: break;
@@ -525,7 +541,6 @@ get_identifier(u8 *name)
 	return var_location;
 }
 
-
 llvm::Value *
 generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 {
@@ -541,7 +556,31 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_run:
 		{
-			
+			auto constant_val = interp_val_to_llvm(node->run.ran_val, backend, func);
+			if(!is_integer(node->run.ran_val.type) && !is_float(node->run.ran_val.type))
+			{
+				Type_Info val_type = node->run.ran_val.type;
+				auto llvm_type = apoc_type_to_llvm(val_type, backend);
+				auto to_global = new llvm::GlobalVariable(*backend.module, llvm_type, true,
+						GlobalValue::LinkageTypes::PrivateLinkage,
+						constant_val, "constant_array");
+
+				auto location = allocate_variable(func, (u8 *)"compile_time_array", node->run.ran_val.type, backend);
+
+				auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
+				llvm::Value *idx_list[] = {
+					zero,
+					zero
+				};
+				auto first_elem = backend.builder->CreateGEP(llvm_type, location, 
+						idx_list, "", true);
+				const DataLayout layout = backend.module->getDataLayout();
+				auto alignment = location->getAlign();//Align(get_type_alignment(val_type));
+				backend.builder->CreateMemCpy(first_elem, alignment, to_global, alignment, get_type_size(node->run.ran_val.type));
+
+				return location;
+			}
+			return constant_val;
 		} break;
 		case type_literal:
 		{
@@ -632,8 +671,8 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			for(size_t i = 0; i < list_count; ++i)
 			{
 				llvm::Value *idx_list[2] = {
+					zero,
 					ConstantInt::get(Type::getInt64Ty(*backend.context), i),
-					zero
 				};
 				auto element_ptr = backend.builder->CreateGEP(array_type, 
 						array_loc, idx_list, "array_elem");
@@ -646,8 +685,8 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			{
 
 				llvm::Value *idx_list[2] = {
+					ConstantInt::get(Type::getInt64Ty(*backend.context), 0),
 					ConstantInt::get(Type::getInt64Ty(*backend.context), i),
-					ConstantInt::get(Type::getInt64Ty(*backend.context), 0)
 				};
 				auto element_ptr = backend.builder->CreateGEP(array_type, 
 						array_loc, idx_list, "array_elem");
@@ -685,6 +724,23 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				}
 			}
 			return struct_loc;
+		} break;
+		case type_index:
+		{
+
+			auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
+			llvm::Value *idx = generate_expression(f, node->index.expression, func);
+			llvm::Value *idx_list[] = {
+				zero,
+				idx
+			};
+			auto array_type = apoc_type_to_llvm(node->index.operand_type, backend);
+			auto elem_type = apoc_type_to_llvm(node->index.idx_type, backend);
+			llvm::Value *array = generate_lhs(f, func, node->index.operand, NULL, false, (Type_Info){});
+
+			auto elem_ptr = backend.builder->CreateGEP(array_type, array, idx_list, "elem_ptr");
+			return backend.builder->CreateLoad(elem_type,
+					elem_ptr, "indexed_val");
 		} break;
 		
 		default:
@@ -1009,10 +1065,17 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
 		} break;
 		case type_index:
 		{
+			llvm::Value *zero = ConstantInt::get(Type::getInt64Ty(*backend.context), 0);
 			llvm::Value *idx = generate_expression(f, lhs->index.expression, func);
-			llvm::Value *op = generate_expression(f, lhs->index.operand, func);
-			return backend.builder->CreateGEP(apoc_type_to_llvm(lhs->index.idx_type, backend)
-									   , op, idx, "array_access");
+			llvm::Value *idx_list[2] = {
+				idx,
+				zero
+			};
+			llvm::Value *array = generate_expression(f, lhs->index.operand, func);
+			llvm::Value *location = generate_lhs(f, func, lhs->index.operand, rhs, is_decl, decl_type);
+
+			return backend.builder->CreateGEP(array->getType(),
+									   location, idx_list, "array_elem");
 		} break;
 	}
 	Assert(false);
@@ -1034,7 +1097,7 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 		expression_value = backend.builder->getInt64(0);
 	}
 	// @NOTE: structs and arrays are handled in their initialization
-	if(node->assignment.decl_type.type != T_STRUCT)
+	if(node->assignment.decl_type.type != T_STRUCT && node->assignment.decl_type.type != T_ARRAY)
 	{
 		llvm::Value *variable = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type);
 		if (is_untyped(node->assignment.rhs_type))
@@ -1067,3 +1130,4 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 
 	// @TODO: Implement volatile variable
 }
+

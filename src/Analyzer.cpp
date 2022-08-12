@@ -225,6 +225,13 @@ verify_func(File_Contents *f, Ast_Node *node)
 	size_t arg_count = SDCount(node->function.arguments);
 	b32 has_body = node->left && node->left->type == type_scope_start;
 	
+	if(node->function.type.type == T_ARRAY && !node->function.is_interpret_only)
+	{
+		raise_formated_semantic_error(f, type_error_token,
+				"Function [ %s ] returns an array which is illegal.\n\t"
+				"This function can only be executed at compile time using $run\n\t"
+				"and as such should be marked with $interp", node->function.identifier.name);
+	}
 	if(has_body)
 	{
 		Token_Iden scope_tok = node->left->scope_desc.token;
@@ -337,8 +344,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 		} break;
 		case type_func_call:
 		{
-			// @TODO: implement
-			verify_func_call(f, node, node->func_call.token);
+			verify_func_call(f, node, node->func_call.token, node);
 		} break;
 		case type_scope_end:
 		{
@@ -680,7 +686,7 @@ verify_array_list(File_Contents *f, Ast_Node *node)
 }
 
 Type_Info
-get_atom_expression_type(File_Contents *f, Ast_Node *expression)
+get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previous)
 {
 	switch ((int)expression->type)
 	{
@@ -700,14 +706,15 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression)
 			b32 failed = false;
 
 			// @NOTE: verify expression
-			get_expression_type(f, expression->run.to_run, expression->run.token, NULL);
+			Type_Info result = get_expression_type(f, expression->run.to_run, expression->run.token, expression);
 			expression->run.ran_val = interpret_expression(expression->run.to_run, &failed);
 			if(failed)
 			{
 				raise_semantic_error(f, "Expression cannot be run at compile time",
 						expression->run.token);
 			}
-		}
+			return result;
+		} break;
 		case type_struct_init:
 		{
 			return verify_struct_init(f, expression);
@@ -716,6 +723,7 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression)
 		{
 			Type_Info operand_type = fix_type(f, get_expression_type(f,
 						expression->index.operand, expression->index.token, NULL));
+			expression->index.operand_type = operand_type;
 			if(operand_type.type != T_ARRAY && operand_type.type != T_POINTER)
 			{
 				raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
@@ -739,7 +747,7 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression)
 		} break;
 		case type_func_call:
 		{
-			return verify_func_call(f, expression, expression->func_call.token);
+			return verify_func_call(f, expression, expression->func_call.token, previous);
 		} break;
 		case type_selector:
 		{
@@ -805,7 +813,7 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression)
 }
 
 Type_Info
-get_unary_expression_type(File_Contents *f, Ast_Node *expression)
+get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previous)
 {
 	if(expression->type == type_unary_expr)
 	{
@@ -905,10 +913,10 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression)
 		return cast_type;
 	}
 	else
-		return get_atom_expression_type(f, expression);
+		return get_atom_expression_type(f, expression, previous);
 }
 
-	void
+void
 check_types_error(File_Contents *f, Token_Iden token, Type_Info a, Type_Info b)
 {
 	if(!check_type_compatibility(a, b))
@@ -918,17 +926,17 @@ check_types_error(File_Contents *f, Token_Iden token, Type_Info a, Type_Info b)
 	}
 }
 
-	Type_Info
-get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Type_Info *previous)
+Type_Info
+get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Ast_Node *previous)
 {
 	if(expression == NULL)
 		return (Type_Info){.type = T_INVALID};
 
 	if(expression->type != type_binary_expr)	
-		return fix_type(f, get_unary_expression_type(f, expression));
+		return fix_type(f, get_unary_expression_type(f, expression, previous));
 
-	Type_Info left = get_expression_type(f, expression->left,  expression->binary_expr.token, NULL);
-	Type_Info right = get_expression_type(f, expression->right, expression->binary_expr.token, NULL);
+	Type_Info left = get_expression_type(f, expression->left,  expression->binary_expr.token, expression);
+	Type_Info right = get_expression_type(f, expression->right, expression->binary_expr.token, expression);
 
 	if(type_is_invalid(left) || type_is_invalid(right))
 		raise_semantic_error(f, "invalid type in expression", desc_token);
@@ -961,10 +969,9 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_toke
 	return fix_type(f, left);
 }
 
-	Type_Info
-verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token)
+Type_Info
+verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, Ast_Node *previous)
 {
-
 	// @TODO: function pointers
 	if (func_call->func_call.operand->type != type_identifier)
 	{
@@ -973,6 +980,13 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token)
 	}
 	Symbol *func_sym = get_symbol_spot(f, func_call->func_call.operand->identifier.token);
 
+	if(func_sym->node->function.is_interpret_only && (!previous || previous->type != type_run))
+	{
+		raise_formated_semantic_error(f,
+				expr_token,
+				"You're trying to call fucntion [ %s ] which is marked as interpret only,\n\t"
+				"that function can only be run at compile time using $run", func_sym->node->function.identifier.name);
+	}
 	Ast_Node **func_args = func_sym->node->function.arguments;
 	Ast_Node **passed_expr = func_call->func_call.arguments;
 	size_t expr_count = SDCount(passed_expr);

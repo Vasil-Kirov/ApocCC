@@ -3,6 +3,52 @@
 #include <Analyzer.h>
 
 int
+primitive_size_to_alignment(i64 size)
+{
+	switch(size)
+	{
+		case ubyte1:
+		case byte1: return 1;
+		case ubyte2:
+		case byte2: return 2;
+		case real32:
+		case ubyte4:
+		case byte4: return 4;
+		case real64:
+		case ubyte8:
+		case byte8: return 8;
+		default: Assert(false); return 0;
+	}
+}
+
+int
+get_type_alignment(Type_Info type)
+{
+	switch(type.type)
+	{
+		case T_UNTYPED_FLOAT:
+		case T_UNTYPED_INTEGER:
+		type.primitive.size = byte8;
+		case T_FLOAT:
+		case T_INTEGER:
+		{
+			return primitive_size_to_alignment(type.primitive.size);
+		} break;
+		case T_POINTER:
+		return sizeof(size_t);
+		case T_STRUCT:
+		case T_ARRAY:
+		return sizeof(size_t) * 2;
+		default:
+		{
+			LG_DEBUG("not implemented type alignment");
+			Assert(false);
+			return 0;
+		} break;
+	}
+}
+
+int
 get_type_size(Type_Info type)
 {
 	if(is_integer(type))

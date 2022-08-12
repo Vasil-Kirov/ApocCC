@@ -1,40 +1,26 @@
 
 func _apoc_init() -> i32 { -> main(); }
 
-func foo() -> [256]u8 {
-	my_arr :[256]u8 = {0};
+func $interp foo() -> [256]i16 {
+	my_arr :[256]i16 = {0};
+	for i := 0; i < 10; ++i {
+		my_arr[i] = #i16 i;
+	}
 	-> my_arr;
 }
 
 func main() -> i32
 {
-//	time := SYSTEMTIME{};
-	//GetSystemTime(@time);
-	//srand(#i32 time.wMilliseconds);
-	//rand_num := rand() % 100;
-	//chosen_num: i32;
-	//printf("Pick a number: \n");
-	//scanf("%d", @chosen_num);
-	//guess_counter := 0;
+	array : = $run foo();
+	//array :[6]i32 = {1, 2, 3, 4, 5, 6};
 
-
-	array := $run foo();
-	array_count:[1024 * 3]u8 = {10, 23, 45};
-
-	//for ; rand_num != chosen_num ; {
-	//	printf("Pick a number: ");
-	//	scanf("%d", @chosen_num);
-	//	if chosen_num < rand_num {
-	//		printf(" Higher ");
-	//	}
-	//	if chosen_num > rand_num {
-	//		printf(" Lower ");
-	//	}
-	//	guess_counter += 1;
-	//}
-	//printf("You guessed it right, it was %d. It took you %d guesses", rand_num, guess_counter);
+	printf("number %d\n", #i32 array[0]);
+	printf("number %d\n", #i32 array[1]);
+	printf("number %d\n", #i32 array[2]);
+	printf("number %d\n", #i32 array[3]);
+	printf("number %d\n", #i32 array[4]);
 	
-	-> 0;
+	-> #i32 array[3];
 }
 
 
