@@ -144,19 +144,32 @@ int main(int argc, char *argv[])
 	TIME_FUNC(timers, analyze(f, f->ast_root), analysis_clock, analysis);
 
 	f->build_commands.optimization = OPT_NONE;
+	f->build_commands.target = TG_WASM;
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root), codegen_clock, codegen);
 	
 	// @TODO: Linux linker
 	// @TODO: arguments
-	std::string linker_command = std::string("LINK /nologo");
-	linker_command += " ";
-	linker_command += f->obj_name;
-	linker_command += " kernel32.lib user32.lib legacy_stdio_definitions.lib UCRT.LIB " 
-		"vcruntime.lib /entry:_apoc_init /INCREMENTAL:NO";
-	
-	TIME_FUNC(timers, platform_call_and_wait(linker_command.c_str()),
-			  linking_clock, linking);
-	
+	if(f->build_commands.target == TG_X64)
+	{
+		std::string linker_command = std::string("LINK /nologo");
+		linker_command += " ";
+		linker_command += f->obj_name;
+		linker_command += " kernel32.lib user32.lib legacy_stdio_definitions.lib UCRT.LIB " 
+			"vcruntime.lib /entry:_apoc_init /INCREMENTAL:NO";
+
+		TIME_FUNC(timers, platform_call_and_wait(linker_command.c_str()),
+				linking_clock, linking);
+	}
+	else if(f->build_commands.target == TG_WASM)
+	{
+		std::string linker_command = std::string("wasm-ld --no-entry");
+		linker_command += " ";
+		linker_command += f->obj_name;
+		linker_command += " -o binary.wasm";
+		linker_command += " --import-memory";
+		TIME_FUNC(timers, platform_call_and_wait(linker_command.c_str()),
+				linking_clock, linking);
+	}
 	timers.diff_track = std::chrono::high_resolution_clock::now() - timers.total_clock; \
 	timers.total += timers.diff_track.count();
 		

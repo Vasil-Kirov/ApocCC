@@ -1,146 +1,123 @@
 	.text
-	.def	@feat.00;
-	.scl	3;
-	.type	0;
-	.endef
-	.globl	@feat.00
-.set @feat.00, 0
 	.file	"Test.apoc"
-	.def	_apoc_init;
-	.scl	2;
-	.type	32;
-	.endef
+	.globaltype	__stack_pointer, i32
+	.functype	add (i32, i32) -> (i32)
+	.export_name	add, add
+	.functype	_apoc_init () -> (i32)
+	.export_name	_apoc_init, _apoc_init
+	.functype	foo (i32) -> ()
+	.functype	__original_main () -> (i32)
+	.export_name	__original_main, main
+	.functype	get_num () -> ()
+	.export_name	get_num, get_num
+	.functype	main (i32, i32) -> (i32)
+	.section	.text.add,"",@
+	.globl	add
+	.type	add,@function
+add:
+	.functype	add (i32, i32) -> (i32)
+	.local  	i32, i32, i32, i32, i32, i32
+	global.get	__stack_pointer
+	local.set	2
+	i32.const	16
+	local.set	3
+	local.get	2
+	local.get	3
+	i32.sub 
+	local.set	4
+	local.get	4
+	local.get	0
+	i32.store	8
+	local.get	4
+	local.get	1
+	i32.store	12
+	local.get	4
+	i32.load	8
+	local.set	5
+	local.get	4
+	i32.load	12
+	local.set	6
+	local.get	5
+	local.get	6
+	i32.add 
+	local.set	7
+	local.get	7
+	return
+	end_function
+.Lfunc_end0:
+	.size	add, .Lfunc_end0-add
+
+	.section	.text._apoc_init,"",@
 	.globl	_apoc_init
-	.p2align	4, 0x90
+	.type	_apoc_init,@function
 _apoc_init:
-.seh_proc _apoc_init
-	subq	$40, %rsp
-	.seh_stackalloc 40
-	.seh_endprologue
-	callq	main
-	nop
-	addq	$40, %rsp
-	retq
-	.seh_endproc
+	.functype	_apoc_init () -> (i32)
+	.local  	i32
+	call	__original_main
+	local.set	0
+	local.get	0
+	return
+	end_function
+.Lfunc_end1:
+	.size	_apoc_init, .Lfunc_end1-_apoc_init
 
-	.def	main;
-	.scl	2;
-	.type	32;
-	.endef
+	.section	.text.__original_main,"",@
+	.globl	__original_main
+	.type	__original_main,@function
+__original_main:
+	.functype	__original_main () -> (i32)
+	.local  	i32
+	i32.const	0
+	local.set	0
+	local.get	0
+	return
+	end_function
+.Lfunc_end2:
+	.size	__original_main, .Lfunc_end2-__original_main
+
+	.section	.text.get_num,"",@
+	.globl	get_num
+	.type	get_num,@function
+get_num:
+	.functype	get_num () -> ()
+	.local  	i32, i32, i32, i64
+	global.get	__stack_pointer
+	local.set	0
+	i32.const	16
+	local.set	1
+	local.get	0
+	local.get	1
+	i32.sub 
+	local.set	2
+	i64.const	0
+	local.set	3
+	local.get	2
+	local.get	3
+	i64.store	8:p2align=2
+	return
+	end_function
+.Lfunc_end3:
+	.size	get_num, .Lfunc_end3-get_num
+
+	.section	.text.main,"",@
 	.globl	main
-	.p2align	4, 0x90
+	.type	main,@function
 main:
-.seh_proc main
-	subq	$296, %rsp
-	.seh_stackalloc 296
-	.seh_endprologue
-	leaq	32(%rsp), %rcx
-	leaq	.Lconstant_array(%rip), %rdx
-	movl	$256, %r8d
-	callq	memcpy
-	leaq	32(%rsp), %rdx
-	leaq	.L__unnamed_1(%rip), %rcx
-	callq	printf
-	xorl	%eax, %eax
-	addq	$296, %rsp
-	retq
-	.seh_endproc
+	.functype	main (i32, i32) -> (i32)
+	.local  	i32
+	call	__original_main
+	local.set	2
+	local.get	2
+	return
+	end_function
+.Lfunc_end4:
+	.size	main, .Lfunc_end4-main
 
-	.def	change_arr;
-	.scl	2;
-	.type	32;
-	.endef
-	.globl	change_arr
-	.p2align	4, 0x90
-change_arr:
-.seh_proc change_arr
-	subq	$72, %rsp
-	.seh_stackalloc 72
-	.seh_endprologue
-	movq	%rcx, 40(%rsp)
-	movl	$16, %ecx
-	callq	mem_alloc
-	movq	%rax, 48(%rsp)
-	movq	$0, 56(%rsp)
-	cmpq	$2, 56(%rsp)
-	jl	.LBB2_6
-	jmp	.LBB2_2
-.LBB2_1:
-	movq	64(%rsp), %rax
-	addq	$1, %rax
-	movq	%rax, 64(%rsp)
-	cmpq	$2, 64(%rsp)
-	jl	.LBB2_6
-.LBB2_2:
-	movq	$0, 64(%rsp)
-	cmpq	$2, 64(%rsp)
-	jl	.LBB2_5
-	jmp	.LBB2_4
-.LBB2_3:
-	movq	64(%rsp), %rax
-	addq	$1, %rax
-	movq	%rax, 64(%rsp)
-	cmpq	$2, 64(%rsp)
-	jl	.LBB2_5
-.LBB2_4:
-	addq	$72, %rsp
-	retq
-.LBB2_5:
-	movq	40(%rsp), %rax
-	movw	6(%rax), %cx
-	movq	64(%rsp), %rdx
-	movq	48(%rsp), %rax
-	movw	(%rax,%rdx,2), %ax
-	movq	64(%rsp), %rdx
-	addw	%dx, %ax
-	addw	%ax, %cx
-	movq	40(%rsp), %rax
-	movw	%cx, 6(%rax)
-	jmp	.LBB2_3
-.LBB2_6:
-	movq	64(%rsp), %rax
-	imulq	64(%rsp), %rax
-	movw	%ax, %dx
-	movq	64(%rsp), %rcx
-	movq	48(%rsp), %rax
-	movw	%dx, (%rax,%rcx,2)
-	jmp	.LBB2_1
-	.seh_endproc
-
-	.def	mem_alloc;
-	.scl	2;
-	.type	32;
-	.endef
-	.globl	mem_alloc
-	.p2align	4, 0x90
-mem_alloc:
-.seh_proc mem_alloc
-	subq	$56, %rsp
-	.seh_stackalloc 56
-	.seh_endprologue
-	movq	%rcx, 40(%rsp)
-	movq	40(%rsp), %rcx
-	callq	malloc
-	movq	%rax, 48(%rsp)
-	movq	48(%rsp), %rcx
-	movq	40(%rsp), %r8
-	xorl	%edx, %edx
-	callq	memset
-	movq	48(%rsp), %rax
-	addq	$56, %rsp
-	retq
-	.seh_endproc
-
-	.section	.rdata,"dr"
+	.type	global_var,@object
+	.section	.rodata.global_var,"",@
 	.globl	global_var
 	.p2align	3
 global_var:
-	.quad	12
-
-	.p2align	4
-.Lconstant_array:
-	.asciz	"ABCDEFGHIJKLMNOPQRSTUVWXYZ\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
-
-.L__unnamed_1:
-	.asciz	"%s"
+	.int64	12
+	.size	global_var, 8
 

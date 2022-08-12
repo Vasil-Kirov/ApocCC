@@ -1,6 +1,10 @@
 
 SOME_NUM :: 10 + 2;
 
+func add(a: i32, b: i32) -> i32 {
+	-> a + b;
+}
+
 func _apoc_init() -> i32 { -> main(); }
 
 func $interp foo() -> [256]u8 {
@@ -13,9 +17,7 @@ func $interp foo() -> [256]u8 {
 
 func main() -> i32
 {
-	array :[256]u8 = $run foo();
-	printf("%s", #*u8 array);
-	
+	//array :[256]u8 = $run foo();
 
 	-> 0;
 }

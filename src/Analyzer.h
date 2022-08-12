@@ -47,17 +47,25 @@ typedef struct
 	Symbol *symbol_table;
 } Scope_Info;
 
-enum Optimization_Level
+typedef enum
 {
 	OPT_NONE,
 	OPT_SOME,
 	OPT_MAX
-};
+} Optimization_Level;
+
+typedef enum
+{
+	TG_X64,
+	TG_X32,
+	TG_WASM,
+} Target_Arch;
 
 typedef struct
 {
 	b32 debug_info;
 	Optimization_Level optimization;
+	Target_Arch target;
 } Build_Commands;
 
 typedef struct _File_Contents

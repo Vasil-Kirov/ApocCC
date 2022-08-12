@@ -1,3 +1,4 @@
+#include "llvm-c/Target.h"
 #include "llvm-c/TargetMachine.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/DataLayout.h"
@@ -103,11 +104,13 @@ generate_obj(File_Contents *f)
 
 	INITIALIZE_TARGET(AArch64);
 	INITIALIZE_TARGET(X86);
+	INITIALIZE_TARGET(WebAssembly);
 
 	auto target_triple = sys::getDefaultTargetTriple();
 	backend.module->setTargetTriple(target_triple);
 
-	const char *c_str_triplet = target_triple.c_str();
+	//const char *c_str_triplet = target_triple.c_str();
+	const char *c_str_triplet = "wasm32";
 
 	char *error = NULL;
 	LLVMTargetRef c_target = NULL;
@@ -126,7 +129,10 @@ generate_obj(File_Contents *f)
 		case OPT_SOME: opt = LLVMCodeGenLevelDefault; break;
 		case OPT_MAX:  opt = LLVMCodeGenLevelAggressive; break;
 	}
-	LLVMTargetMachineRef machine = LLVMCreateTargetMachine(c_target, c_str_triplet, cpu, LLVMGetHostCPUFeatures(),
+	auto features = LLVMGetHostCPUFeatures();
+	// @NOTE: for wasm
+	features = (char *)"";
+	LLVMTargetMachineRef machine = LLVMCreateTargetMachine(c_target, c_str_triplet, cpu, features,
 		opt, LLVMRelocDefault, LLVMCodeModelDefault);
 	
 	LLVMModuleRef file_mod = llvm::wrap(backend.module);
@@ -511,6 +517,9 @@ void
 generate_func(File_Contents *f, Ast_Node *node)
 {
 	Function *func = generate_func_signature(f, node);
+
+	if(f->build_commands.target == TG_WASM)
+		func->addFnAttr( llvm::Attribute::get(*backend.context, "wasm-export-name", func->getName()) );
 
 	// @TODO: put source info in the function
 	DEBUG_INFO(
