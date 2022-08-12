@@ -1,6 +1,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include <LLVM_Backend.h>
 #include <LLVM_Helpers.h>
@@ -396,6 +397,11 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 		if(is_integer(from))
 			return Instruction::CastOps::IntToPtr;
 		else if(from.type == T_POINTER)
+		{
+			*should_cast = false;
+			return Instruction::CastOps::CastOpsEnd;
+		}
+		else if(from.type == T_ARRAY)
 		{
 			*should_cast = false;
 			return Instruction::CastOps::CastOpsEnd;

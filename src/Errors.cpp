@@ -25,11 +25,13 @@ u8 *get_error_segment(Token_Iden error_token)
 	u8 *start = scanner;
 	i32 counter = 0;
 	i32 last_line_columns = 0;
+	u8 *str = SDCreate(u8);
 	char *white_space = SDCreate(char);
 	char tab = '\t';
 	char space = ' ';
 	while(true)
 	{
+		SDPush(str, *scanner);
 		if (*scanner == 0)
 		{
 			scanner--;
@@ -49,7 +51,22 @@ u8 *get_error_segment(Token_Iden error_token)
 			last_line_columns++;
 		}
 		if(*scanner == '\n')
+		{
+			if(counter == 0)
+			{
+				int i = SDCount(str);
+				char space = ' ';
+				u8 *to_put = scanner + 1;
+				if(*to_put == '\t')
+				{
+					for(int i = 0; i < 4; ++i)
+						SDPush(str, space);
+				}
+				else SDPush(str, space);
+				str[i] = '>';
+			}
 			counter++;
+		}
 
 		if(counter == 3)
 			break;
@@ -60,7 +77,7 @@ u8 *get_error_segment(Token_Iden error_token)
 	
 	// @NOTE: + 10 for safety
 	u8 *result = (u8 *)AllocateCompileMemory(len + last_line_columns + 10);
-	memcpy(result, start, len);
+	memcpy(result, str, len);
 	*(result + len) = '\n';
 	scanner = result + len + 1;
 	i32 tick_counter = 0;

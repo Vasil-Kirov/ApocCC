@@ -774,6 +774,14 @@ interpret_binary(Ast_Node *node, b32 *failed)
 			{
 				DO_OP(result, >, left, right);
 			} break;
+			case tok_logical_lequal:
+			{
+				DO_OP(result, <=, left, right);
+			} break;
+			case tok_logical_gequal:
+			{
+				DO_OP(result, >=, left, right);
+			} break;
 			case tok_bits_and:
 			{
 				result.type.type = T_UNTYPED_INTEGER;

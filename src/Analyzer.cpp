@@ -202,7 +202,7 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 		} break;
 		case type_assignment:
 		{
-			verify_assignment(f, node);
+			verify_assignment(f, node, true);
 			analyze_file_level_statement(f, node->left);
 		} break;
 		default:
@@ -301,13 +301,19 @@ void
 verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_node)
 {
 	if(node == NULL) return;
+	Ast_Node *to_switch = NULL;
 	switch(node->type)
 	{
 		case type_for:
 		{
+			Token_Iden scope_tok = node->for_loop.token;
+			Scope_Info new_scope = {};
+			new_scope.file = scope_tok.file;
+			new_scope.start_line = scope_tok.line;
+			push_scope(f, new_scope);
 			if(node->for_loop.expr1)
 			{
-				verify_assignment(f, node->for_loop.expr1);
+				verify_assignment(f, node->for_loop.expr1, false);
 			}
 			if(node->for_loop.expr3)
 			{
@@ -318,6 +324,8 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 			{
 				raise_formated_semantic_error(f, node->for_loop.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(expression));
 			}
+			verify_func_level_statement(f, node->left->right, func_node);
+			to_switch = node->left->left;
 		} break;
 		case type_var:
 		{
@@ -340,7 +348,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 		} break;
 		case type_assignment:
 		{
-			verify_assignment(f, node);
+			verify_assignment(f, node, false);
 		} break;
 		case type_func_call:
 		{
@@ -416,7 +424,10 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 					type_to_str(node->type), node->type);
 		}
 	}
-	verify_func_level_statement(f, node->left, func_node);
+	if(!to_switch)
+		verify_func_level_statement(f, node->left, func_node);
+	else 
+		verify_func_level_statement(f, to_switch, func_node);
 }
 
 Ast_Node *
@@ -474,7 +485,7 @@ get_assign_type_expression(File_Contents *f, Ast_Node *node)
 }
 
 void
-verify_assignment(File_Contents *f, Ast_Node *node)
+verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 {
 	if(node->type != type_assignment)
 	{
@@ -528,6 +539,11 @@ verify_assignment(File_Contents *f, Ast_Node *node)
 		}
 		node->assignment.rhs_type = expression_type;
 	}
+	// @TODO: remove "is_const" from the Type_Info struct and use a better way
+	// to find if a lhs expression is constant
+	if(node->assignment.decl_type.is_const && !node->assignment.is_declaration)
+		raise_semantic_error(f, "Trying to assign to a constant variable",
+				node->assignment.token);
 	if(node->assignment.is_declaration)
 	{
 		Symbol this_sym = {};
@@ -535,8 +551,14 @@ verify_assignment(File_Contents *f, Ast_Node *node)
 		this_sym.node = node;
 		this_sym.identifier = node->assignment.token.identifier;
 		this_sym.type = node->assignment.decl_type;
-		this_sym.tag = S_VARIABLE;
+		this_sym.type.is_const = node->assignment.is_const;
+		if(is_global)
+			this_sym.tag = S_GLOBAL_VAR;
+		else
+			this_sym.tag = S_VARIABLE;
 		add_symbol(f, this_sym);
+	
+
 
 		if(node->assignment.decl_type.type == T_ARRAY)
 		{
@@ -1171,6 +1193,10 @@ get_symbol_spot(File_Contents *f, Token_Iden token)
 				if(vstd_strcmp((char *)(scope.symbol_table[j].identifier), (char *)identifier))
 				{
 					result = &scope.symbol_table[j];
+					if(result->tag != S_FUNCTION && result->tag != S_GLOBAL_VAR)
+					{
+						result = NULL;
+					}
 					goto EXIT_FUNC_SEARCH;
 				}
 			}	

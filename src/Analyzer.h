@@ -16,6 +16,7 @@ typedef enum
 {
 	S_NONE,
 	S_FUNCTION,
+	S_GLOBAL_VAR,
 	S_VARIABLE,
 	S_STRUCT_MEMBER,
 	S_FUNC_ARG
@@ -132,7 +133,7 @@ b32
 check_type_compatibility(Type_Info a, Type_Info b);
 
 void
-verify_assignment(File_Contents *f, Ast_Node *node);
+verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global);
 
 Type_Info
 get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Ast_Node *previous);

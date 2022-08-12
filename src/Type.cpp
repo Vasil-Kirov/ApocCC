@@ -118,6 +118,8 @@ is_castable(Type_Info type, Type_Info cast)
 			return true;
 		return false;
 	}
+	if(type.type == T_ARRAY && cast.type == T_POINTER)
+		return is_castable(*type.array.type, *cast.pointer.type);
 	if(is_integer(type) || is_float(type))
 	{
 		if(cast.type == T_POINTER && is_integer(type))
@@ -134,7 +136,7 @@ is_castable(Type_Info type, Type_Info cast)
 	}
 	if(type.type == T_POINTER)
 	{
-		if(cast.type != T_POINTER)
+		if(!is_integer(cast) && cast.type != T_POINTER)
 			return false;
 		return true;
 	}

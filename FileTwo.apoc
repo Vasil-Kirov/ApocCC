@@ -10,6 +10,16 @@ func rand() -> i32;
 func GetSystemTime(time:* SYSTEMTIME) ->;
 
 
+func change_arr(arr:* i16) ->
+{
+	some_ptr := #*i16 mem_alloc(16);
+	for i := 0; i < 2; ++i {
+		some_ptr[i] = #i16 (i * i);
+	}
+	for i := 0; i < 2; ++i {
+		arr[3] += some_ptr[i] + #i16 i;
+	}
+}
 
 func mem_alloc(size: u64) ->* void
 {

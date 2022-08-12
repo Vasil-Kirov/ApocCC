@@ -31,31 +31,80 @@ _apoc_init:
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	subq	$552, %rsp
-	.seh_stackalloc 552
+	subq	$296, %rsp
+	.seh_stackalloc 296
 	.seh_endprologue
 	leaq	32(%rsp), %rcx
 	leaq	.Lconstant_array(%rip), %rdx
-	movl	$512, %r8d
+	movl	$256, %r8d
 	callq	memcpy
-	movzwl	32(%rsp), %edx
+	leaq	32(%rsp), %rdx
 	leaq	.L__unnamed_1(%rip), %rcx
 	callq	printf
-	movzwl	34(%rsp), %edx
-	leaq	.L__unnamed_2(%rip), %rcx
-	callq	printf
-	movzwl	36(%rsp), %edx
-	leaq	.L__unnamed_3(%rip), %rcx
-	callq	printf
-	movzwl	38(%rsp), %edx
-	leaq	.L__unnamed_4(%rip), %rcx
-	callq	printf
-	movzwl	40(%rsp), %edx
-	leaq	.L__unnamed_5(%rip), %rcx
-	callq	printf
-	movzwl	38(%rsp), %eax
-	addq	$552, %rsp
+	xorl	%eax, %eax
+	addq	$296, %rsp
 	retq
+	.seh_endproc
+
+	.def	change_arr;
+	.scl	2;
+	.type	32;
+	.endef
+	.globl	change_arr
+	.p2align	4, 0x90
+change_arr:
+.seh_proc change_arr
+	subq	$72, %rsp
+	.seh_stackalloc 72
+	.seh_endprologue
+	movq	%rcx, 40(%rsp)
+	movl	$16, %ecx
+	callq	mem_alloc
+	movq	%rax, 48(%rsp)
+	movq	$0, 56(%rsp)
+	cmpq	$2, 56(%rsp)
+	jl	.LBB2_6
+	jmp	.LBB2_2
+.LBB2_1:
+	movq	64(%rsp), %rax
+	addq	$1, %rax
+	movq	%rax, 64(%rsp)
+	cmpq	$2, 64(%rsp)
+	jl	.LBB2_6
+.LBB2_2:
+	movq	$0, 64(%rsp)
+	cmpq	$2, 64(%rsp)
+	jl	.LBB2_5
+	jmp	.LBB2_4
+.LBB2_3:
+	movq	64(%rsp), %rax
+	addq	$1, %rax
+	movq	%rax, 64(%rsp)
+	cmpq	$2, 64(%rsp)
+	jl	.LBB2_5
+.LBB2_4:
+	addq	$72, %rsp
+	retq
+.LBB2_5:
+	movq	40(%rsp), %rax
+	movw	6(%rax), %cx
+	movq	64(%rsp), %rdx
+	movq	48(%rsp), %rax
+	movw	(%rax,%rdx,2), %ax
+	movq	64(%rsp), %rdx
+	addw	%dx, %ax
+	addw	%ax, %cx
+	movq	40(%rsp), %rax
+	movw	%cx, 6(%rax)
+	jmp	.LBB2_3
+.LBB2_6:
+	movq	64(%rsp), %rax
+	imulq	64(%rsp), %rax
+	movw	%ax, %dx
+	movq	64(%rsp), %rcx
+	movq	48(%rsp), %rax
+	movw	%dx, (%rax,%rcx,2)
+	jmp	.LBB2_1
 	.seh_endproc
 
 	.def	mem_alloc;
@@ -83,277 +132,15 @@ mem_alloc:
 	.seh_endproc
 
 	.section	.rdata,"dr"
+	.globl	global_var
+	.p2align	3
+global_var:
+	.quad	12
+
 	.p2align	4
 .Lconstant_array:
-	.short	0
-	.short	1
-	.short	2
-	.short	3
-	.short	4
-	.short	5
-	.short	6
-	.short	7
-	.short	8
-	.short	9
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
-	.short	0
+	.asciz	"ABCDEFGHIJKLMNOPQRSTUVWXYZ\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
 
 .L__unnamed_1:
-	.asciz	"number %d\n"
-
-.L__unnamed_2:
-	.asciz	"number %d\n"
-
-.L__unnamed_3:
-	.asciz	"number %d\n"
-
-.L__unnamed_4:
-	.asciz	"number %d\n"
-
-.L__unnamed_5:
-	.asciz	"number %d\n"
+	.asciz	"%s"
 

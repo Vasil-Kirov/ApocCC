@@ -346,7 +346,7 @@ parse_identifier_statement(File_Contents *f, Token ends_with)
 		{
 			advance_token(f);
 			Type_Info assign_type = {};
-			if (f->curr_token->type == tok_equals)
+			if (f->curr_token->type == tok_equals || is_const)
 				assign_type.type = T_DETECT;	
 			else
 				assign_type = parse_type(f);
@@ -355,7 +355,8 @@ parse_identifier_statement(File_Contents *f, Token ends_with)
 				advance_token(f);
 				return ast_assignment_from_decl(lhs, NULL, assign_type, identifier_token, is_const);
 			}
-			parser_eat(f, (Token)'=');
+			if(!is_const)
+				parser_eat(f, (Token)'=');
 			Ast_Node *rhs = parse_expression(f, ends_with, false);
 			return ast_assignment_from_decl(lhs, rhs, assign_type, identifier_token, is_const);
 		} break;
@@ -972,7 +973,9 @@ parse_type(File_Contents *f)
 	}
 	else
 	{
-		result = (Type_Info){.type = T_INVALID};
+		advance_token(f);
+		raise_parsing_unexpected_token("type", f);
+		//result = (Type_Info){.type = T_INVALID};
 	}
 	result.token = pointer_or_type;
 	return result;

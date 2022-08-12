@@ -82,6 +82,7 @@ typedef struct _Type_Info
 		Ast_Node *func;
 	};
 	u8 *identifier;
+	b32 is_const;
 } Type_Info;
 
 int

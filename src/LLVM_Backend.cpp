@@ -476,6 +476,37 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 	return body_block;
 }
 
+llvm::Value *
+generate_index(File_Contents *f, Ast_Node *node, Function *func, llvm::Value *rhs, b32 is_decl, Type_Info decl_type)
+{
+	auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
+	llvm::Value *idx = generate_expression(f, node->index.expression, func);
+	llvm::Value *array = NULL;
+	auto array_type = apoc_type_to_llvm(node->index.operand_type, backend);
+	if(node->index.operand_type.type == T_ARRAY)
+	{
+		llvm::Value *idx_list[] = {
+			zero,
+			idx
+		};
+		array = generate_lhs(f, func, node->index.operand, rhs, is_decl, decl_type); 
+		return backend.builder->CreateGEP(array_type, array, idx_list, "elem_ptr");
+	}
+	else if(node->index.operand_type.type == T_POINTER)
+	{
+		llvm::Value *idx_list[] = {
+			idx
+		};
+		auto elem_ptr = apoc_type_to_llvm(*node->index.operand_type.pointer.type, backend);
+		array = generate_lhs(f, func, node->index.operand, rhs, is_decl, decl_type); 
+		array = backend.builder->CreateLoad(array_type, array, "ptr_load");
+		return backend.builder->CreateGEP(elem_ptr, array, idx_list, "elem_ptr");
+	}
+	else
+		Assert(false);
+	return NULL;
+}
+
 void
 generate_func(File_Contents *f, Ast_Node *node)
 {
@@ -529,13 +560,14 @@ generate_func(File_Contents *f, Ast_Node *node)
 }
 
 llvm::Value *
-get_identifier(u8 *name)
+get_identifier(u8 *name, b32 *is_const_global)
 {
 	std::string identifier_name = std::string((char *)name);
 	AllocaInst *var_location = backend.named_values[identifier_name];
 	if(var_location == NULL)
 	{
 		auto global_var = backend.named_globals[identifier_name];
+		*is_const_global = global_var->isConstant();
 		return global_var;
 	}
 	return var_location;
@@ -548,11 +580,18 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 	{
 		case type_identifier:
 		{
+			b32 is_const_global = false;
 			llvm::AllocaInst *value =
-			(llvm::AllocaInst *)get_identifier(node->identifier.name);
-			
-			return backend.builder->CreateLoad(value->getAllocatedType(),
-											value);
+			(llvm::AllocaInst *)get_identifier(node->identifier.name, &is_const_global);
+			auto allocated_type = value->getAllocatedType();
+			if(is_const_global)
+			{
+				auto const_global = (GlobalVariable *)value;
+				return const_global->getInitializer();
+			}
+			else
+				return backend.builder->CreateLoad(
+						allocated_type, value);
 		} break;
 		case type_run:
 		{
@@ -727,18 +766,8 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_index:
 		{
-
-			auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
-			llvm::Value *idx = generate_expression(f, node->index.expression, func);
-			llvm::Value *idx_list[] = {
-				zero,
-				idx
-			};
-			auto array_type = apoc_type_to_llvm(node->index.operand_type, backend);
 			auto elem_type = apoc_type_to_llvm(node->index.idx_type, backend);
-			llvm::Value *array = generate_lhs(f, func, node->index.operand, NULL, false, (Type_Info){});
-
-			auto elem_ptr = backend.builder->CreateGEP(array_type, array, idx_list, "elem_ptr");
+			auto elem_ptr = generate_index(f, node, func, NULL, false, (Type_Info){});
 			return backend.builder->CreateLoad(elem_type,
 					elem_ptr, "indexed_val");
 		} break;
@@ -763,9 +792,11 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 		{
 			case '@':
 			{
+				b32 is_const_global = false;
 				Assert(node->unary_expr.expression->type == type_identifier);
 				llvm::Value *address =
-					get_identifier(node->unary_expr.expression->identifier.name);
+					get_identifier(node->unary_expr.expression->identifier.name,
+							&is_const_global);
 				return address;
 			} break;
 			case '*':
@@ -823,10 +854,23 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 	{
 		Type_Info cast_type = node->cast.type;
 		Type_Info casted = node->cast.expr_type;
-		llvm::Value *cast_expr = generate_expression(f, node->cast.expression, func);
+		if(node->cast.expr_type.type == T_ARRAY && node->cast.type.type == T_POINTER)
+		{
+			auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
+			llvm::Value *idx_list[] = {
+				zero,
+			};
+			auto ptr_type = apoc_type_to_llvm(node->cast.expr_type, backend);
+			auto ptr = generate_lhs(f, func, node->cast.expression, NULL, false, (Type_Info){}); 
+			return backend.builder->CreateGEP(ptr_type, ptr, idx_list, "elem_ptr");
+		}
+		else
+		{
+			llvm::Value *cast_expr = generate_expression(f, node->cast.expression, func);
 
-		cast_expr = create_cast(cast_type, casted, cast_expr);
-		return cast_expr;
+			cast_expr = create_cast(cast_type, casted, cast_expr);
+			return cast_expr;
+		}
 	}
 	else return generate_operand(f, node, func);
 }
@@ -1059,23 +1103,14 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
 			}
 			else
 			{
-				result = get_identifier(lhs->identifier.name);
+				b32 is_const_global = false;
+				result = get_identifier(lhs->identifier.name, &is_const_global);
 			}
 			return result;
 		} break;
 		case type_index:
 		{
-			llvm::Value *zero = ConstantInt::get(Type::getInt64Ty(*backend.context), 0);
-			llvm::Value *idx = generate_expression(f, lhs->index.expression, func);
-			llvm::Value *idx_list[2] = {
-				idx,
-				zero
-			};
-			llvm::Value *array = generate_expression(f, lhs->index.operand, func);
-			llvm::Value *location = generate_lhs(f, func, lhs->index.operand, rhs, is_decl, decl_type);
-
-			return backend.builder->CreateGEP(array->getType(),
-									   location, idx_list, "array_elem");
+			return generate_index(f, lhs, func, rhs, is_decl, decl_type);
 		} break;
 	}
 	Assert(false);
