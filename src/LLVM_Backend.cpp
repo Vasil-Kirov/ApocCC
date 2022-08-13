@@ -107,10 +107,21 @@ generate_obj(File_Contents *f)
 	INITIALIZE_TARGET(WebAssembly);
 
 	auto target_triple = sys::getDefaultTargetTriple();
-	backend.module->setTargetTriple(target_triple);
+	const char *c_str_triplet;
 
-	//const char *c_str_triplet = target_triple.c_str();
-	const char *c_str_triplet = "wasm32";
+	const char *features;
+	if(f->build_commands.target == TG_X64)
+	{
+		backend.module->setTargetTriple(target_triple);
+		c_str_triplet = target_triple.c_str();
+		features = LLVMGetHostCPUFeatures();
+	}
+	else if(f->build_commands.target == TG_WASM)
+	{
+		backend.module->setTargetTriple(std::string("wasm32"));
+		c_str_triplet = "wasm32";
+		features = (char *)"";
+	}
 
 	char *error = NULL;
 	LLVMTargetRef c_target = NULL;
@@ -129,9 +140,6 @@ generate_obj(File_Contents *f)
 		case OPT_SOME: opt = LLVMCodeGenLevelDefault; break;
 		case OPT_MAX:  opt = LLVMCodeGenLevelAggressive; break;
 	}
-	auto features = LLVMGetHostCPUFeatures();
-	// @NOTE: for wasm
-	features = (char *)"";
 	LLVMTargetMachineRef machine = LLVMCreateTargetMachine(c_target, c_str_triplet, cpu, features,
 		opt, LLVMRelocDefault, LLVMCodeModelDefault);
 	

@@ -34,6 +34,9 @@ typedef double f64;
 #define false 0
 #endif
 
+#define ARR_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
+#define FOR_EACH(arr) for(size_t i = 0; i < ARR_SIZE(arr); ++i)
+
 typedef struct _entire_file
 {
 	void *data;

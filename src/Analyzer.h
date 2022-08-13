@@ -4,6 +4,7 @@
 #include <Basic.h>
 #include <Lexer.h>
 #include <Parser.h>
+#include <string>
 
 
 typedef struct
@@ -49,23 +50,26 @@ typedef struct
 
 typedef enum
 {
-	OPT_NONE,
-	OPT_SOME,
-	OPT_MAX
+	OPT_NONE = 1,
+	OPT_SOME = 2,
+	OPT_MAX  = 3
 } Optimization_Level;
 
 typedef enum
 {
-	TG_X64,
-	TG_X32,
-	TG_WASM,
+	TG_X64  = 1,
+	TG_X32  = 2,
+	TG_WASM = 3,
 } Target_Arch;
 
 typedef struct
 {
-	b32 debug_info;
 	Optimization_Level optimization;
 	Target_Arch target;
+	std::string output_file;
+	std::string linker_command;
+	b32 debug_info;
+	b32 call_linker;
 } Build_Commands;
 
 typedef struct _File_Contents

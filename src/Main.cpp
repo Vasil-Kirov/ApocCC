@@ -12,6 +12,7 @@
 #include <Stack.h>
 #include <Errors.h>
 #include <Interpret.h>
+#include <CommandLine.h>
 
 
 #include <platform/platform.h>
@@ -26,6 +27,7 @@
 #include <Analyzer.cpp>
 #include <Errors.cpp>
 #include <Interpret.cpp>
+#include <CommandLine.cpp>
 
 #include <LLVM_Helpers.h>
 #include <LLVM_Backend.h>
@@ -127,49 +129,51 @@ int main(int argc, char *argv[])
 	{
 		LG_FATAL("apoc [files]");	
 	}
-	
+
+	std::vector<std::string> file_names;
+	Build_Commands build_command = parse_command_line(argc, argv, &file_names);
 	File_Contents **files = SDCreate(File_Contents *);
-	for(size_t i = 1; i < argc; ++i)
+	for(size_t i = 0; i < file_names.size(); ++i)
 	{
 		File_Contents *f = (File_Contents *)AllocatePermanentMemory(sizeof(File_Contents));
 		f->build_commands.debug_info = false;
 		initialize_compiler(f);
 		initialize_analyzer(f);
 		
-		TIME_FUNC(timers, lex_file(f, argv[i]), lex_clock, lexing);
+		TIME_FUNC(timers, lex_file(f, (char *)file_names[i].c_str()), lex_clock, lexing);
 		SDPush(files, f);
 	}
 	TIME_FUNC(timers, File_Contents *f = append_token_streams(files), syncing_clock, syncing);	
 	TIME_FUNC(timers, f->ast_root = parse(f), parse_clock, parsing);
 	TIME_FUNC(timers, analyze(f, f->ast_root), analysis_clock, analysis);
 
-	f->build_commands.optimization = OPT_NONE;
-	f->build_commands.target = TG_WASM;
+	f->build_commands = build_command;
+	f->build_commands.linker_command = build_command.linker_command;
+	f->build_commands.output_file = build_command.output_file;
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root), codegen_clock, codegen);
 	
-	// @TODO: Linux linker
-	// @TODO: arguments
-	if(f->build_commands.target == TG_X64)
-	{
-		std::string linker_command = std::string("LINK /nologo");
-		linker_command += " ";
-		linker_command += f->obj_name;
-		linker_command += " kernel32.lib user32.lib legacy_stdio_definitions.lib UCRT.LIB " 
-			"vcruntime.lib /entry:_apoc_init /INCREMENTAL:NO";
+	f->build_commands.linker_command += " ";
+	f->build_commands.linker_command += f->obj_name;
 
-		TIME_FUNC(timers, platform_call_and_wait(linker_command.c_str()),
-				linking_clock, linking);
-	}
-	else if(f->build_commands.target == TG_WASM)
+	if(f->build_commands.target != TG_WASM)
 	{
-		std::string linker_command = std::string("wasm-ld --no-entry");
-		linker_command += " ";
-		linker_command += f->obj_name;
-		linker_command += " -o binary.wasm";
-		linker_command += " --import-memory";
-		TIME_FUNC(timers, platform_call_and_wait(linker_command.c_str()),
+#if defined(_WIN32)
+	f->build_commands.linker_command += " /OUT:" + f->build_commands.output_file;
+#elif defined (CM_LINUX)
+	f->build_commands.linker_command += " -o" + f->build_commands.output_file;
+#else
+#error Linker for this platform is not defined
+#endif
+	}
+	else
+		f->build_commands.linker_command += " -o" + f->build_commands.output_file;
+
+	if(f->build_commands.call_linker)
+	{
+		TIME_FUNC(timers, platform_call_and_wait(f->build_commands.linker_command.c_str()),
 				linking_clock, linking);
 	}
+
 	timers.diff_track = std::chrono::high_resolution_clock::now() - timers.total_clock; \
 	timers.total += timers.diff_track.count();
 		

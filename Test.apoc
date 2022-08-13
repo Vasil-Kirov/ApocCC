@@ -17,7 +17,10 @@ func $interp foo() -> [256]u8 {
 
 func main() -> i32
 {
-	//array :[256]u8 = $run foo();
+	array :[256]u8 = $run foo();
+	for i := 0; i <= 'Z' - 'A'; ++i {
+		printf("%c", array[i]);
+	}
 
 	-> 0;
 }

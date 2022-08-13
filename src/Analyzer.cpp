@@ -87,7 +87,7 @@ raise_formated_semantic_error(File_Contents *f, Token_Iden token, const char *fo
 	char *error = (char *)AllocateCompileMemory(4096);
 	va_list args;
 	va_start(args, format);
-	vstd_vsnsprintf(error, strlen(format), format, args);
+	vstd_vsnsprintf(error, vstd_strlen((char *)format), format, args);
 	va_end(args);
 	raise_semantic_error(f, error, token);
 }

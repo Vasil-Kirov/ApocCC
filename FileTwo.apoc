@@ -1,6 +1,33 @@
+func malloc(size: u64) ->* void;
+func memset(dst:* void, val: i32, count: u64) ->* void;
+func scanf(format:* u8, ...) -> i32;
+func printf(format:* u8, ...) -> i32;
+//func atoi(num_str:* u8) -> i32;
+func srand(seed: i32) ->;
+func rand() -> i32;
+func GetSystemTime(time:* SYSTEMTIME) ->;
 
 
-func get_num() ->
+func mem_alloc(size: u64) ->* void
 {
-	i := 0;
+	result := malloc(size);
+	memset(result, 0, size);
+	-> result;
 }
+
+
+struct SYSTEMTIME
+{
+	wYear:         u16;
+	wMonth:        u16;
+	wDayOfWeek:    u16;
+	wDay:          u16;
+	wHour:         u16;
+	wMinute:       u16;
+	wSecond:       u16;
+	wMilliseconds: u16;
+}
+
+
+
+
