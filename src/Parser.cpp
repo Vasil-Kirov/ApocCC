@@ -184,6 +184,14 @@ ast_postfix(Token_Iden postfix, Ast_Node *operand)
 	return result;
 }
 
+Ast_Node *
+ast_statements()
+{
+	Ast_Node *result = alloc_node();
+	result->type = type_statements;
+	result->statements.list = SDCreate(Ast_Node *);
+	return result;
+}
 
 Ast_Node *
 node_to_ptr(Ast_Node node)
@@ -204,7 +212,7 @@ parse(File_Contents *f)
 
 	Scope_Info scope_info = {false, (unsigned int)info_tok->line, 0, info_tok->file, NULL};
 	push_scope(f, scope_info);
-	root = parse_file_level_statement(f);
+	root = parse_file_level_statement_list(f);
 	if(!reached_eof)
 	{
 		raise_parsing_unexpected_token("end of file", f);
@@ -221,37 +229,46 @@ parse_file_level_statement(File_Contents *f)
 	Ast_Node *result = alloc_node();
 	switch ((int)f->curr_token->type)
 	{
-	case (Token)'$':
-	{
-	} break;
-	case tok_struct:
-	{
-		result = parse_struct(f);
-		result->left = parse_file_level_statement(f);
-	} break;
-	case tok_func:
-	{
-		result = parse_func(f);
-		if (result == NULL)
+		case tok_struct:
 		{
-			raise_parsing_unexpected_token(expected, f);
-		}
-	} break;
-	case tok_identifier:
+			result = parse_struct(f);
+		} break;
+		case tok_func:
+		{
+			result = parse_func(f);
+			if (result == NULL)
+			{
+				raise_parsing_unexpected_token(expected, f);
+			}
+		} break;
+		case tok_identifier:
+		{
+			result = parse_identifier_statement(f, (Token)';');
+		} break;
+		case tok_eof:
+		{
+			reached_eof = true;
+			return NULL;
+		}break;
+		default:
+		{
+			advance_token(f);
+			raise_parsing_unexpected_token("top level statement", f);
+		} break;
+	}
+	return result;
+}
+
+Ast_Node *
+parse_file_level_statement_list(File_Contents *f)
+{
+	Ast_Node *result = ast_statements();
+	while(true)
 	{
-		result = parse_identifier_statement(f, (Token)';');
-		result->left = parse_file_level_statement(f);
-	} break;
-	case tok_eof:
-	{
-		reached_eof = true;
-		return NULL;
-	}break;
-	default:
-	{
-		advance_token(f);
-		raise_parsing_unexpected_token("top level statement", f);
-	} break;
+		Ast_Node *statement = parse_file_level_statement(f);
+		if(statement == NULL)
+			break;
+		SDPush(result->statements.list, statement);
 	}
 	return result;
 }
@@ -270,11 +287,7 @@ parse_body(File_Contents *f, b32 is_func, Token_Iden opt_tok)
 	}
 	Scope_Info new_scope = {false, (unsigned int)f->curr_token->line, 0, (char *)f->path, NULL};
 	push_scope(f, new_scope);
-	result->right = parse_statement(f);
-	if(is_func)
-		result->left = parse_file_level_statement(f);
-	else
-		result->left = parse_statement(f);
+	result->scope_desc.body = parse_statement_list(f);
 	return result;
 }
 
@@ -385,12 +398,13 @@ parse_for_statement(File_Contents *f)
 	// @TODO: Make optional
 	result->for_loop.expr2 = parse_expression(f, (Token)';', false);
 
+	f->expression_level = -1;
 	if(f->curr_token->type != '{')
-		result->for_loop.expr3 = parse_expression(f, (Token)'{', false);
+		result->for_loop.expr3 = parse_expression(f, (Token)NO_EXPECT, false);
 	else
 		advance_token(f);
 
-	result->left = parse_body(f, false, last_read_token);
+	f->expression_level = 0;
 
 	result->for_loop.token = token;
 	return result;
@@ -403,57 +417,71 @@ parse_statement(File_Contents *f)
 	
 	switch((int)f->curr_token->type)
 	{
-	case '$':
-	{
-		LG_FATAL("$ has not been implemented");
-	}break;
-	case '{':
-	{
-		return parse_body(f, false, invalid_token);
-	} break;
-	case tok_if:
-	{
-		advance_token(f);
-		result->type = type_if;
-		result->condition = parse_expression(f, (Token)'{', false);
-		result->left = parse_body(f, false, last_read_token);
-	} break;
-	case tok_for:
-	{
-		result = parse_for_statement(f);
-	} break;
-	case tok_star:
-	case tok_identifier:
-	{
-		result = parse_identifier_statement(f, (Token)';');
-		result->left = parse_statement(f);
-	} break;
-	case tok_arrow:
-	{
-		advance_token(f);
-		result->type = type_return;
-		result->ret.token = *f->curr_token;
-		result->ret.expression = parse_expression(f, (Token)';', false);
-		result->left = parse_statement(f);
-	} break;
-	case tok_break:
-	{
-		advance_token(f);
-		result->type = type_break;
-		result->left = parse_statement(f);
+		case '{':
+		{
+			return parse_body(f, false, advance_token(f));
+		} break;
+		case tok_if:
+		{
+			result->type = type_if;
+			f->expression_level = -1;
+			result->condition.token = *f->curr_token;
+			result->condition.expr = parse_expression(f, NO_EXPECT, false);
+			f->expression_level = 0;
+			advance_token(f);
+		} break;
+		case tok_else:
+		{
+			
+		} break;
+		case tok_for:
+		{
+			result = parse_for_statement(f);
+		} break;
+		case tok_star:
+		case tok_identifier:
+		{
+			result = parse_identifier_statement(f, (Token)';');
+		} break;
+		case tok_arrow:
+		{
+			advance_token(f);
+			result->type = type_return;
+			result->ret.token = *f->curr_token;
+			result->ret.expression = parse_expression(f, (Token)';', false);
+		} break;
+		case tok_break:
+		{
+			advance_token(f);
+			result->type = type_break;
+		}
+		case '}':
+		{
+			advance_token(f);
+			pop_scope(f, *f->curr_token);
+			result->type = type_scope_end;
+			result->scope_desc.token = *f->curr_token;
+			return result;
+		} break;
+		default:
+		{
+			raise_parsing_unexpected_token("[ '}' ]", f);
+		}
 	}
-	case '}':
+	return result;
+}
+
+Ast_Node *
+parse_statement_list(File_Contents *f)
+{
+	Ast_Node *result = ast_statements();
+	b32 should_break = false;
+	while(!should_break)
 	{
-		advance_token(f);
-		pop_scope(f, *f->curr_token);
-		result->type = type_scope_end;
-		result->scope_desc.token = *f->curr_token;
-		return result;
-	} break;
-	default:
-	{
-		raise_parsing_unexpected_token("[ '}' ]", f);
-	}
+		if(f->curr_token->type == '}')
+			should_break = true;
+		Ast_Node *statement = parse_statement(f);
+		SDPush(result->statements.list, statement);
 	}
 	return result;
 }
@@ -464,10 +492,10 @@ Ast_Node **
 delimited(File_Contents *f, char start, char stop, char seperator, Ast_Node *(*parser)(File_Contents *))
 {
 	Ast_Node **result = SDCreate(Ast_Node *);
-	
+
 	b32 has_args = false;
 	parser_eat(f, (Token)start);
-	
+
 	while (true)
 	{
 		if(f->curr_token->type == stop)
@@ -487,7 +515,7 @@ delimited(File_Contents *f, char start, char stop, char seperator, Ast_Node *(*p
 	return result;
 }
 
-int
+	int
 get_precedence(Token op, b32 on_left, b32 is_lhs)
 {
 	switch ((int)op)
@@ -680,6 +708,8 @@ parse_atom_expression(File_Contents *f, Ast_Node *operand, char stop_at, b32 is_
 			} break;
 			case '{':
 			{
+				if(f->expression_level < 0)
+					return operand;
 				if(is_lhs)
 				{
 					raise_parsing_unexpected_token("left-hand side of statement "
@@ -1092,12 +1122,11 @@ parse_func(File_Contents *f)
 
 	if(body.type == '{')
 	{
-		result->left = parse_body(f, true, invalid_token);
+		result->function.body = parse_body(f, true, invalid_token);
 	}
 	else if(body.type == ';')
 	{
 		parser_eat(f, (Token)';');
-		result->left = parse_file_level_statement(f);
 	}
 	else
 		raise_parsing_unexpected_token("'{' or ';'", f);

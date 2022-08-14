@@ -112,6 +112,9 @@ llvm::Value *
 generate_expression(File_Contents *f, Ast_Node *node, Function *func);
 
 void
+generate_statement_list(File_Contents *f, Ast_Node *list);
+
+void
 generate_statement(File_Contents *f, Ast_Node *root);
 
 void
@@ -133,7 +136,13 @@ llvm::Value *
 generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
 			 llvm::Value *rhs, b32 is_decl, Type_Info decl_type);
 
+
+void
+generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block,
+		const char *block_name, BasicBlock *to_go, Ast_Node *list, u64 *idx);
+
 llvm::BasicBlock *
-generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block, const char *block_name, BasicBlock *to_go);
+generate_blocks_from_list(File_Contents *f, Ast_Node *list_node, Function *func,
+		BasicBlock *passed_block, const char *block_name, BasicBlock *to_go);
 
 #endif

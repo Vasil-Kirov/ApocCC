@@ -329,7 +329,7 @@ val_to_bool(Interp_Val val)
 
 Interp_Val
 interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_count,
-		b32 *returned)
+		b32 *returned, Ast_Node *node_list, size_t *idx)
 {
 	Interp_Val result = {};
 	if(*failed)
@@ -337,9 +337,6 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 		raise_interpret_error("Unexpected end of function", *token);
 		return result;
 	}
-
-	if(scope_count < 0)
-		return result;
 
 	switch ((int)node->type)
 	{
@@ -365,12 +362,25 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 		} break;
 		case type_if:
 		{
-			result = interpret_expression(node->condition, failed);
+			*token = node->condition.token;
+			result = interpret_expression(node->condition.expr, failed);
 			b32 is_true = val_to_bool(result);
 			if(is_true)
 			{
 				interp_push_scope();
-				result = interpret_statement(node->right->left, failed, token, 0, returned);
+				*idx += 1;
+				Ast_Node *next_node = node_list->statements.list[*idx];
+				if(next_node->type == type_scope_start)
+				{
+					result = interpret_statement_list(next_node->scope_desc.body, failed, 
+							token, scope_count, returned);
+				}
+				else
+				{
+					result = interpret_statement(next_node, failed, token, 0, returned,
+							node_list, idx);
+					destroy_scope();
+				}
 				if(*returned)
 				{
 					destroy_scope();
@@ -388,12 +398,24 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 			Interp_Val expr2 = interpret_expression(node->for_loop.expr2, failed);
 			b32 is_true = val_to_bool(expr2);
 
+			
+			*idx += 1;
+			Ast_Node *next_node = node_list->statements.list[*idx];
 			while(is_true)
 			{
 				// @TODO: Hack?
 				interp_push_scope();
-				result = interpret_statement(node->left->right, failed,
-						token, scope_count, returned);
+				if(next_node->type == type_scope_start)
+				{
+					result = interpret_statement_list(next_node->scope_desc.body, failed, 
+							token, scope_count, returned);
+				}
+				else
+				{
+					result = interpret_statement(next_node, failed, token,
+							scope_count, returned, node_list, idx);
+					destroy_scope();
+				}
 				if(*returned)
 					return result;
 				
@@ -401,8 +423,6 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 				Interp_Val expr2 = interpret_expression(node->for_loop.expr2, failed);
 				is_true = val_to_bool(expr2);
 			}
-			node = node->left;
-
 			destroy_scope();
 		} break;
 		case type_return:
@@ -417,8 +437,24 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 			LG_FATAL("Incorrect statement");
 		} break;
 	}
-	return interpret_statement(node->left, failed, token, scope_count, returned);
-		
+	return result;
+}
+
+Interp_Val
+interpret_statement_list(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_count,
+		b32 *returned)
+{
+	Interp_Val result = {};
+	Ast_Node **list = node->statements.list;
+	size_t count = SDCount(list);
+	for(size_t i = 0; i < count; ++i)
+	{
+		result = interpret_statement(list[i], failed, token, scope_count, returned,
+				node, &i);
+		if(*returned)
+			break;
+	}
+	return result;
 }
 
 Interp_Val
@@ -429,7 +465,7 @@ interpret_function(Interp_Val func, Ast_Call call, b32 *failed)
 	Assert(f_node->type == type_func);
 	interp_push_scope();
 
-	Ast_Node *statement = f_node->left->right;
+	Ast_Node *statement = f_node->function.body;
 	if(!statement)
 	{
 		*failed = true;
@@ -455,13 +491,12 @@ interpret_function(Interp_Val func, Ast_Call call, b32 *failed)
 	
 	Token_Iden token = {};
 	b32 returned = false;
-	result = interpret_statement(statement, failed, &token, 0, &returned);
+	result = interpret_statement_list(statement->scope_desc.body, failed, &token, 0, &returned);
 	if(!returned)
 	{
 		*failed = true;
 		raise_interpret_error("Function did not return", token);
 	}
-	statement = statement->right;
 	destroy_scope();
 	return result;
 }

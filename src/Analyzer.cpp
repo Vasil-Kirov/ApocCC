@@ -5,6 +5,7 @@
 #include <Type.h>
 #include <Errors.h>
 #include <Interpret.h>
+#include <vcruntime.h>
 
 void
 initialize_analyzer(File_Contents *f)
@@ -13,6 +14,7 @@ initialize_analyzer(File_Contents *f)
 	shdefault(f->type_table, invalid);
 	f->scopes = SDCreate(Scope_Info);
 	f->scope_stack = stack_allocate(Scope_Info);
+	f->to_add_next_scope = SDCreate(Symbol);
 }
 
 void
@@ -78,6 +80,15 @@ push_scope(File_Contents *f, Scope_Info current_scope)
 {
 	current_scope.symbol_table = SDCreate(Symbol);
 	stack_push(f->scope_stack, current_scope);
+	size_t to_add_count = SDCount(f->to_add_next_scope);
+	if(to_add_count != 0)
+	{
+		for(i64 i = to_add_count - 1; i >= 0; --i)
+		{
+			add_symbol(f, f->to_add_next_scope[i]);
+			SDPop(f->to_add_next_scope);
+		}
+	}
 }
 
 
@@ -175,8 +186,20 @@ analyze(File_Contents *f, Ast_Node *ast_tree)
 	scope_info.file = (const char *)f->path;
 	scope_info.start_line = 1;
 	push_scope(f, scope_info);
-	analyze_file_level_statement(f, ast_tree);
+	analyze_file_level_statement_list(f, ast_tree);
 	// @Check: maybe pop_scope()?
+}
+
+void
+analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
+{
+	Assert(node->type == type_statements);
+	Ast_Node **statements = node->statements.list;
+	size_t statement_count = SDCount(statements);
+	for(size_t i = 0; i < statement_count; ++i)
+	{
+		analyze_file_level_statement(f, statements[i]);
+	}
 }
 
 void
@@ -188,30 +211,20 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 		case type_struct:
 		{
 			verify_struct(f, node);
-			analyze_file_level_statement(f, node->left);
 		}break;
 		case type_func:
 		{
 			verify_func(f, node);
-			Ast_Node *next_node = NULL;
-			if(node->left->type == type_scope_start)
-				next_node = node->left->left;
-			else
-				next_node = node->left;
-			analyze_file_level_statement(f, next_node);
 		} break;
 		case type_assignment:
 		{
 			verify_assignment(f, node, true);
-			analyze_file_level_statement(f, node->left);
 		} break;
 		default:
 		{
 			LG_WARN("File level statement of type %s (id: %d) not analyzed",
 					type_to_str(node->type), node->type);
-			if(node->left != NULL)
-				analyze_file_level_statement(f, node->left);
-		}
+		} break;
 	}
 	return;
 }
@@ -223,7 +236,7 @@ verify_func(File_Contents *f, Ast_Node *node)
 	Token_Iden type_error_token = node->function.type.token;
 	node->function.type = fix_type(f, node->function.type);
 	size_t arg_count = SDCount(node->function.arguments);
-	b32 has_body = node->left && node->left->type == type_scope_start;
+	b32 has_body = node->function.body != NULL;
 	
 	if(node->function.type.type == T_ARRAY && !node->function.is_interpret_only)
 	{
@@ -231,14 +244,6 @@ verify_func(File_Contents *f, Ast_Node *node)
 				"Function [ %s ] returns an array which is illegal.\n\t"
 				"This function can only be executed at compile time using $run\n\t"
 				"and as such should be marked with $interp", node->function.identifier.name);
-	}
-	if(has_body)
-	{
-		Token_Iden scope_tok = node->left->scope_desc.token;
-		Scope_Info new_scope = {};
-		new_scope.file = scope_tok.file;
-		new_scope.start_line = scope_tok.line;
-		push_scope(f, new_scope);
 	}
 	
 	for (size_t i = 0; i < arg_count; i++)
@@ -260,20 +265,15 @@ verify_func(File_Contents *f, Ast_Node *node)
 			else
 			{
 				arg_symbol.identifier = arg.identifier.name;
-				arg_symbol.type = arg.type;	
-				add_symbol(f, arg_symbol);
+				arg_symbol.type = fix_type(f, arg.type);	
+				arg_symbol.node->variable.type = arg_symbol.type;
+				if(has_body)
+					SDPush(f->to_add_next_scope, arg_symbol);
 			}
 		}
-		// @NOTE: fix args
-		if(arg.type.type != T_DETECT)
+		else if(arg.type.type != T_DETECT)
 		{
-			node->function.arguments[i]->variable.type = fix_type(f,															arg.type);
-			if(has_body)
-			{
-				Symbol *symbol_spot = get_symbol_spot(f,												  arg.identifier.token);
-				
-				symbol_spot->type = arg.type;
-			}
+			node->function.arguments[i]->variable.type = fix_type(f, arg.type);
 		}
 		if(arg.type.type == T_DETECT &&
 		   i != arg_count - 1)
@@ -293,15 +293,15 @@ verify_func(File_Contents *f, Ast_Node *node)
 	
 	if(has_body)
 	{
-		verify_func_level_statement(f, node->left->right, node);
+		verify_func_level_statement_list(f, node->function.body, node);
 	}	
 }
 
 void
-verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_node)
+verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_node, 
+		Ast_Node *current_list, size_t *idx)
 {
 	if(node == NULL) return;
-	Ast_Node *to_switch = NULL;
 	switch(node->type)
 	{
 		case type_for:
@@ -324,8 +324,17 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 			{
 				raise_formated_semantic_error(f, node->for_loop.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(expression));
 			}
-			verify_func_level_statement(f, node->left->right, func_node);
-			to_switch = node->left->left;
+			*idx += 1;
+			auto next_node = current_list->statements.list[*idx];
+			if(next_node->type == type_scope_start)
+			{
+				verify_func_level_statement_list(f, next_node->scope_desc.body, func_node);
+			}
+			else
+			{
+				verify_func_level_statement(f, next_node, func_node, current_list, idx);
+				pop_scope(f, scope_tok);
+			}
 		} break;
 		case type_var:
 		{
@@ -340,10 +349,30 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 		}break;
 		case type_if:
 		{
-			Type_Info if_type = get_expression_type(f, node->condition, node->left->scope_desc.token, NULL);
+			Token_Iden scope_tok = node->for_loop.token;
+			Scope_Info new_scope = {};
+			new_scope.file = scope_tok.file;
+			new_scope.start_line = scope_tok.line;
+			push_scope(f, new_scope);
+
+			Type_Info if_type = get_expression_type(f, node->condition.expr, 
+					node->condition.token, NULL);
 			if(if_type.type != T_BOOLEAN)
 			{
-				raise_formated_semantic_error(f, node->left->scope_desc.token, "Expression type %s cannot automatically be converted to a boolean", var_type_to_name(if_type));
+				raise_formated_semantic_error(f, node->condition.token,
+						"Expression type %s cannot automatically be converted to a boolean",
+						var_type_to_name(if_type));
+			}
+			*idx += 1;
+			auto next_node = current_list->statements.list[*idx];
+			if(next_node->type == type_scope_start)
+			{
+				verify_func_level_statement_list(f, next_node->scope_desc.body, func_node);
+			}
+			else
+			{
+				verify_func_level_statement(f, next_node, func_node, current_list, idx);
+				pop_scope(f, scope_tok);
 			}
 		} break;
 		case type_assignment:
@@ -368,13 +397,13 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 						ret_node->type = type_return;
 						ret_node->ret.expression = NULL;
 						ret_node->ret.func_type.type = T_VOID;
-						ret_node->left = node;
-						Ast_Node *to_replace = func_node->left->right;
-						while(to_replace->left->type != type_scope_end)
-						{
-							to_replace = to_replace->left;
-						}
-						to_replace->left = ret_node;
+						Ast_Node *to_replace = func_node->function.body;
+						size_t i = 0;
+						for(; to_replace->statements.list[i]->type != type_scope_end;
+								++i) {}
+
+						to_replace->statements.list[i] = ret_node;
+						SDPush(to_replace->statements.list, node);
 					}
 					else
 						raise_semantic_error(f, "Not all paths lead to a return statement", node->scope_desc.token);
@@ -392,7 +421,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 			new_scope.file = scope_tok.file;
 			new_scope.start_line = scope_tok.line;
 			push_scope(f, new_scope);
-			verify_func_level_statement(f, node->right, func_node);
+			verify_func_level_statement_list(f, node->scope_desc.body, func_node);
 		} break;
 		case type_return:
 		{
@@ -424,10 +453,24 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 					type_to_str(node->type), node->type);
 		}
 	}
-	if(!to_switch)
-		verify_func_level_statement(f, node->left, func_node);
-	else 
-		verify_func_level_statement(f, to_switch, func_node);
+}
+
+void
+verify_func_level_statement_list(File_Contents *f, Ast_Node *list_node, Ast_Node *func_node)
+{
+	if(list_node->type == type_scope_start)
+	{
+		Token_Iden scope_tok = list_node->scope_desc.token;
+
+		Scope_Info new_scope = {};
+		new_scope.file = scope_tok.file;
+		new_scope.start_line = scope_tok.line;
+		push_scope(f, new_scope);
+		list_node = list_node->scope_desc.body;
+	}
+	size_t count = SDCount(list_node->statements.list);
+	for(size_t i = 0; i < count; ++i)
+		verify_func_level_statement(f, list_node->statements.list[i], func_node, list_node, &i);
 }
 
 Ast_Node *

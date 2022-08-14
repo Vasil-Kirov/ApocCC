@@ -19,7 +19,8 @@ func main() -> i32
 {
 	array :[256]u8 = $run foo();
 	for i := 0; i <= 'Z' - 'A'; ++i {
-		printf("%c", array[i]);
+		array[i] = #u8 (array[i] + 'A');
+		printf("%d", #i32 array[i]);
 	}
 
 	-> 0;

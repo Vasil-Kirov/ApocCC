@@ -48,5 +48,8 @@ interpret_add_function(Symbol func_sym);
 void
 initialize_interpreter();
 
+Interp_Val
+interpret_statement_list(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_count,
+		b32 *returned);
 
 #endif

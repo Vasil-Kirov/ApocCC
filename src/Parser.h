@@ -20,6 +20,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_statements   = -60,
 	type_run          = -59,
 	type_array_list   = -58,
 	type_cast         = -57,
@@ -133,6 +134,7 @@ typedef struct
 	Type_Info type;
 	Ast_Identifier identifier;
 	Ast_Node **arguments; // Simple DArray
+	Ast_Node *body;
 	b32 has_var_args;
 	b32 is_interpret_only;
 } Ast_Func;
@@ -163,6 +165,11 @@ typedef struct
 	Type_Info decl_type;
 	Type_Info rhs_type;
 } Ast_Assignment;
+
+typedef struct
+{
+	Ast_Node **list; // SDArray
+} Ast_Statement;
 
 typedef struct _Ast_Call
 {
@@ -220,6 +227,7 @@ typedef struct
 typedef struct
 {
 	Token_Iden token;
+	Ast_Node *body;
 } Scope_Desc;
 
 typedef struct
@@ -249,19 +257,25 @@ typedef struct
 	Type_Info selected_type;
 } Ast_Selector;
 
+typedef struct
+{
+	Ast_Node *expr;
+	Token_Iden token;
+} Ast_Condition;
 	
 struct _abstract_syntax_tree
 {
 	Ast_Type type;
 	union
 	{
+		Ast_Statement statements;
 		Ast_Run run;
 		Ast_Array_List array_list;
 		Ast_Cast cast;
 		Ast_For for_loop;
 		Ast_Selector selector;
 		Ast_Func function;
-		Ast_Node *condition;
+		Ast_Condition condition;
 		Ast_Unary_Expr unary_expr;
 		Ast_Binary_Expr binary_expr;
 		Ast_Assignment assignment;
@@ -287,10 +301,16 @@ Ast_Node *
 parse_file_level_statement(File_Contents *f);
 
 Ast_Node *
+parse_file_level_statement_list(File_Contents *f);
+
+Ast_Node *
 parse_identifier(File_Contents *f, Token_Iden name_token);
 
 Ast_Node *
 parse_statement(File_Contents *f);
+
+Ast_Node *
+parse_statement_list(File_Contents *f);
 
 Ast_Node *
 parse_expression(File_Contents *f, Token stop_at, b32 is_lhs);

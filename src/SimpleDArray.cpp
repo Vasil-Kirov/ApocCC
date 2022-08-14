@@ -46,6 +46,14 @@ _ISimpleDArrayPush(void **Array, void *Item)
 }
 
 void
+_ISimpleDArrayPop(void **Array)
+{
+	void *ArrayPtr = *Array;
+	SDHeader(ArrayPtr)->CurrentlyUsed -= SDHeader(ArrayPtr)->TypeSize;
+	SDHeader(ArrayPtr)->Count -= 1;
+}
+
+void
 _ISimpleDArrayInsert(void **Array, void *Item, int Index)
 {
 	Assert(Index >= 0);

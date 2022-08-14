@@ -24,10 +24,14 @@ _ISimpleDArraySkip(void **Array, int Amount);
 void
 _ISimpleDArrayInsert(void **Array, void *Item, int Index);
 
+void
+_ISimpleDArrayPop(void **Array);
+
 #define SDHeader(Array) ((DArray_Header *)( ( (char *)(Array) ) - sizeof(DArray_Header)))
 #define SDCreate(Type) (Type *)_ISimpleDArrayCreate(sizeof(Type))
 #define SDCount(Array) SDHeader(Array)->Count
 #define SDPush(Array, Item) _ISimpleDArrayPush((void **)&(Array), (void *)&(Item))
+#define SDPop(Array) _ISimpleDArrayPop((void **)&Array);
 #define SDFree(Array) platform_free_chunk(Array);
 
 #endif //_SIMPLE_D_ARRAY_H

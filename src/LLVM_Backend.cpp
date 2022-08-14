@@ -1,6 +1,7 @@
 #include "llvm-c/Target.h"
 #include "llvm-c/TargetMachine.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
@@ -172,7 +173,7 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root)
 	backend = llvm_initialize(f);
 
 	generate_signatures(f);
-	generate_statement(f, root);
+	generate_statement_list(f, root);
 	generate_obj(f);
 }
 
@@ -245,44 +246,48 @@ generate_signatures(File_Contents *f)
 void
 generate_statement(File_Contents *f, Ast_Node *node)
 {
-	while(node)
+	switch((int)node->type)
 	{
-		switch((int)node->type)
+		case type_func:
 		{
-			case type_func:
-			{
-				if(!node->function.is_interpret_only && node->left->type == type_scope_start)
-					generate_func(f, node);
+			if(!node->function.is_interpret_only && node->function.body)
+				generate_func(f, node);
 
-				// Generate prototypes before
-			} break;
-			case type_assignment:
+			// Generate prototypes before
+		} break;
+		case type_assignment:
+		{
+			b32 failed = false;
+			auto interp_val = interpret_expression(node->assignment.rhs, &failed);
+			if(failed)
 			{
-				b32 failed = false;
-				auto interp_val = interpret_expression(node->assignment.rhs, &failed);
-				if(failed)
-				{
-					raise_interpret_error("Global decleration must be constant",
-							node->assignment.token);
-					LG_FATAL(".");
-				}
-				Constant* const_val = interp_val_to_llvm(interp_val, backend, NULL);
-				auto global_type = apoc_type_to_llvm(node->assignment.decl_type, backend);
-				auto global_var = new GlobalVariable(
-						*backend.module, global_type, node->assignment.is_const,
-						GlobalValue::LinkageTypes::ExternalLinkage,
-						const_val, "global_var");
-				backend.named_globals[std::string((char *)node->assignment.token.identifier)] = global_var;
-			} break;
-			case type_struct: break;
-			case type_scope_start: break;
-			default:
-			{
-				LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
-			} break;
-		}
-		node = node->left;
+				raise_interpret_error("Global decleration must be constant",
+						node->assignment.token);
+				LG_FATAL(".");
+			}
+			Constant* const_val = interp_val_to_llvm(interp_val, backend, NULL);
+			auto global_type = apoc_type_to_llvm(node->assignment.decl_type, backend);
+			auto global_var = new GlobalVariable(
+					*backend.module, global_type, node->assignment.is_const,
+					GlobalValue::LinkageTypes::ExternalLinkage,
+					const_val, "global_var");
+			backend.named_globals[std::string((char *)node->assignment.token.identifier)] = global_var;
+		} break;
+		case type_struct: break;
+		case type_scope_start: break;
+		default:
+		{
+			LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
+		} break;
 	}
+}
+
+void
+generate_statement_list(File_Contents *f, Ast_Node *list)
+{
+	size_t list_size = SDCount(list->statements.list);
+	for(size_t i = 0; i < list_size; ++i)
+		generate_statement(f, list->statements.list[i]);
 }
 
 llvm::Value *
@@ -363,18 +368,46 @@ generate_boolean_expression(File_Contents *f, Ast_Node *expression, Function *fu
 }
 
 void
-generate_for_loop(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *block, BasicBlock *to_go)
+generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
+		BasicBlock *block, BasicBlock *to_go, Ast_Node *list, u64 *idx)
 {
 	if(node->for_loop.expr1)
 		generate_assignment(f, func, node->for_loop.expr1);
 
-
-	auto jmp_block = BasicBlock::Create(*backend.context, "for_true_jump", func);
-
-
 	auto evaluation = generate_boolean_expression(f, node->for_loop.expr2, func);
-	auto for_false = generate_block(f, node->left->left, func, NULL, "for_false", to_go);
-	auto for_true = generate_block(f, node->left->right, func, NULL, "for_true", jmp_block);
+
+	BasicBlock *jmp_block = BasicBlock::Create(*backend.context, "for_true_jump", func);
+	BasicBlock *for_false = NULL;
+	BasicBlock *for_true  = NULL;
+	
+	*idx += 1;
+	auto loop_body = list->statements.list[*idx];
+	*idx += 1;
+	{
+		for_false = BasicBlock::Create(*backend.context, "for_false", func);
+		backend.builder->SetInsertPoint(for_false);
+		size_t count = SDCount(list->statements.list);
+
+		for(; *idx < count; *idx += 1)
+			generate_block(f, list->statements.list[*idx], func,
+					for_false, "for_false", to_go, list, idx);
+
+		if(to_go)
+			backend.builder->CreateBr(to_go);
+	}
+
+	if(loop_body->type == type_scope_start)
+	{
+		for_true = generate_blocks_from_list(f, loop_body->scope_desc.body, func,
+				NULL, "for_true", jmp_block);
+	}
+	else
+	{
+		for_true = BasicBlock::Create(*backend.context, "for_true", func);
+		backend.builder->SetInsertPoint(for_true);
+		generate_block(f, loop_body, func, NULL, "for_true", jmp_block, list, idx);
+	}
+
 	backend.builder->SetInsertPoint(jmp_block);
 
 	if(node->for_loop.expr3)
@@ -387,8 +420,103 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *
 	backend.builder->CreateCondBr(evaluation, for_true, for_false);
 }
 
+void
+generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block,
+		const char *block_name, BasicBlock *to_go, Ast_Node *list, u64 *idx)
+{
+	switch((int)node->type)
+	{
+		case type_func_call:
+		{
+			// @TODO: func pointers
+			Assert(node->func_call.operand->type == type_identifier);
+			auto callee = FunctionCallee(shget(backend.func_table, node->func_call.operand->identifier.name));
+
+			size_t arg_count = SDCount(node->func_call.arguments);
+			llvm::Value *arg_exprs[arg_count];
+			auto arg_types = node->func_call.arg_types;
+			auto expr_types = node->func_call.expr_types;
+			for (size_t i = 0; i < arg_count; ++i)
+			{
+				arg_exprs[i] = generate_expression(f, node->func_call.arguments[i], func);
+				if(arg_types[i].type != T_DETECT)
+					arg_exprs[i] = create_cast(arg_types[i], expr_types[i], arg_exprs[i]);
+			}
+			backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+		} break;
+		case type_assignment:
+		{
+			generate_assignment(f, func, node);
+		} break;
+		case type_return:
+		{
+			if(node->ret.expression)
+			{
+				llvm::Value *ret_val = generate_expression(f, node->ret.expression, func);
+				if (is_untyped(node->ret.expression_type))
+				{
+					ret_val = create_cast(node->ret.func_type, node->ret.expression_type, ret_val);
+				}
+				backend.builder->CreateRet(ret_val);
+			}
+			else
+				backend.builder->CreateRetVoid();
+		} break;
+		case type_for:
+		{
+			generate_for_loop(f, node, func, passed_block, to_go, list,idx);
+		} break;
+		case type_if:
+		{
+			llvm::Value *evaluation =
+				generate_boolean_expression(f, node->condition.expr, func);
+
+			llvm::BasicBlock *if_true = NULL;
+			llvm::BasicBlock *if_false = NULL;
+
+			*idx += 1;
+			auto body_node = list->statements.list[*idx];
+			*idx += 1;
+			auto next_node = list->statements.list[*idx];
+			
+			{
+				if_false = BasicBlock::Create(*backend.context, "if_false", func);
+				backend.builder->SetInsertPoint(if_false);
+				size_t count = SDCount(list->statements.list);
+
+				for(; *idx < count; *idx += 1)
+					generate_block(f, list->statements.list[*idx], func,
+							if_false, "if_false", to_go, list, idx);
+				
+				if(to_go)
+					backend.builder->CreateBr(to_go);
+			}
+
+			if(body_node->type == type_scope_start)
+			{
+				generate_blocks_from_list(f, next_node->scope_desc.body, func,
+						NULL, "if_true", if_false);
+			}
+			else
+			{
+				if_true = BasicBlock::Create(*backend.context, "if_true", func);
+				backend.builder->SetInsertPoint(if_true);
+				generate_block(f, body_node, func, if_true, "if_true", if_false, list, idx);
+			}
+			backend.builder->SetInsertPoint(passed_block);
+			backend.builder->CreateCondBr(evaluation, if_true, if_false);
+		} break;
+		case type_scope_end: {} break;
+		default:
+		{
+			LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
+		} break;
+	}
+}
+
 llvm::BasicBlock *
-generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block, const char *block_name, BasicBlock *to_go)
+generate_blocks_from_list(File_Contents *f, Ast_Node *list_node, Function *func,
+		BasicBlock *passed_block, const char *block_name, BasicBlock *to_go)
 {
 	BasicBlock *body_block = NULL;
 	if(!passed_block)
@@ -398,95 +526,14 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 	}
 	else
 		body_block = passed_block;
-	Ast_Node *to_switch = NULL;
-	int levels_up = 0;
-	while(true)
-	{
-		if(!node)
-			break;
-		switch((int)node->type)
-		{
-			case type_func_call:
-			{
-				// @TODO: func pointers
-				Assert(node->func_call.operand->type == type_identifier);
-				auto callee = FunctionCallee(shget(backend.func_table, node->func_call.operand->identifier.name));
+	size_t count = SDCount(list_node->statements.list);
+	auto list = list_node->statements.list;
+	for(size_t i = 0; i < count; ++i)
+		generate_block(f, list[i], func, body_block, block_name, to_go,
+				list_node, &i);
 
-				size_t arg_count = SDCount(node->func_call.arguments);
-				llvm::Value *arg_exprs[arg_count];
-				auto arg_types = node->func_call.arg_types;
-				auto expr_types = node->func_call.expr_types;
-				for (size_t i = 0; i < arg_count; ++i)
-				{
-					arg_exprs[i] = generate_expression(f, node->func_call.arguments[i], func);
-					if(arg_types[i].type != T_DETECT)
-						arg_exprs[i] = create_cast(arg_types[i], expr_types[i], arg_exprs[i]);
-				}
-				backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
-			} break;
-			case type_assignment:
-			{
-				generate_assignment(f, func, node);
-			} break;
-			case type_return:
-			{
-				if(node->ret.expression)
-				{
-					llvm::Value *ret_val = generate_expression(f, node->ret.expression, func);
-					if (is_untyped(node->ret.expression_type))
-					{
-						ret_val = create_cast(node->ret.func_type, node->ret.expression_type, ret_val);
-					}
-					backend.builder->CreateRet(ret_val);
-				}
-				else
-					backend.builder->CreateRetVoid();
-			} break;
-			case type_for:
-			{
-				generate_for_loop(f, node, func, body_block, to_go);
-				to_go = NULL;
-				goto RETURN_BLOCK;
-			} break;
-			case type_if:
-			{
-				llvm::Value *evaluation = generate_boolean_expression(f, node->condition, func);
-
-				auto if_false = generate_block(f, node->left->left, func, NULL, "if_false", to_go);
-				auto if_true = generate_block(f, node->left->right, func, NULL, "if_true", if_false);
-				backend.builder->SetInsertPoint(body_block);
-				backend.builder->CreateCondBr(evaluation, if_true, if_false);
-				to_go = NULL;
-				goto RETURN_BLOCK;
-			} break;
-			case type_scope_start:
-			{
-				levels_up++;
-			} break;
-			case type_scope_end:
-			{
-				emergency_token = node->scope_desc.token;
-				if(levels_up == 0)
-				{
-					goto RETURN_BLOCK;
-				}
-			} break;
-			default:
-			{
-				LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
-			} break;
-		}
-		if(to_switch)
-			node = to_switch;
-		else
-			node = node->left;
-		to_switch = NULL;
-	}
-	RETURN_BLOCK:;
-	
 	if(to_go)
 		backend.builder->CreateBr(to_go);
-
 	return body_block;
 }
 
@@ -558,10 +605,9 @@ generate_func(File_Contents *f, Ast_Node *node)
 			backend.builder->CreateStore(&arg, variable);
 		}
 	}
-	node = node->left;
-	Assert(node->type == type_scope_start);
-	node = node->right;
-	generate_block(f, node, func, body_block, "", NULL);
+	Assert(node->function.body);
+	
+	generate_blocks_from_list(f, node->function.body->scope_desc.body, func, body_block, "main", NULL);
 
 	std::error_code error_code;
 	raw_fd_ostream std_out_fd("-", error_code);

@@ -5,7 +5,7 @@ target triple = "x86_64-pc-windows-msvc"
 
 @global_var = constant i64 12
 @constant_array = private constant [256 x i8] c"ABCDEFGHIJKLMNOPQRSTUVWXYZ\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
-@0 = private unnamed_addr constant [3 x i8] c"%c\00", align 1
+@0 = private unnamed_addr constant [3 x i8] c"%d\00", align 1
 
 define i32 @add(i32 %a, i32 %b) {
 entry:
@@ -53,7 +53,15 @@ for_true:                                         ; preds = %entry, %for_true_ju
   %7 = load i64, ptr %i, align 4
   %elem_ptr = getelementptr [256 x i8], ptr %compile_time_array, i64 0, i64 %7
   %indexed_val = load i8, ptr %elem_ptr, align 1
-  %8 = call i32 (ptr, ...) @printf(ptr @0, i8 %indexed_val)
+  %8 = add i8 %indexed_val, 65
+  %9 = load i64, ptr %i, align 4
+  %elem_ptr1 = getelementptr [256 x i8], ptr %compile_time_array, i64 0, i64 %9
+  store i8 %8, ptr %elem_ptr1, align 1
+  %10 = load i64, ptr %i, align 4
+  %elem_ptr2 = getelementptr [256 x i8], ptr %compile_time_array, i64 0, i64 %10
+  %indexed_val3 = load i8, ptr %elem_ptr2, align 1
+  %cast = sext i8 %indexed_val3 to i32
+  %11 = call i32 (ptr, ...) @printf(ptr @0, i32 %cast)
   br label %for_true_jump
 }
 

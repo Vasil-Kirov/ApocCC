@@ -72,6 +72,7 @@ typedef struct
 	b32 call_linker;
 } Build_Commands;
 
+// @NOTE: this is poorly names, should probably be changed to something like `compile_state`
 typedef struct _File_Contents
 {
 	Token_Iden *prev_token;
@@ -87,10 +88,12 @@ typedef struct _File_Contents
 	u8         *at;
 	u8         *path;
 	char       *obj_name;
-	u64 current_line;
-	u64 current_column;
+	u64         current_line;
+	u64         current_column;
 	Ast_Node   *ast_root;
+	Symbol     *to_add_next_scope;
 	Build_Commands build_commands;
+	int         expression_level;
 } File_Contents;
 
 Type_Info
@@ -126,6 +129,9 @@ initialize_analyzer();
 void
 analyze_file_level_statement(File_Contents *f, Ast_Node *node);
 
+void
+analyze_file_level_statement_list(File_Contents *f, Ast_Node *node);
+
 u8 *
 var_type_to_name(Type_Info type);
 
@@ -139,7 +145,11 @@ void
 verify_func(File_Contents *f, Ast_Node *node);
 
 void
-verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_node);
+verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_node, 
+		Ast_Node *current_list, i32 *idx);
+
+void
+verify_func_level_statement_list(File_Contents *f, Ast_Node *list_node, Ast_Node *func_node);
 
 b32
 check_type_compatibility(Type_Info a, Type_Info b);
