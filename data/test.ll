@@ -5,7 +5,8 @@ target triple = "x86_64-pc-windows-msvc"
 
 %Actual_Window = type { i32, i32 }
 
-@global_var = constant i64 12
+@global_var = constant i32 10
+@global_var.1 = constant i64 12
 @0 = private unnamed_addr constant [3 x i8] c"%d\00", align 1
 
 define i32 @_apoc_init() {
@@ -17,11 +18,12 @@ entry:
 define i32 @main() {
 entry:
   %window = alloca ptr, align 8
+  %a = alloca i32, align 4
+  store i64 10, ptr %a, align 4
   %0 = call ptr @get_window()
   store ptr %0, ptr %window, align 8
-  %1 = load ptr, ptr %window, align 8
-  %2 = call i32 @something(ptr %1)
-  %3 = call i32 (ptr, ...) @printf(ptr @0, i32 %2)
+  %1 = load i32, ptr %a, align 4
+  %2 = call i32 (ptr, ...) @printf(ptr @0, i32 %1)
   ret i32 0
 }
 

@@ -420,7 +420,15 @@ parse_identifier_statement(File_Contents *f, Token ends_with)
 				return ast_assignment_from_decl(lhs, NULL, assign_type, identifier_token, is_const);
 			}
 			if(!is_const)
-				parser_eat(f, (Token)'=');
+			{
+				if(f->curr_token->type == ':')
+				{
+					is_const = true;
+					advance_token(f);
+				}
+				else
+					parser_eat(f, (Token)'=');
+			}
 			Ast_Node *rhs = parse_expression(f, ends_with, false);
 			return ast_assignment_from_decl(lhs, rhs, assign_type, identifier_token, is_const);
 		} break;

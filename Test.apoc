@@ -1,6 +1,7 @@
 
 func _apoc_init() -> i32 { -> main(); }
 
+MY_VAR :i32 : 10;
 //func $interp foo() -> [256]u8 {
 //	my_arr :[256]u8 = {0};
 //	for i := 'A'; i <= 'Z'; ++i {
@@ -23,8 +24,9 @@ func main() -> i32
 	array[0] += #u8 NUMS.FIVE;
 	
 	*/
+	a: i32 = MY_VAR;
 	window := get_window();
-	printf("%d", something(window));
+	printf("%d", a);
 	/*
 	printf("%d\n", NUMS.FIVE);
 	if NUMS.TWELVE == 12 && NUMS.NINETEEN == 19

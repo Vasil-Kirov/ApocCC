@@ -31,18 +31,17 @@ _apoc_init:
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	subq	$40, %rsp
-	.seh_stackalloc 40
+	subq	$56, %rsp
+	.seh_stackalloc 56
 	.seh_endprologue
+	movq	$10, 44(%rsp)
 	callq	get_window
-	movq	%rax, 32(%rsp)
-	movq	32(%rsp), %rcx
-	callq	something
-	movl	%eax, %edx
+	movq	%rax, 48(%rsp)
+	movl	44(%rsp), %edx
 	leaq	.L__unnamed_1(%rip), %rcx
 	callq	printf
 	xorl	%eax, %eax
-	addq	$40, %rsp
+	addq	$56, %rsp
 	retq
 	.seh_endproc
 
@@ -115,8 +114,13 @@ mem_alloc:
 
 	.section	.rdata,"dr"
 	.globl	global_var
-	.p2align	3
+	.p2align	2
 global_var:
+	.quad	10
+
+	.globl	global_var.1
+	.p2align	3
+global_var.1:
 	.quad	12
 
 .L__unnamed_1:
