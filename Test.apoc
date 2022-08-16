@@ -1,28 +1,82 @@
 
-SOME_NUM :: 10 + 2;
-
-func add(a: i32, b: i32) -> i32 {
-	-> a + b;
-}
-
 func _apoc_init() -> i32 { -> main(); }
 
-func $interp foo() -> [256]u8 {
-	my_arr :[256]u8 = {0};
-	for i := 'A'; i <= 'Z'; ++i {
-		my_arr[i - 'A'] = #u8 i;
-	}
-	-> my_arr;
-}
+//func $interp foo() -> [256]u8 {
+//	my_arr :[256]u8 = {0};
+//	for i := 'A'; i <= 'Z'; ++i {
+//		my_arr[i - 'A'] = #u8 i;
+//	}
+//	-> my_arr;
+//}
+//
+//func factorial(x: i64) -> i64 {
+//	if x <= 1 -> 1;
+//	-> x * factorial(x - 1);
+//}
+
+struct Window {}
 
 func main() -> i32
 {
-	array :[256]u8 = $run foo();
-	for i := 0; i <= 'Z' - 'A'; ++i {
-		array[i] = #u8 (array[i] + 'A');
-		printf("%d", #i32 array[i]);
+	/*
+	array :[4]u8 = {'A', 'B', 'C', 'D'};
+	array[0] += #u8 NUMS.FIVE;
+	
+	*/
+	window := get_window();
+	printf("%d", something(window));
+	/*
+	printf("%d\n", NUMS.FIVE);
+	if NUMS.TWELVE == 12 && NUMS.NINETEEN == 19
+		printf("yes\n");
+	/*
+	// @TODO: remove the need for curly braces
+	if #bool 1 {
+		*ptr = 0;
 	}
+	*/
 
+	item := array[3];
+	if item == 'B'
+		printf("it's B\n");
+	else if item == 'A'
+		printf("it's A\n");
+	else if item == 'C'
+		printf("it's C\n");
+	else if item == 'D'
+	{
+		printf("it's D\n");
+		printf("sizeof %d, elem %d, div %d\n",
+			$size array, $size array[1], $size array / $size array[0]);
+	}
+	else
+		printf("else\n");
+	for i := 0; i < $size array / $size array[0] ; ++i
+		printf("%c\n", array[i]);
+
+	*/
 	-> 0;
 }
 
+func get_window() ->* Window
+{
+	window := #*Actual_Window mem_alloc($size Actual_Window);
+	window.a = 10;
+	window.b = 10;
+	-> #*Window window;
+}
+
+struct Actual_Window {a: i32; b: i32;}
+
+func something(window:* Window) -> i32
+{
+	actual_window := #*Actual_Window window;
+	-> actual_window.a;
+}
+
+enum NUMS {
+	FIVE = 5;
+	TWELVE;
+	NINETEEN;
+	TWENTYSIX = 26;
+}

@@ -3,21 +3,10 @@ source_filename = "Test.apoc"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-@global_var = constant i64 12
-@constant_array = private constant [256 x i8] c"ABCDEFGHIJKLMNOPQRSTUVWXYZ\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
-@0 = private unnamed_addr constant [3 x i8] c"%d\00", align 1
+%Actual_Window = type { i32, i32 }
 
-define i32 @add(i32 %a, i32 %b) {
-entry:
-  %b2 = alloca i32, align 4
-  %a1 = alloca i32, align 4
-  store i32 %a, ptr %a1, align 4
-  store i32 %b, ptr %b2, align 4
-  %0 = load i32, ptr %a1, align 4
-  %1 = load i32, ptr %b2, align 4
-  %2 = add i32 %0, %1
-  ret i32 %2
-}
+@global_var = constant i64 12
+@0 = private unnamed_addr constant [3 x i8] c"%d\00", align 1
 
 define i32 @_apoc_init() {
 entry:
@@ -25,44 +14,43 @@ entry:
   ret i32 %0
 }
 
-declare [256 x i8] @foo()
-
 define i32 @main() {
 entry:
-  %i = alloca i64, align 8
-  %compile_time_array = alloca [256 x i8], align 16
-  %0 = getelementptr inbounds [256 x i8], ptr %compile_time_array, i64 0, i64 0
-  call void @llvm.memcpy.p0.p0.i64(ptr align 16 %0, ptr align 16 @constant_array, i64 256, i1 false)
-  store i64 0, ptr %i, align 4
-  %1 = load i64, ptr %i, align 4
-  %2 = icmp sle i64 %1, 25
-  br i1 %2, label %for_true, label %for_false
-
-for_true_jump:                                    ; preds = %for_true
-  %3 = load i64, ptr %i, align 4
-  %4 = add i64 %3, 1
-  store i64 %4, ptr %i, align 4
-  %5 = load i64, ptr %i, align 4
-  %6 = icmp sle i64 %5, 25
-  br i1 %6, label %for_true, label %for_false
-
-for_false:                                        ; preds = %entry, %for_true_jump
+  %window = alloca ptr, align 8
+  %0 = call ptr @get_window()
+  store ptr %0, ptr %window, align 8
+  %1 = load ptr, ptr %window, align 8
+  %2 = call i32 @something(ptr %1)
+  %3 = call i32 (ptr, ...) @printf(ptr @0, i32 %2)
   ret i32 0
+}
 
-for_true:                                         ; preds = %entry, %for_true_jump
-  %7 = load i64, ptr %i, align 4
-  %elem_ptr = getelementptr [256 x i8], ptr %compile_time_array, i64 0, i64 %7
-  %indexed_val = load i8, ptr %elem_ptr, align 1
-  %8 = add i8 %indexed_val, 65
-  %9 = load i64, ptr %i, align 4
-  %elem_ptr1 = getelementptr [256 x i8], ptr %compile_time_array, i64 0, i64 %9
-  store i8 %8, ptr %elem_ptr1, align 1
-  %10 = load i64, ptr %i, align 4
-  %elem_ptr2 = getelementptr [256 x i8], ptr %compile_time_array, i64 0, i64 %10
-  %indexed_val3 = load i8, ptr %elem_ptr2, align 1
-  %cast = sext i8 %indexed_val3 to i32
-  %11 = call i32 (ptr, ...) @printf(ptr @0, i32 %cast)
-  br label %for_true_jump
+define ptr @get_window() {
+entry:
+  %window = alloca ptr, align 8
+  %0 = call ptr @mem_alloc(i64 8)
+  store ptr %0, ptr %window, align 8
+  %1 = load ptr, ptr %window, align 8
+  %2 = getelementptr inbounds %Actual_Window, ptr %1, i32 0, i32 0
+  store i32 10, ptr %2, align 4
+  %3 = load ptr, ptr %window, align 8
+  %4 = getelementptr inbounds %Actual_Window, ptr %3, i32 0, i32 1
+  store i32 10, ptr %4, align 4
+  %5 = load ptr, ptr %window, align 8
+  ret ptr %5
+}
+
+define i32 @something(ptr %window) {
+entry:
+  %actual_window = alloca ptr, align 8
+  %window1 = alloca ptr, align 8
+  store ptr %window, ptr %window1, align 8
+  %0 = load ptr, ptr %window1, align 8
+  store ptr %0, ptr %actual_window, align 8
+  %"derefrence struct" = load ptr, ptr %actual_window, align 8
+  %struct_member_ptr = getelementptr inbounds %Actual_Window, ptr %"derefrence struct", i32 0, i32 0
+  %struct_member = load i32, ptr %struct_member_ptr, align 4
+  ret i32 %struct_member
 }
 
 declare ptr @malloc(i64)
@@ -93,8 +81,3 @@ entry:
   %5 = load ptr, ptr %result, align 8
   ret ptr %5
 }
-
-; Function Attrs: argmemonly nofree nounwind willreturn
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #0
-
-attributes #0 = { argmemonly nofree nounwind willreturn }

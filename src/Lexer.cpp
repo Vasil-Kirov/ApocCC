@@ -9,6 +9,7 @@ static str_hash_table *keyword_table;
 
 #define KEYWORD_ERROR 32767
 
+// @TODO: maybe pass start_line and start_column for better error message or something idk
 void
 advance_buffer(File_Contents *f)
 {
@@ -23,6 +24,9 @@ advance_buffer(File_Contents *f)
 			f->current_column++;
 		f->at++;
 	}
+	else
+		raise_token_syntax_error(f, "Unexpected end of file",
+				(char *)f->path, f->current_line, f->current_column);
 }
 
 void
@@ -51,6 +55,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "func", tok_func);
 		shput(keyword_table, "extern", tok_extern);
 		shput(keyword_table, "struct", tok_struct);
+		shput(keyword_table, "enum", tok_enum);
 		shput(keyword_table, "import", tok_import);
 		shput(keyword_table, "cast", tok_cast);
 		shput(keyword_table, "if", tok_if);
@@ -84,8 +89,10 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "<<=", tok_lshift_equals);
 		shput(keyword_table, ">>=", tok_rshift_equals);
 		shput(keyword_table, "...", tok_var_args);
-		shput(keyword_table, "$run", tok_run);
-		shput(keyword_table, "$interp", tok_interp);
+		shput(keyword_table, "$run",     tok_run);
+		shput(keyword_table, "$interp",  tok_interp);
+		shput(keyword_table, "$size",    tok_size);
+		shput(keyword_table, "$default", tok_default);
 	}
 	
 	// NOTE(Vasko): Add basic types to string hash table
@@ -240,29 +247,67 @@ Token_Iden get_token(File_Contents *f)
 	{
 		u64 start_col = f->current_column;
 		u64 start_line = f->current_line;
-		b32 found_dot = false;
-		do {
+		if(last_char == '0' && f->at[1] == 'x')
+		{
 			advance_buffer(f);
-			if(*f->at == '.')
-			{
-				if(found_dot)
-				{
-					raise_token_syntax_error(f, "Number has an extra decimal point", (char *)f->path, start_line,
-											 start_col);
-					return get_token(f);
-				}
-				found_dot = true;
+			advance_buffer(f);
+			if(!is_hex(*f->at))
+						raise_token_syntax_error(f, "Expected hex characters after 0x",
+								(char *)f->path, start_line,
+								start_col);
+			while (is_hex(*f->at)) {
+				advance_buffer(f);
 			}
-		} while (is_number(*f->at) || *f->at == '.');
-		u64 num_size = f->at - string_start;
-		
-		u8 *number_string = (u8 *)AllocateCompileMemory(num_size+1);
-		memcpy(number_string, string_start, num_size);
-		number_string[num_size] = '\0';
+			u8 *hex_start = (string_start + 2);
+			size_t len = f->at - hex_start;
+			u8 hex_num[len];
+			memcpy(hex_num, hex_start, len);
+			u64 num = hex_to_num(hex_num, len);
+			u64 copy_num = num;
+			u64 num_len = 0;
+			while(copy_num)
+			{
+				num_len++;
+				copy_num /= 10;
+			}
+			u8 *number_string = (u8 *)AllocateCompileMemory(num_len + 1);
+			_vstd_U64ToStr(num, (char *)number_string);
 
-		Token_Iden result = {number_string, (char *)f->path, f->file_data, tok_number,
-							 start_line, start_col};
-		return result;
+			Token_Iden result = {};
+			result.identifier = number_string;
+			result.file = (char *)f->path;
+			result.f_start = f->file_data;
+			result.line = start_line;
+			result.column = start_col;
+			result.type = tok_number;
+			return result;
+		}
+		else
+		{
+			b32 found_dot = false;
+			do {
+				advance_buffer(f);
+				if(*f->at == '.')
+				{
+					if(found_dot)
+					{
+						raise_token_syntax_error(f, "Number has an extra decimal point", (char *)f->path, start_line,
+								start_col);
+						return get_token(f);
+					}
+					found_dot = true;
+				}
+			} while (is_number(*f->at) || *f->at == '.');
+			u64 num_size = f->at - string_start;
+
+			u8 *number_string = (u8 *)AllocateCompileMemory(num_size+1);
+			memcpy(number_string, string_start, num_size);
+			number_string[num_size] = '\0';
+
+			Token_Iden result = {number_string, (char *)f->path, f->file_data, tok_number,
+				start_line, start_col};
+			return result;
+		}
 	}
 	else
 	{
@@ -377,6 +422,35 @@ Token_Iden get_token(File_Contents *f)
 				while(*f->at != '\n')
 					advance_buffer(f);
 				advance_buffer(f);
+				return get_token(f);
+			}
+			else if(string_start[0] == '/' && string_start[1] == '*')
+			{
+				int nest = 0;
+				while(nest >= 0)
+				{
+					while(*f->at != '*')
+					{
+						if(*f->at == 0)
+							raise_token_syntax_error(f, "Unexpected end of file before closing of "
+								"block comment", (char *)f->path, start_line, start_col);
+						advance_buffer(f);
+					}
+					if(*(f->at - 1) == '/')
+					{
+						advance_buffer(f);
+						nest++;
+					}
+					else
+					{
+						advance_buffer(f);
+						if(*f->at == '/')
+						{
+							nest--;
+							advance_buffer(f);
+						}
+					}
+				}
 				return get_token(f);
 			}
 

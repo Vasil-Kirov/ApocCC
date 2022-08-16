@@ -1,3 +1,4 @@
+#include "llvm/IR/Type.h"
 #include <Analyzer.h>
 #include <Log.h>
 #include <stdlib/std.h>
@@ -189,32 +190,44 @@ analyze(File_Contents *f, Ast_Node *ast_tree)
 	analyze_file_level_statement_list(f, ast_tree);
 	// @Check: maybe pop_scope()?
 }
-
 void
 analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 {
 	Assert(node->type == type_statements);
 	Ast_Node **statements = node->statements.list;
 	size_t statement_count = SDCount(statements);
+	Ast_Node **functions = SDCreate(Ast_Node *);
 	for(size_t i = 0; i < statement_count; ++i)
 	{
-		analyze_file_level_statement(f, statements[i]);
+		Ast_Node *maybe_func = analyze_file_level_statement(f, statements[i]);
+		if(maybe_func)
+			SDPush(functions, maybe_func);
+	}
+	// @NOTE: we delay function verification so that all global symbols can be declared
+	size_t func_count = SDCount(functions);
+	for (size_t i = 0; i < func_count; ++i)
+	{
+		verify_func(f, functions[i]);
 	}
 }
 
-void
+Ast_Node *
 analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 {
-	if(node == NULL) return;
+	if(node == NULL) return NULL;
 	switch(node->type)
 	{
 		case type_struct:
 		{
 			verify_struct(f, node);
 		}break;
+		case type_enum:
+		{
+			verify_enum(f, node);
+		} break;
 		case type_func:
 		{
-			verify_func(f, node);
+			return node;
 		} break;
 		case type_assignment:
 		{
@@ -226,7 +239,149 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 					type_to_str(node->type), node->type);
 		} break;
 	}
-	return;
+	return NULL;
+}
+
+void
+verify_enum(File_Contents *f, Ast_Node *node)
+{
+	Ast_Enum *enumerator = &node->enumerator;
+	size_t member_count = SDCount(enumerator->members);
+	Ast_Node *first_rhs = NULL;
+	Ast_Node *last_rhs = NULL;
+	Token_Iden first_token = {};
+	Token_Iden last_token = {};
+	size_t n = 0;
+	for(size_t i = 0; i < member_count; ++i)
+	{
+		Ast_Assignment member = enumerator->members[i]->assignment;
+		if(member.rhs)
+		{
+			if(!first_rhs)
+			{
+				first_rhs = member.rhs;
+				first_token = member.token;
+			}
+			last_rhs = member.rhs;
+			last_token = member.token;
+			n = i + 1;
+		}
+	}
+	
+	Interp_Val d = {};
+	d.type.type = T_INTEGER;
+	d.type.primitive.size = byte8;
+	d.ti64 = 1;
+	Interp_Val first_val = {};
+	first_val.type.type = T_INTEGER;
+	first_val.type.primitive.size = byte8;
+	first_val.ti64 = 0;
+	if(first_rhs && first_rhs != last_rhs)
+	{
+		b32 failed = false;
+		get_expression_type(f, first_rhs, first_token, NULL);
+		get_expression_type(f, last_rhs, last_token, NULL);
+		Interp_Val first = interpret_expression(first_rhs, &failed);
+		Interp_Val last = interpret_expression(last_rhs, &failed);
+
+		first_val = first;
+		// @TODO: better error message token
+		if(failed)
+			raise_semantic_error(f, "Non constant expression used for enum member value",
+					enumerator->token);
+		if((!is_integer(first.type) && !is_float(first.type)) ||
+				(!is_integer(last.type) && !is_float(last.type)))
+			raise_semantic_error(f, "Enum contains a non primitive value",
+					enumerator->token);
+		
+		Interp_Val top = {};
+		Interp_Val bot = {};
+		DO_U_OP(top, -, first);
+		DO_OP(top, +, top, last);
+		if(is_float(top.type))
+		{
+			bot.type.type = T_FLOAT;
+			bot.type.primitive.size = real64;
+			bot.tf64 = n - 1;
+		}
+		else if(is_integer(top.type))
+		{
+			bot.type.type = T_INTEGER;
+			if(is_signed(top.type))
+			{
+				bot.type.primitive.size = byte8;
+				bot.ti64 = n - 1;
+			}
+			else
+			{
+				bot.type.primitive.size = ubyte8;
+				bot.tu64 = n - 1;
+			}
+		}
+		else
+			Assert(false);
+
+		DO_OP(d, /, top, bot);
+	}
+
+	for(size_t i = 0; i < member_count; ++i)
+	{
+		Ast_Assignment member = enumerator->members[i]->assignment;
+		Assert(member.lhs->type == type_identifier);
+		for(size_t j = i + 1; j < member_count; ++j)
+		{
+			Ast_Assignment comp_member = enumerator->members[j]->assignment;
+			if(vstd_strcmp((char *)member.lhs->identifier.name, (char *)comp_member.lhs->identifier.name))
+			{
+				raise_formated_semantic_error(f, member.token, 
+						"Members #%d and #%d have the same identifier",
+						i + 1, j + 1);
+			}
+		}
+		memset(enumerator->members[i], 0, sizeof(Ast_Node));
+		enumerator->members[i]->type = type_interp_val;
+		enumerator->members[i]->interp_val.id = member.lhs->identifier;
+		if(!member.rhs)
+		{
+			Interp_Val val = {};
+			DO_RINT_OP(val, *, d, i);
+			DO_OP(enumerator->members[i]->interp_val.val, +, first_val, val);
+		}
+		else
+		{
+			Type_Info mem_type = get_expression_type(f, member.rhs, member.token, NULL);
+			if(is_untyped(enumerator->type))
+				enumerator->type = mem_type;
+			else if(!check_type_compatibility(enumerator->type, mem_type))
+				raise_formated_semantic_error(f, member.token, 
+						"Member %s in enum is of type %s which is incompatible with the rest of the enum "
+						"is of type %s",
+						member.lhs->identifier.name, var_type_to_name(mem_type),
+						var_type_to_name(enumerator->type));
+			b32 failed = false;
+			enumerator->members[i]->interp_val.val = interpret_expression(member.rhs, &failed);
+			if(failed)
+				raise_formated_semantic_error(f, member.token, "Member number #%d in enum %s "
+						"contains an incorrect constant expression",
+						i + 1, node->enumerator.id.name);
+		}
+	}
+	
+	Type_Info *enum_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	memcpy(enum_type, &node->enumerator.type, sizeof(Type_Info));
+	Type_Info sym_type = {};
+	sym_type.type = T_ENUM;
+	sym_type.token = node->enumerator.token;
+	sym_type.enumerator.node = node;
+	sym_type.enumerator.type = enum_type;
+
+	Symbol enum_sym = {};
+	enum_sym.tag        = S_ENUM;
+	enum_sym.identifier = node->enumerator.id.name;
+	enum_sym.node       = node;
+	enum_sym.type       = sym_type;
+	enum_sym.token      = node->enumerator.token;
+	add_symbol(f, enum_sym);
 }
 
 void
@@ -373,6 +528,14 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 			{
 				verify_func_level_statement(f, next_node, func_node, current_list, idx);
 				pop_scope(f, scope_tok);
+			}
+		} break;
+		case type_else:
+		{
+			if(current_list->statements.list[*idx - 2]->type != type_if)
+			{
+				raise_semantic_error(f, "else statement doesn't have a matching if",
+						node->condition.token);
 			}
 		} break;
 		case type_assignment:
@@ -570,6 +733,14 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 				expression_type = untyped_to_type(expression_type);
 				expression_type.identifier = (u8 *)"i64";
 			}
+			else if(expression_type.type == T_ARRAY)
+			{
+				if(is_untyped(*expression_type.array.type))
+				{
+					Type_Info elem_type = untyped_to_type(*expression_type.array.type);
+					memcpy(expression_type.array.type, &elem_type, sizeof(Type_Info));
+				}
+			}
 			node->assignment.decl_type = expression_type;
 		}
 		else if(!check_type_compatibility(node->assignment.decl_type, expression_type))
@@ -606,18 +777,26 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 		if(node->assignment.decl_type.type == T_ARRAY)
 		{
 			auto count_expr = node->assignment.decl_type.array.optional_expression;
+			auto elem_count = node->assignment.decl_type.array.elem_count;
 			auto type_token = node->assignment.decl_type.token;
-			if(!count_expr)
+			if(count_expr)
 			{
-				raise_semantic_error(f, "Expected an expression to declare array size", type_token);
-			}
-			Type_Info array_size_type = get_expression_type(f, count_expr, type_token, NULL);
-			if(!is_integer(array_size_type))
-			{
-				raise_semantic_error(f, "Expected an integer expression", type_token);
+				Type_Info array_size_type = get_expression_type(f, count_expr, type_token, NULL);
+				if(!is_integer(array_size_type))
+				{
+					raise_semantic_error(f, "Expected an integer expression", type_token);
+				}
 			}
 			b32 failed = false;
-			Interp_Val count_val = interpret_expression(count_expr, &failed);
+			
+			Interp_Val count_val = {};
+			if(count_expr)
+				count_val = interpret_expression(count_expr, &failed);
+			else
+			{
+				count_val.type.type = T_UNTYPED_INTEGER;
+				count_val.tu64 = elem_count;
+			}
 			Assert(is_integer(count_val.type));
 			if(failed)
 			{
@@ -751,6 +930,58 @@ verify_array_list(File_Contents *f, Ast_Node *node)
 }
 
 Type_Info
+verify_selector(File_Contents *f, Ast_Node *expression)
+{
+	Type_Info operand_type = fix_type(f, get_expression_type(f, expression->selector.operand, expression->selector.dot_token, NULL));
+	expression->selector.operand_type = operand_type;
+	if(!is_accessible(operand_type))
+	{
+		raise_formated_semantic_error(f, expression->selector.dot_token,
+				"Expression of type %s is not selectable", var_type_to_name(operand_type));
+	}
+
+	while(operand_type.type == T_POINTER)
+		operand_type = *operand_type.pointer.type;
+	
+	if(is_or_is_pointing_to(operand_type, T_STRUCT))
+	{
+		Ast_Struct structure = operand_type.structure->structure;
+		u8 *name = expression->selector.identifier->identifier.name;
+		for(size_t i = 0; i < structure.member_count; ++i)
+		{
+			if(vstd_strcmp((char *)name, (char *)structure.members[i].identifier.name))
+			{
+				expression->selector.selected_type = structure.members[i].type;
+				expression->selector.selected_index = i;
+				return structure.members[i].type;
+			}
+		}
+		raise_formated_semantic_error(f, expression->selector.dot_token,
+				"Accessed member [ %s ] of structure [ %s ] doesn't exist",
+				name, structure.struct_id.name);
+	}
+	else if(operand_type.type == T_ENUM)
+	{
+		Ast_Enum enumerator = operand_type.enumerator.node->enumerator;
+		u8 *name = expression->selector.identifier->identifier.name;
+		size_t member_count = SDCount(enumerator.members);
+		for(size_t i = 0; i < member_count; ++i)
+		{
+			u8 *mem_name = enumerator.members[i]->interp_val.id.name;
+			if(vstd_strcmp((char *)name, (char *)mem_name))
+			{
+				expression->selector.selected_type = operand_type;
+				expression->selector.selected_index = i;
+				return enumerator.type;
+			}
+		}
+	}
+	else
+		Assert(false);
+	return (Type_Info){};
+}
+
+Type_Info
 get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previous)
 {
 	switch ((int)expression->type)
@@ -816,29 +1047,7 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 		} break;
 		case type_selector:
 		{
-			Type_Info operand_type = fix_type(f, get_expression_type(f, expression->selector.operand, expression->selector.dot_token, NULL));
-			expression->selector.operand_type = operand_type;
-			if(!is_accessible(operand_type))
-			{
-				raise_formated_semantic_error(f, expression->selector.dot_token,
-						"Expression of type %s is not selectable", var_type_to_name(operand_type));
-			}
-
-			Ast_Struct structure = operand_type.structure->structure;
-			u8 *name = expression->selector.identifier->identifier.name;
-			for(size_t i = 0; i < structure.member_count; ++i)
-			{
-				if(vstd_strcmp((char *)name, (char *)structure.members[i].identifier.name))
-				{
-					expression->selector.selected_type = structure.members[i].type;
-					expression->selector.selected_index = i;
-					return structure.members[i].type;
-				}
-			}
-			raise_formated_semantic_error(f, expression->selector.dot_token,
-					"Accessed member [ %s ] of structure [ %s ] doesn't exist",
-					name, structure.struct_id.name);
-
+			return verify_selector(f, expression);
 		} break;
 		case type_postfix:
 		{
@@ -866,6 +1075,8 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 		{
 			Type_Info result = {};
 			result.type = T_ARRAY;
+			result.token = expression->array_list.token;
+			result.array.elem_count = SDCount(expression->array_list.list);
 			result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 			result.identifier = (u8 *)"array_list";
 			Type_Info array_type = verify_array_list(f, expression);
@@ -965,9 +1176,30 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *prev
 			} break;
 		}
 	}
+	else if(expression->type == type_size)
+	{
+		Type_Info op_type = {};
+		op_type.type = T_INVALID;
+		if(expression->size.operand->type == type_identifier)
+		{
+			op_type = get_type(f, expression->size.operand->identifier.name);
+		}
+		if(op_type.type == T_INVALID)
+			op_type = get_expression_type(f, expression->size.operand,
+					expression->size.token, previous);
+
+		expression->size.operand_type = op_type;
+		Type_Info size_type = {T_UNTYPED_INTEGER};
+		return size_type;
+	}
 	else if(expression->type == type_cast)
 	{
 		Type_Info cast_type = fix_type(f, expression->cast.type);
+		if(cast_type.type == T_INVALID)
+		{
+			raise_formated_semantic_error(f, expression->cast.token,
+					"Cast type %s is undefined", var_type_to_name(cast_type));
+		}
 		Type_Info casted = get_expression_type(f, expression->cast.expression, expression->cast.token, NULL);
 		expression->cast.expr_type = casted;
 		if(!is_castable(casted, cast_type))
@@ -1056,7 +1288,8 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, A
 	Ast_Node **passed_expr = func_call->func_call.arguments;
 	size_t expr_count = SDCount(passed_expr);
 	size_t args_count = SDCount(func_args);
-
+	func_call->func_call.expr_types = SDCreate(Type_Info);
+	func_call->func_call.arg_types = SDCreate(Type_Info);
 	if(args_count != expr_count)
 	{
 		if(func_sym->node->function.has_var_args && (args_count == expr_count + 1 || expr_count > args_count))
@@ -1076,8 +1309,8 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, A
 		Type_Info expr_type = fix_type(f, get_expression_type(f, passed_expr[i], expr_token, NULL));
 		Type_Info arg_type = fix_type(f, func_args[j]->variable.type);
 		
-		func_call->func_call.expr_types[i] = expr_type;
-		func_call->func_call.arg_types[i] = arg_type;
+		SDPush(func_call->func_call.expr_types, expr_type);
+		SDPush(func_call->func_call.arg_types, arg_type);
 		if(arg_type.type == T_DETECT)
 		{
 			found_var_args = true;
@@ -1129,6 +1362,8 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 					 "Struct %s doesn't exist, error in struct initializer", struct_id);
 		raise_semantic_error(f, error, error_token);
 	}
+
+	struct_init->struct_init.expr_types = SDCreate(Type_Info);
 	if(SDCount(expressions) == 0)
 	{
 		struct_init->struct_init.is_empty_init = true;
@@ -1141,7 +1376,7 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 			result->type = type_literal;
 			result->atom.identifier = pure_identifier(zero_tok);
 			SDPush(struct_init->struct_init.expressions, result);
-			struct_init->struct_init.expr_types[i] = untyped_int;
+			SDPush(struct_init->struct_init.expr_types, untyped_int);
 		}
 	}
 	else
@@ -1159,7 +1394,7 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 			Type_Info expr_type = get_expression_type(f, expressions[i], error_token,
 													  NULL);
 			Type_Info member_type = members[i].type;
-			struct_init->struct_init.expr_types[i] = expr_type;
+			SDPush(struct_init->struct_init.expr_types, expr_type);
 			if(!check_type_compatibility(member_type, expr_type))
 			{
 				char *error = (char *)AllocateCompileMemory(2048);
@@ -1184,7 +1419,7 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 				result->type = type_literal;
 				result->atom.identifier = pure_identifier(zero_tok);
 				SDPush(struct_init->struct_init.expressions, result);
-				struct_init->struct_init.expr_types[i] = untyped_int;
+				SDPush(struct_init->struct_init.expr_types, untyped_int);
 			}
 		}
 	}
@@ -1283,19 +1518,20 @@ check_type_compatibility(Type_Info a, Type_Info b)
 		if(a.type == T_UNTYPED_FLOAT && b.type == T_INTEGER)
 			return false;
 
+		if(a.type == T_UNTYPED_INTEGER && b.type == T_UNTYPED_FLOAT)
+			return false;
+
 		if(is_integer(b) || is_float(b))
 			return true;
-		/*
-		a = untyped_to_type(a);
-		if(a.type == b.type)
-			return true;
-		*/
 	}	
 	if(b.type == T_UNTYPED_INTEGER || b.type == T_UNTYPED_FLOAT)
 	{
 		if(b.type == T_UNTYPED_FLOAT && a.type == T_INTEGER)
 			return false;
 		
+		if(b.type == T_UNTYPED_INTEGER && a.type == T_UNTYPED_FLOAT)
+			return false;
+
 		if(is_integer(a) || is_float(a))
 			return true;
 		/*
@@ -1312,6 +1548,8 @@ check_type_compatibility(Type_Info a, Type_Info b)
 		return false;
 	if(a.type == T_POINTER)
 		return check_type_compatibility(*a.pointer.type, *b.pointer.type);
+	if(a.type == T_BOOLEAN && b.type == T_BOOLEAN)
+		return true;
 	if(!vstd_strcmp((char *)a.identifier, (char *)b.identifier))
 		return false;
 	
@@ -1333,6 +1571,10 @@ verify_struct(File_Contents *f, Ast_Node *struct_node)
 			raise_semantic_error(f, "You can't put a struct as it's own member variable, use a pointer",
 								 members[i].identifier.token);
 		}
+		else if(members[i].type.type == T_INVALID)
+			raise_formated_semantic_error(f, members[i].type.token, 
+					"Type of member %s in struct %s is not declared",
+					members[i].identifier.name, struct_node->structure.struct_id.name);
 	}
 }
 

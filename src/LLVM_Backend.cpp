@@ -26,6 +26,7 @@ static Backend_State backend;
 static Debug_Info debug;
 static Token_Iden emergency_token;
 
+//#define ONLY_IR
 
 Backend_State
 llvm_initialize(File_Contents *f)
@@ -159,9 +160,11 @@ generate_obj(File_Contents *f)
 	char *obj_file = change_file_extension(
 			platform_path_to_file_name((char *)f->path), (char *)"o");
 	f->obj_name = obj_file;
+#if !defined(ONLY_IR)
 	LLVMTargetMachineEmitToFile(machine, file_mod, obj_file, LLVMObjectFile, &error);
 	LLVMTargetMachineEmitToFile(machine, file_mod, "asm.s", LLVMAssemblyFile, &error);
-	
+#endif	
+
 	std::error_code std_err;
 	raw_fd_ostream ir_dest("test.ll", std_err);
 	backend.module->print(ir_dest, nullptr);
@@ -243,7 +246,7 @@ generate_signatures(File_Contents *f)
 	}
 }
 
-void
+Ast_Node *
 generate_statement(File_Contents *f, Ast_Node *node)
 {
 	switch((int)node->type)
@@ -251,7 +254,7 @@ generate_statement(File_Contents *f, Ast_Node *node)
 		case type_func:
 		{
 			if(!node->function.is_interpret_only && node->function.body)
-				generate_func(f, node);
+				return node;
 
 			// Generate prototypes before
 		} break;
@@ -273,6 +276,7 @@ generate_statement(File_Contents *f, Ast_Node *node)
 					const_val, "global_var");
 			backend.named_globals[std::string((char *)node->assignment.token.identifier)] = global_var;
 		} break;
+		case type_enum: break;
 		case type_struct: break;
 		case type_scope_start: break;
 		default:
@@ -280,14 +284,24 @@ generate_statement(File_Contents *f, Ast_Node *node)
 			LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
 		} break;
 	}
+	return NULL;
 }
 
 void
 generate_statement_list(File_Contents *f, Ast_Node *list)
 {
+	Ast_Node **functions = SDCreate(Ast_Node *);
 	size_t list_size = SDCount(list->statements.list);
 	for(size_t i = 0; i < list_size; ++i)
-		generate_statement(f, list->statements.list[i]);
+	{
+		Ast_Node *maybe_func = generate_statement(f, list->statements.list[i]);
+		if(maybe_func)
+			SDPush(functions, maybe_func);
+	}
+	// @NOTE: delay function generation so all global symbols can be declared
+	size_t func_count = SDCount(functions);
+	for(size_t i = 0; i < func_count; ++i)
+		generate_func(f, functions[i]);
 }
 
 llvm::Value *
@@ -406,6 +420,7 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 		for_true = BasicBlock::Create(*backend.context, "for_true", func);
 		backend.builder->SetInsertPoint(for_true);
 		generate_block(f, loop_body, func, NULL, "for_true", jmp_block, list, idx);
+		backend.builder->CreateBr(jmp_block);
 	}
 
 	backend.builder->SetInsertPoint(jmp_block);
@@ -420,10 +435,11 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	backend.builder->CreateCondBr(evaluation, for_true, for_false);
 }
 
-void
+BasicBlock *
 generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block,
 		const char *block_name, BasicBlock *to_go, Ast_Node *list, u64 *idx)
 {
+	BasicBlock *result = NULL;
 	switch((int)node->type)
 	{
 		case type_func_call:
@@ -473,12 +489,55 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 
 			llvm::BasicBlock *if_true = NULL;
 			llvm::BasicBlock *if_false = NULL;
+			llvm::BasicBlock *to_go_if = NULL;
 
 			*idx += 1;
 			auto body_node = list->statements.list[*idx];
 			*idx += 1;
 			auto next_node = list->statements.list[*idx];
 			
+			if(next_node->type == type_else)
+			{
+				*idx += 1;
+				auto else_node = list->statements.list[*idx];
+				if(else_node->type == type_scope_start)
+				{
+					to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
+					if_false = generate_blocks_from_list(f, else_node->scope_desc.body,
+							func, NULL, "else", to_go_if);
+					backend.builder->SetInsertPoint(to_go_if);
+					size_t count = SDCount(list->statements.list);
+
+					for(; *idx < count; *idx += 1)
+						generate_block(f, list->statements.list[*idx], func,
+								to_go_if, "to_go_if", to_go, list, idx);
+				}
+				else if(else_node->type == type_if)
+				{
+					if_false = BasicBlock::Create(*backend.context, "if_false", func);
+					backend.builder->SetInsertPoint(if_false);
+					to_go_if = generate_block(f, else_node, func, if_false, "", to_go_if, list, idx);
+				}
+				else
+				{
+					to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
+					if_false = BasicBlock::Create(*backend.context, "if_false", func);
+					backend.builder->SetInsertPoint(if_false);
+					generate_block(f, else_node, func, if_false, "", to_go_if, list, idx);
+					backend.builder->CreateBr(to_go_if);
+					*idx += 1;	
+					backend.builder->SetInsertPoint(to_go_if);
+					size_t count = SDCount(list->statements.list);
+
+					for(; *idx < count; *idx += 1)
+						generate_block(f, list->statements.list[*idx], func, to_go_if, "to_go_if",
+								to_go, list, idx);
+					
+					if(to_go)
+						backend.builder->CreateBr(to_go);
+				}
+			}
+			else	
 			{
 				if_false = BasicBlock::Create(*backend.context, "if_false", func);
 				backend.builder->SetInsertPoint(if_false);
@@ -490,21 +549,26 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				
 				if(to_go)
 					backend.builder->CreateBr(to_go);
+
+				to_go_if = if_false;
 			}
 
 			if(body_node->type == type_scope_start)
 			{
-				generate_blocks_from_list(f, next_node->scope_desc.body, func,
-						NULL, "if_true", if_false);
+				if_true = generate_blocks_from_list(f, body_node->scope_desc.body, func,
+						NULL, "if_true", to_go_if);
 			}
 			else
 			{
 				if_true = BasicBlock::Create(*backend.context, "if_true", func);
 				backend.builder->SetInsertPoint(if_true);
-				generate_block(f, body_node, func, if_true, "if_true", if_false, list, idx);
+				generate_block(f, body_node, func, if_true, "if_true", to_go_if, list, idx);
+				if(if_true->getTerminator() == NULL)
+					backend.builder->CreateBr(to_go_if);
 			}
 			backend.builder->SetInsertPoint(passed_block);
 			backend.builder->CreateCondBr(evaluation, if_true, if_false);
+			result = to_go_if;
 		} break;
 		case type_scope_end: {} break;
 		default:
@@ -512,6 +576,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
 		} break;
 	}
+	return result;
 }
 
 llvm::BasicBlock *
@@ -522,10 +587,11 @@ generate_blocks_from_list(File_Contents *f, Ast_Node *list_node, Function *func,
 	if(!passed_block)
 	{
 		body_block = BasicBlock::Create(*backend.context, block_name, func);
-		backend.builder->SetInsertPoint(body_block);
 	}
 	else
 		body_block = passed_block;
+
+	backend.builder->SetInsertPoint(body_block);
 	size_t count = SDCount(list_node->statements.list);
 	auto list = list_node->statements.list;
 	for(size_t i = 0; i < count; ++i)
@@ -613,7 +679,9 @@ generate_func(File_Contents *f, Ast_Node *node)
 	raw_fd_ostream std_out_fd("-", error_code);
 	if (verifyFunction(*func, &std_out_fd))
 	{
+#if !defined (ONLY_IR)
 		LG_FATAL("Incorrect function");
+#endif
 	}
 	DEBUG_INFO (
 		emit_location(emergency_token.line, emergency_token.column);
@@ -686,7 +754,8 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_literal:
 		{
-			// @TODO: check size in case of uint64 sized integer
+			// check size in case of uint64 sized integer
+			// @NOTE: don't
 			char *name = (char *)node->atom.identifier.name;
 			Type_Info type = number_to_untyped_type((u8 *)name);
 			if(is_float(type))
@@ -740,21 +809,52 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_selector:
 		{
-			auto struct_type = shget(backend.struct_types, node->selector.operand_type.identifier);
+
 			llvm::Value *operand = NULL;
-			if(node->selector.operand_type.type != T_POINTER)
+			Type_Info op_type = node->selector.operand_type;
+			if(op_type.type == T_POINTER)
 			{
 				if(node->selector.operand->type == type_struct_init)
-				{
 					operand = generate_expression(f, node->selector.operand, func);
-				}
 				else
-					operand = backend.named_values[std::string((char *)node->selector.operand->identifier.name)];
+					operand = backend.named_values[std::string(
+							(char *)node->selector.operand->identifier.name)];
+			}
+
+			while(op_type.type == T_POINTER)
+			{
+				auto llvm_type = apoc_type_to_llvm(op_type, backend);
+				operand = backend.builder->CreateLoad(llvm_type, operand, "derefrence struct");
+				op_type = *op_type.pointer.type;
+			}
+
+			if(op_type.type == T_STRUCT)
+			{
+				auto struct_type = shget(backend.struct_types, op_type.identifier);
+				if(!operand)
+				{
+					if(node->selector.operand->type == type_struct_init)
+					{
+						operand = generate_expression(f, node->selector.operand, func);
+					}
+					else
+						operand = backend.named_values[std::string(
+								(char *)node->selector.operand->identifier.name)];
+				}
+				auto elem_ptr = backend.builder->CreateStructGEP(
+						struct_type, operand, node->selector.selected_index,
+						"struct_member_ptr");
+				auto llvm_op_type = apoc_type_to_llvm(node->selector.selected_type, backend);
+				return backend.builder->CreateLoad(llvm_op_type, elem_ptr, "struct_member");
+			}
+			else if(op_type.type == T_ENUM)
+			{
+				auto enumerator = op_type.enumerator.node->enumerator;
+				auto member = enumerator.members[node->selector.selected_index];
+				return interp_val_to_llvm(member->interp_val.val, backend, func);
 			}
 			else
-				Assert(false); // implement
-			auto elem_ptr = backend.builder->CreateStructGEP(struct_type, operand, node->selector.selected_index, "struct_member_ptr");
-			return backend.builder->CreateLoad(apoc_type_to_llvm(node->selector.selected_type, backend), elem_ptr, "struct_member");
+				Assert(false);
 		} break;
 		case type_array_list:
 		{
@@ -913,6 +1013,11 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 		}
 		return result;
 	}
+	else if(node->type == type_size)
+	{
+		int type_size = get_type_size(node->size.operand_type);
+		return backend.builder->getInt64((u64)type_size);
+	}
 	else if(node->type == type_cast)
 	{
 		Type_Info cast_type = node->cast.type;
@@ -1049,6 +1154,10 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 				else
 					result = backend.builder->CreateICmpNE(left, right);
 			} break;
+			case tok_logical_and:
+			{
+				result = backend.builder->CreateAnd(left, right, "&&");
+			} break;
 			case tok_bits_rshift:
 			{
 				result = backend.builder->CreateShl(left, right);
@@ -1174,6 +1283,20 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
 		case type_index:
 		{
 			return generate_index(f, lhs, func, rhs, is_decl, decl_type);
+		} break;
+		case type_selector:
+		{
+			auto selector =generate_lhs(f, func, lhs->selector.operand, rhs, is_decl, decl_type);
+			Type_Info op_type = lhs->selector.operand_type;
+			while(op_type.type == T_POINTER)
+			{
+				llvm::Type *llvm_op_type = apoc_type_to_llvm(op_type, backend);
+				selector = backend.builder->CreateLoad(llvm_op_type, selector);
+				op_type = *op_type.pointer.type;
+			}
+			auto struct_type = shget(backend.struct_types, op_type.identifier);
+			return backend.builder->CreateStructGEP(struct_type, selector,
+					lhs->selector.selected_index);
 		} break;
 	}
 	Assert(false);

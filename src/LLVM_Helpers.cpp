@@ -391,6 +391,12 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			}
 		}
 	}
+	else if(to.type == T_BOOLEAN)
+	{
+		if(is_integer(from))
+			return Instruction::CastOps::Trunc;
+		Assert(false);
+	}
 	else
 	{
 		Assert(to.type == T_POINTER);

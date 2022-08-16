@@ -114,7 +114,7 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func);
 void
 generate_statement_list(File_Contents *f, Ast_Node *list);
 
-void
+Ast_Node *
 generate_statement(File_Contents *f, Ast_Node *root);
 
 void
@@ -137,7 +137,7 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
 			 llvm::Value *rhs, b32 is_decl, Type_Info decl_type);
 
 
-void
+BasicBlock *
 generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block,
 		const char *block_name, BasicBlock *to_go, Ast_Node *list, u64 *idx);
 

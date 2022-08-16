@@ -95,6 +95,61 @@ vstd_str_to_double(char *str)
 	
 }
 
+u64
+do_pow(u64 num, u64 to_pow)
+{
+	u64 original_num = num;
+	if(to_pow == 0) return 1;
+	while(--to_pow)
+	{
+		num *= original_num;
+	}
+	return num;
+}
+
+inline u8
+c_to_lower(u8 c)
+{
+	if(c >= 'A' && c <= 'Z')
+		return c + 32;
+	return c;
+}
+
+u64
+hex_to_num(u8 *hex_str, size_t len)
+{
+	u64 result = 0;
+	u8 map[256] = {};
+	map[(int)'a'] = 10;
+	map[(int)'b'] = 11;
+	map[(int)'c'] = 12;
+	map[(int)'d'] = 13;
+	map[(int)'e'] = 14;
+	map[(int)'f'] = 15;
+	for(i64 i = len - 1; i >= 0; --i)
+	{
+		u8 c = hex_str[i];
+		if(is_number(c))
+			result += (c - '0') * do_pow(16, len - i - 1);
+		else
+			result += map[c_to_lower(c)] * do_pow(16, len - i - 1);
+	}
+	return result;
+}
+
+inline b32
+is_hex(u8 c)
+{
+	u8 hex_chars[] = {'a', 'b', 'c', 'd', 'e', 'f'};
+	if(is_number(c))
+		return true;
+
+	for(size_t i = 0; i < sizeof(hex_chars); ++i)
+		if(c_to_lower(c) == hex_chars[i])
+			return true;
+	return false;
+}
+
 inline b32
 is_special_char(u8 c)
 {
@@ -544,3 +599,4 @@ vstd_vsnsprintf(char *Buffer, size_t FormatSize, const char *Format, va_list Arg
 {
 	FormatString(Buffer, Format, (i32)FormatSize, Args);
 }
+

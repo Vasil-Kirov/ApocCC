@@ -20,7 +20,8 @@ typedef enum
 	S_GLOBAL_VAR,
 	S_VARIABLE,
 	S_STRUCT_MEMBER,
-	S_FUNC_ARG
+	S_FUNC_ARG,
+	S_ENUM
 } Symbol_Type;
 
 typedef struct _Symbol
@@ -126,7 +127,7 @@ add_symbol(File_Contents *f, Symbol symbol);
 void
 initialize_analyzer();
 
-void
+Ast_Node *
 analyze_file_level_statement(File_Contents *f, Ast_Node *node);
 
 void
@@ -137,6 +138,9 @@ var_type_to_name(Type_Info type);
 
 Symbol *
 get_symbol_spot(File_Contents *f, Token_Iden token);
+
+void
+verify_enum(File_Contents *f, Ast_Node *node);
 
 void
 verify_struct(File_Contents *f, Ast_Node *struct_node);

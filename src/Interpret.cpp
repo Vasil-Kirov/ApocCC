@@ -3,55 +3,6 @@
 #include <math.h>
 #include <Basic.h>
 
-#define DO_OP(out, op, l, r) \
-	Assert(l.type.type != T_INVALID); Assert(r.type.type != T_INVALID);	\
-	if(is_float(l.type))                   \
-	{                                      \
-		out.type.type = T_UNTYPED_FLOAT;   \
-		out.tf64 = l.tf64 op r.tf64;       \
-	}                                      \
-	else if(is_integer(l.type))            \
-	{                                      \
-				out.type.type = T_UNTYPED_INTEGER;    \
-				if(is_signed(l.type))                 \
-				{                                     \
-					out.type.primitive.size = byte8;  \
-					out.ti64 = l.ti64 op r.ti64;      \
-				}                                     \
-				else                                  \
-				{                                     \
-					out.type.primitive.size = ubyte8; \
-					out.tu64 = l.tu64 op r.tu64;      \
-				}                          \
-	}                                      \
-	else                                   \
-		Assert(false);                     
-
-
-#define DO_U_OP(out, op, l) \
-	Assert(l.type.type != T_INVALID)       \
-	if(is_float(l.type))                   \
-	{                                      \
-		out.type.type = T_UNTYPED_FLOAT;   \
-		out.tf64 = op l.tf64;              \
-	}                                      \
-	else if(is_integer(l.type))            \
-	{                                      \
-				out.type.type = T_UNTYPED_INTEGER;    \
-				if(is_signed(l.type))                 \
-				{                                     \
-					out.type.primitive.size = byte8;  \
-					out.ti64 = op l.ti64;             \
-				}                                     \
-				else                                  \
-				{                                     \
-					out.type.primitive.size = ubyte8; \
-					out.tu64 = op l.tu64;             \
-				}                          \
-	}                                      \
-	else                                   \
-		Assert(false);                     
-
 #include <stack>
 static std::stack<Interp_Table *> symbol_scope;
 

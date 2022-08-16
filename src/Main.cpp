@@ -132,6 +132,8 @@ int main(int argc, char *argv[])
 
 	std::vector<std::string> file_names;
 	Build_Commands build_command = parse_command_line(argc, argv, &file_names);
+	if(file_names.size() == 0)
+		LG_FATAL("No source files specified");
 	File_Contents **files = SDCreate(File_Contents *);
 	for(size_t i = 0; i < file_names.size(); ++i)
 	{

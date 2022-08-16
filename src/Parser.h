@@ -20,6 +20,10 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_interp_val   = -64,
+	type_enum         = -63,
+	type_default      = -62,
+	type_size         = -61,
 	type_statements   = -60,
 	type_run          = -59,
 	type_array_list   = -58,
@@ -112,7 +116,7 @@ typedef struct _Ast_Variable
 typedef struct _Ast_Struct
 {
 	Ast_Identifier struct_id;
-    Ast_Variable members[REASONABLE_MAXIMUM];
+    Ast_Variable *members;
 	int member_count;
 } Ast_Struct;
 
@@ -176,8 +180,8 @@ typedef struct _Ast_Call
 	Ast_Node *operand;
 	Ast_Node **arguments; // Simple DArray of expressions
 	Token_Iden token;
-	Type_Info expr_types[REASONABLE_MAXIMUM];
-	Type_Info arg_types[REASONABLE_MAXIMUM];
+	Type_Info *expr_types;
+	Type_Info *arg_types;
 } Ast_Call;
 
 typedef enum
@@ -198,7 +202,7 @@ typedef struct
 	Ast_Node **expressions; // Note(Vasko): SimpleDArray
 	Token_Iden token;
 	Type_Info type; // @NOTE: Only available after analysis
-	Type_Info expr_types[REASONABLE_MAXIMUM]; // @NOTE: after analysis
+	Type_Info *expr_types; // @NOTE: after analysis
 	b32 is_empty_init;
 } Ast_Struct_Init;
 
@@ -248,7 +252,6 @@ typedef struct
 	
 typedef struct
 {
-
 	unsigned int selected_index; // @NOTE: only available after analysis
 	Ast_Node *operand;
 	Ast_Node *identifier;
@@ -263,11 +266,35 @@ typedef struct
 	Token_Iden token;
 } Ast_Condition;
 	
+typedef struct
+{
+	Ast_Node *operand;
+	Token_Iden token;
+	Type_Info operand_type; // @NOTE: only available after analysis
+} Ast_Size;
+
+typedef struct
+{
+	Type_Info type;
+	Token_Iden token;
+	Ast_Identifier id;
+	Ast_Node **members; // @NOTE: rhs turns to type_interp_val after analysis
+} Ast_Enum;
+
+typedef struct
+{
+	Ast_Identifier id;
+	Interp_Val val;
+} Ast_Interp_Val;
+
 struct _abstract_syntax_tree
 {
 	Ast_Type type;
 	union
 	{
+		Ast_Interp_Val interp_val;
+		Ast_Enum enumerator;
+		Ast_Size size;
 		Ast_Statement statements;
 		Ast_Run run;
 		Ast_Array_List array_list;
@@ -323,6 +350,12 @@ parse_func_call(File_Contents *f, Ast_Node *operand);
 
 Ast_Node *
 parse_struct(File_Contents *f);
+
+Ast_Node *
+parse_enum(File_Contents *f);
+
+Ast_Node **
+delimited(File_Contents *f, char start, char stop, char seperator, Ast_Node *(*parser)(File_Contents *));
 
 #include <Analyzer.h>
 

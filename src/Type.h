@@ -28,19 +28,20 @@ typedef enum
 
 typedef enum
 {
-	T_UNTYPED_INTEGER = 1 << 0,
-	T_UNTYPED_FLOAT   = 1 << 1,
-	T_INTEGER         = 1 << 2,
-	T_FLOAT           = 1 << 3,
-	T_STRUCT          = 1 << 4,
-	T_ARRAY           = 1 << 5,
-	T_POINTER         = 1 << 6,
-	T_DETECT          = 1 << 7,
-	T_INVALID         = 1 << 8,
-	T_VOID            = 1 << 9,
-	T_STRING          = 1 << 10,
-	T_BOOLEAN		  = 1 << 11,
-	T_FUNC            = 1 << 12,
+	T_UNTYPED_INTEGER = 1 ,
+	T_UNTYPED_FLOAT   = 2 ,
+	T_INTEGER         = 3 ,
+	T_FLOAT           = 4 ,
+	T_STRUCT          = 5 ,
+	T_ARRAY           = 6 ,
+	T_POINTER         = 7 ,
+	T_DETECT          = 8 ,
+	T_INVALID         = 9 ,
+	T_VOID            = 10,
+	T_STRING          = 11,
+	T_BOOLEAN		  = 12,
+	T_FUNC            = 13,
+	T_ENUM            = 14,
 } Type_Type;
 
 typedef enum
@@ -79,6 +80,11 @@ typedef struct _Type_Info
 		{
 			struct _Ast_Identifier *content;
 		} v_string;
+		struct
+		{
+			Ast_Node *node;
+			struct _Type_Info *type;
+		} enumerator;
 		Ast_Node *func;
 	};
 	u8 *identifier;
@@ -87,6 +93,9 @@ typedef struct _Type_Info
 
 int
 get_type_alignment(Type_Info type);
+
+b32
+is_or_is_pointing_to(Type_Info type, Type_Type check);
 
 int
 get_type_size(Type_Info type);

@@ -1,6 +1,7 @@
 #include <Type.h>
 #include <Basic.h>
 #include <Analyzer.h>
+#include <Parser.h>
 
 int
 primitive_size_to_alignment(i64 size)
@@ -47,24 +48,39 @@ get_type_alignment(Type_Info type)
 		} break;
 	}
 }
+int
+get_struct_alignment(Type_Info struct_type)
+{
+	Assert(struct_type.type == T_STRUCT);
+	size_t biggest_member = 1;
+	auto members = struct_type.structure->structure.members;
+	size_t member_count = SDCount(members);
+	for(size_t i = 0; i < member_count; ++i)
+	{
+		int this_member = 1;
+		if(members[i].type.type == T_STRUCT)
+			this_member = get_struct_alignment(members[i].type);
+		else
+			this_member = get_type_size(members[i].type);
+		
+		if(this_member > biggest_member) biggest_member = this_member;
+	}
+	return biggest_member;
+}
 
 int
 get_type_size(Type_Info type)
 {
-	if(is_integer(type))
+	if(type.type == T_UNTYPED_INTEGER)
+		type.primitive.size = byte8;
+	else if(type.type == T_UNTYPED_FLOAT)
+		type.primitive.size = real64;
+
+	if(is_integer(type) || is_float(type))
 	{
-		int byte_size = type.primitive.size;
-		if(!is_signed(type))
-			byte_size -= 4;
-		return byte_size;
-	}
-	else if(is_float(type))
-	{
-		if(type.primitive.size == real32)
-			return 4;
-		if(type.primitive.size == real64)
-			return 8;
-		Assert(false);
+		// @TODO: since the types are aligned to their size this works
+		// but it doesn't feel nice
+		return primitive_size_to_alignment(type.primitive.size);
 	}
 	else if(type.type == T_POINTER)
 		return sizeof(size_t);
@@ -75,6 +91,38 @@ get_type_size(Type_Info type)
 	else if(type.type == T_STRING)
 	{
 		return vstd_strlen((char *)type.v_string.content->name);
+	}
+	else if(type.type == T_STRUCT)
+	{
+		Ast_Variable *members = type.structure->structure.members;
+		size_t result = 0;
+		size_t memory_address = 1;
+		size_t member_count = SDCount(members);
+		size_t largest_member = 1;
+		b32 is_packed = type.is_packed;
+		for(size_t i = 0; i < member_count; ++i)
+		{
+			size_t member_size = get_type_size(members[i].type);
+			size_t align_size = member_size;
+			if(members[i].type.type == T_STRUCT)
+			{
+				align_size = get_struct_alignment(members[i].type);
+			}
+			if(align_size > largest_member)
+				largest_member = align_size;
+
+			if(is_packed && align_size % memory_address != 0)
+			{
+				size_t align_addr = (memory_address + align_size) - 
+					(memory_address % align_size);
+				member_size += align_addr - memory_address;
+			}
+
+			result += member_size;
+			memory_address += member_size;
+		}
+		return result % largest_member == 0 ? result :
+			(result + largest_member) - (result % largest_member);
 	}
 	else if(type.type == T_BOOLEAN)
 		return 1;
@@ -187,7 +235,9 @@ is_accessible(Type_Info type)
 {
 	if(type.type == T_STRUCT)
 		return true;
-	if(type.type == T_POINTER)
+	else if(type.type == T_ENUM)
+		return true;
+	else if(type.type == T_POINTER)
 		return is_accessible(*type.pointer.type);
 	return false;
 }
@@ -197,6 +247,16 @@ is_untyped(Type_Info type)
 {
 	if(type.type == T_UNTYPED_FLOAT || type.type == T_UNTYPED_INTEGER)
 		return true;
+	return false;
+}
+
+b32
+is_or_is_pointing_to(Type_Info type, Type_Type check)
+{
+	if(type.type == check)
+		return true;
+	else if(type.type == T_POINTER)
+		return is_or_is_pointing_to(*type.pointer.type, check);
 	return false;
 }
 

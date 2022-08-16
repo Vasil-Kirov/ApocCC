@@ -6,25 +6,6 @@
 	.globl	@feat.00
 .set @feat.00, 0
 	.file	"Test.apoc"
-	.def	add;
-	.scl	2;
-	.type	32;
-	.endef
-	.globl	add
-	.p2align	4, 0x90
-add:
-.seh_proc add
-	pushq	%rax
-	.seh_stackalloc 8
-	.seh_endprologue
-	movl	%ecx, (%rsp)
-	movl	%edx, 4(%rsp)
-	movl	(%rsp), %eax
-	addl	4(%rsp), %eax
-	popq	%rcx
-	retq
-	.seh_endproc
-
 	.def	_apoc_init;
 	.scl	2;
 	.type	32;
@@ -50,38 +31,62 @@ _apoc_init:
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	subq	$296, %rsp
-	.seh_stackalloc 296
+	subq	$40, %rsp
+	.seh_stackalloc 40
 	.seh_endprologue
-	leaq	32(%rsp), %rcx
-	leaq	.Lconstant_array(%rip), %rdx
-	movl	$256, %r8d
-	callq	memcpy
-	movq	$0, 288(%rsp)
-	cmpq	$25, 288(%rsp)
-	jle	.LBB2_3
-	jmp	.LBB2_2
-.LBB2_1:
-	movq	288(%rsp), %rax
-	addq	$1, %rax
-	movq	%rax, 288(%rsp)
-	cmpq	$25, 288(%rsp)
-	jle	.LBB2_3
-.LBB2_2:
-	xorl	%eax, %eax
-	addq	$296, %rsp
-	retq
-.LBB2_3:
-	movq	288(%rsp), %rax
-	movb	32(%rsp,%rax), %cl
-	addb	$65, %cl
-	movq	288(%rsp), %rax
-	movb	%cl, 32(%rsp,%rax)
-	movq	288(%rsp), %rax
-	movsbl	32(%rsp,%rax), %edx
+	callq	get_window
+	movq	%rax, 32(%rsp)
+	movq	32(%rsp), %rcx
+	callq	something
+	movl	%eax, %edx
 	leaq	.L__unnamed_1(%rip), %rcx
 	callq	printf
-	jmp	.LBB2_1
+	xorl	%eax, %eax
+	addq	$40, %rsp
+	retq
+	.seh_endproc
+
+	.def	get_window;
+	.scl	2;
+	.type	32;
+	.endef
+	.globl	get_window
+	.p2align	4, 0x90
+get_window:
+.seh_proc get_window
+	subq	$40, %rsp
+	.seh_stackalloc 40
+	.seh_endprologue
+	movl	$8, %ecx
+	callq	mem_alloc
+	movq	%rax, 32(%rsp)
+	movq	32(%rsp), %rax
+	movl	$10, (%rax)
+	movq	32(%rsp), %rax
+	movl	$10, 4(%rax)
+	movq	32(%rsp), %rax
+	addq	$40, %rsp
+	retq
+	.seh_endproc
+
+	.def	something;
+	.scl	2;
+	.type	32;
+	.endef
+	.globl	something
+	.p2align	4, 0x90
+something:
+.seh_proc something
+	subq	$16, %rsp
+	.seh_stackalloc 16
+	.seh_endprologue
+	movq	%rcx, (%rsp)
+	movq	(%rsp), %rax
+	movq	%rax, 8(%rsp)
+	movq	8(%rsp), %rax
+	movl	(%rax), %eax
+	addq	$16, %rsp
+	retq
 	.seh_endproc
 
 	.def	mem_alloc;
@@ -113,10 +118,6 @@ mem_alloc:
 	.p2align	3
 global_var:
 	.quad	12
-
-	.p2align	4
-.Lconstant_array:
-	.asciz	"ABCDEFGHIJKLMNOPQRSTUVWXYZ\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
 
 .L__unnamed_1:
 	.asciz	"%d"

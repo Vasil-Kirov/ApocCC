@@ -77,12 +77,15 @@ typedef enum : signed short
 	tok_var_args = -39,
 	tok_char = -40,
 
+	tok_enum = -41,
 	// compile time execution (preceeded by
-	tok_import = -41, // import
-	tok_run    = -42, // run expression
-	tok_must   = -43, // must handle return value of function
-	tok_any    = -44, // must handle all possible switch statement values
-	tok_interp = -45, // function can only be interpreted
+	tok_import = -42, // import
+	tok_run    = -43, // run expression
+	tok_must   = -44, // must handle return value of function
+	tok_any    = -45, // must handle all possible switch statement values
+	tok_interp = -46, // function can only be interpreted
+	tok_size   = -47, // size_of
+	tok_default= -48, // struct default accessor
 } Token;
 
 typedef struct _str_hash_table

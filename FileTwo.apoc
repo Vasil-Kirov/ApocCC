@@ -7,6 +7,7 @@ func srand(seed: i32) ->;
 func rand() -> i32;
 func GetSystemTime(time:* SYSTEMTIME) ->;
 
+SOME_NUM :: 10 + 2;
 
 func mem_alloc(size: u64) ->* void
 {
