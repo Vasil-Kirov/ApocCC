@@ -91,6 +91,9 @@ typedef struct _Type_Info
 	b32 is_const;
 } Type_Info;
 
+Type_Info
+union_get_biggest_type(Ast_Node *node);
+
 int
 get_type_alignment(Type_Info type);
 

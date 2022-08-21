@@ -20,7 +20,7 @@ void
 _ISimpleDArrayPush(void **Array, void *Item)
 {
 	void *ArrayPtr = *Array;
-	if(SDHeader(ArrayPtr)->CurrentlyUsed + SDHeader(ArrayPtr)->TypeSize > 
+	if(SDHeader(ArrayPtr)->CurrentlyUsed + SDHeader(ArrayPtr)->TypeSize >= 
 	   SDHeader(ArrayPtr)->CurrentlyAllocated)
 	{
 		u64 NewSize = (u64)(SDHeader(ArrayPtr)->CurrentlyAllocated * 1.5);

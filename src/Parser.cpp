@@ -163,13 +163,14 @@ ast_enum(Ast_Identifier id, Ast_Node **members, Type_Info type, Token_Iden error
 }
 
 Ast_Node *
-ast_struct(Ast_Identifier id, Ast_Variable *members, int member_count)
+ast_struct(Ast_Identifier id, Ast_Variable *members, int member_count, b32 is_union)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_struct;
 	result->structure.struct_id = id;
 	result->structure.members = members;
 	result->structure.member_count = member_count;
+	result->structure.is_union = is_union;
 	
 	return result;
 }
@@ -314,14 +315,18 @@ parse_enum(File_Contents *f)
 		raise_parsing_unexpected_token("identifier", f);
 
 	Type_Info type = {T_UNTYPED_INTEGER};
+	type.primitive.size = byte8;
 	if(f->curr_token->type == (Token)':')
 	{
 		advance_token(f);
 		type = parse_type(f);
 	}
 
+	Ast_Identifier id = pure_identifier(identifier_token);
 	Ast_Node **members = delimited(f, '{', '}', ';', parse_enum_value);
-	return ast_enum(pure_identifier(identifier_token), members, type, tok);
+	type = add_primitive_type(f, (char *)id.name, type.primitive.size);
+	auto result = ast_enum(id, members, type, tok);
+	return result;
 }
 
 Ast_Node *
@@ -430,6 +435,7 @@ parse_identifier_statement(File_Contents *f, Token ends_with)
 					parser_eat(f, (Token)'=');
 			}
 			Ast_Node *rhs = parse_expression(f, ends_with, false);
+			assign_type.is_const = is_const;
 			return ast_assignment_from_decl(lhs, rhs, assign_type, identifier_token, is_const);
 		} break;
 		default:
@@ -1047,6 +1053,8 @@ parse_type(File_Contents *f)
 	{
 		// @Note: Invalid types are checked in analyzer
 		result = get_type(f, pointer_or_type.identifier);
+		if(!result.identifier)
+			result.identifier = pointer_or_type.identifier;
 		advance_token(f);
 	}
 	else if(pointer_or_type.type == '[')
@@ -1093,6 +1101,12 @@ Ast_Node *
 parse_struct(File_Contents *f)
 {
 	parser_eat(f, tok_struct);
+	b32 is_union = false;
+	if(f->curr_token->type == tok_union)
+	{
+		is_union = true;
+		advance_token(f);
+	}
 	Token_Iden struct_id = get_next_expecting(f, tok_identifier, "struct name");
 	parser_eat(f, (Token)'{');
 	Token_Iden curr_tok;
@@ -1126,7 +1140,7 @@ parse_struct(File_Contents *f)
 	*/
 
 	Ast_Node *result = ast_struct(ast_identifier(f, struct_id)->identifier,
-			members, SDCount(members));
+			members, SDCount(members), is_union);
 	add_type(f, result);
 	return result;
 }

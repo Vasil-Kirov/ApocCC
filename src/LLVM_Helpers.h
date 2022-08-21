@@ -3,6 +3,9 @@
 #define _LLVM_HELPERS_H
 #include <LLVM_Backend.h>
 
+void
+create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State backend);
+
 AllocaInst *
 allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State backend);
 

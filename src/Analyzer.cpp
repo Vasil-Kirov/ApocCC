@@ -18,7 +18,7 @@ initialize_analyzer(File_Contents *f)
 	f->to_add_next_scope = SDCreate(Symbol);
 }
 
-void
+Type_Info
 add_primitive_type(File_Contents *f, const char *name, Var_Size size)
 {
 	Type_Type type = T_INVALID;
@@ -35,11 +35,13 @@ add_primitive_type(File_Contents *f, const char *name, Var_Size size)
 	
 	Type_Info type_info = { type };
 	type_info.primitive.size = size;
+	type_info.identifier = (u8 *)name;
 
 	if(shgeti(f->type_table, name) == -1)
 	{
 		shput(f->type_table, name, type_info);
 	}
+	return type_info;
 }
 
 void
@@ -560,7 +562,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 						ret_node->type = type_return;
 						ret_node->ret.expression = NULL;
 						ret_node->ret.func_type.type = T_VOID;
-						Ast_Node *to_replace = func_node->function.body;
+						Ast_Node *to_replace = func_node->function.body->scope_desc.body;
 						size_t i = 0;
 						for(; to_replace->statements.list[i]->type != type_scope_end;
 								++i) {}
@@ -699,6 +701,14 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 				 __FILE__, __LINE__, type_to_str(node->type), node->type);
 	}
 
+	if(node->assignment.is_declaration && node->assignment.decl_type.type != T_DETECT)
+	{
+		node->assignment.decl_type = fix_type(f, node->assignment.decl_type);
+		if(node->assignment.decl_type.type == T_INVALID)
+			raise_formated_semantic_error(f, node->assignment.token, 
+					"Type %s, used in declaration, is undefined", var_type_to_name(node->assignment.decl_type));
+	}
+
 	if(node->assignment.assign_type != '=')
 	{
 		node->assignment.rhs = get_assign_type_expression(f, node);
@@ -719,6 +729,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 		{
 			// node->assignment.decl_type = get_symbol_spot(f, node->assignment.token)->type;
 			node->assignment.decl_type = get_expression_type(f, node->assignment.lhs, node->assignment.token, NULL);
+			node->assignment.is_const = node->assignment.decl_type.is_const;
 		}
 		if(type_is_invalid(expression_type))
 		{
@@ -755,9 +766,11 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 	}
 	// @TODO: remove "is_const" from the Type_Info struct and use a better way
 	// to find if a lhs expression is constant
-	if(node->assignment.decl_type.is_const && !node->assignment.is_declaration)
+	if(node->assignment.is_const && !node->assignment.is_declaration)
 		raise_semantic_error(f, "Trying to assign to a constant variable",
 				node->assignment.token);
+
+
 	if(node->assignment.is_declaration)
 	{
 		Symbol this_sym = {};
@@ -1499,11 +1512,13 @@ get_symbol_spot(File_Contents *f, Token_Iden token)
 b32
 are_op_compatible(Type_Info a, Type_Info b)
 {
+	// @NOTE: making pointers valid for all operations for the sake of comparrison, this might be a bad idea
+	/*
 	if(a.type == T_POINTER && is_pointer_rhs_compatible(b))
 		return true;
 	if(b.type == T_POINTER && is_pointer_rhs_compatible(a))
 		return true;
-	
+	*/
 	if(!is_rhs_valid(a) || !is_rhs_valid(b))
 		return false;
 	
@@ -1565,6 +1580,7 @@ verify_struct(File_Contents *f, Ast_Node *struct_node)
 	Type_Info struct_type = get_type(f, struct_node->structure.struct_id.name);
 	for(size_t i = 0; i < member_count; ++i)
 	{
+		members[i].type = fix_type(f, members[i].type);
 		if(struct_type.type == T_STRUCT && members[i].type.type == T_STRUCT && 
 		   vstd_strcmp((char *)members[i].type.identifier, (char *)struct_type.identifier))
 		{
@@ -1581,8 +1597,15 @@ verify_struct(File_Contents *f, Ast_Node *struct_node)
 
 u8 *
 var_type_to_name(Type_Info type)
-{
+{	
 	char *result = (char *)AllocatePermanentMemory(1024);
+	if(type.identifier)
+	{
+		vstd_strcat(result, "[");
+		vstd_strcat(result, (char *)type.identifier);
+		vstd_strcat(result, "]");
+		return (u8 *)result;
+	}
 	vstd_strcat(result, "[");
 	if(is_type_primitive(type))
 	{
@@ -1609,6 +1632,10 @@ var_type_to_name(Type_Info type)
 					vstd_strcat(result, "untyped integer");
 				else if(type.type == T_UNTYPED_FLOAT)
 					vstd_strcat(result, "untyped float");
+				else if(type.type == T_BOOLEAN)
+					vstd_strcat(result, "boolean");
+				else
+					vstd_strcat(result, "unkown primitive type");
 			} break;
 		}
 	}

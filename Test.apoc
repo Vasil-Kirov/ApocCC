@@ -1,5 +1,24 @@
+ 
+func _apoc_init() -> i32
+{
+	out_val := main();
+	printf("\nExit Code: %d\n", out_val);
+	-> out_val;
+}
 
-func _apoc_init() -> i32 { -> main(); }
+enum SDL_INIT_FLAGS
+{
+	TIMER          = 0x00000001;
+	AUDIO          = 0x00000010;
+	VIDEO          = 0x00000020;
+	JOYSTICK       = 0x00000200;
+	HAPTIC         = 0x00001000;
+	GAMECONTROLLER = 0x00002000;  /**< SDL_INIT_GAMECONTROLLER implies SDL_INIT_JOYSTICK */
+	EVENTS         = 0x00004000;
+	SENSOR         = 0x00008000;
+	NOPARACHUTE    = 0x00100000;  /**< compatibility; this flag is ignored. */
+	ALL            = 0x0010F231;
+}
 
 MY_VAR :i32 : 10;
 //func $interp foo() -> [256]u8 {
@@ -16,54 +35,26 @@ MY_VAR :i32 : 10;
 //}
 
 struct Window {}
+struct RGBA_U8 {a: u8; b: u8; g: u8; r: u8}
+struct $union RGBA { c: RGBA_U8; rgba: u32 }
+
+true :: #bool 1;
+false :: #bool 0;
 
 func main() -> i32
 {
-	/*
-	array :[4]u8 = {'A', 'B', 'C', 'D'};
-	array[0] += #u8 NUMS.FIVE;
-	
-	*/
-	a: i32 = MY_VAR;
-	window := get_window();
-	printf("%d", a);
-	/*
-	printf("%d\n", NUMS.FIVE);
-	if NUMS.TWELVE == 12 && NUMS.NINETEEN == 19
-		printf("yes\n");
-	/*
-	// @TODO: remove the need for curly braces
-	if #bool 1 {
-		*ptr = 0;
+	val := true;
+	printf("Is True?: %d", val);
+	for i := 0; val; ++i {
+		val = false;
 	}
-	*/
-
-	item := array[3];
-	if item == 'B'
-		printf("it's B\n");
-	else if item == 'A'
-		printf("it's A\n");
-	else if item == 'C'
-		printf("it's C\n");
-	else if item == 'D'
-	{
-		printf("it's D\n");
-		printf("sizeof %d, elem %d, div %d\n",
-			$size array, $size array[1], $size array / $size array[0]);
-	}
-	else
-		printf("else\n");
-	for i := 0; i < $size array / $size array[0] ; ++i
-		printf("%c\n", array[i]);
-
-	*/
 	-> 0;
 }
 
-func get_window() ->* Window
+func get_window(a: i32) ->* Window
 {
 	window := #*Actual_Window mem_alloc($size Actual_Window);
-	window.a = 10;
+	window.a = a;
 	window.b = 10;
 	-> #*Window window;
 }
@@ -75,6 +66,8 @@ func something(window:* Window) -> i32
 	actual_window := #*Actual_Window window;
 	-> actual_window.a;
 }
+
+struct Test {a: NUMS;}
 
 enum NUMS {
 	FIVE = 5;

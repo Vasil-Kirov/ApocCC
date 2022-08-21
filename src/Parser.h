@@ -20,6 +20,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_union        = -65,
 	type_interp_val   = -64,
 	type_enum         = -63,
 	type_default      = -62,
@@ -118,6 +119,7 @@ typedef struct _Ast_Struct
 	Ast_Identifier struct_id;
     Ast_Variable *members;
 	int member_count;
+	b32 is_union;
 } Ast_Struct;
 
 typedef struct
@@ -322,7 +324,13 @@ struct _abstract_syntax_tree
 };
 
 Ast_Node *
+ast_union(File_Contents *f);
+
+Ast_Node *
 parse_identifier_statement(File_Contents *f, Token ends_with);
+
+Ast_Node *
+parse_enum(File_Contents *f);
 
 Ast_Node *
 parse_file_level_statement(File_Contents *f);

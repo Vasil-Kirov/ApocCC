@@ -93,6 +93,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "$interp",  tok_interp);
 		shput(keyword_table, "$size",    tok_size);
 		shput(keyword_table, "$default", tok_default);
+		shput(keyword_table, "$union", tok_union);
 	}
 	
 	// NOTE(Vasko): Add basic types to string hash table

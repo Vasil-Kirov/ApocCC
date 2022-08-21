@@ -22,6 +22,26 @@ primitive_size_to_alignment(i64 size)
 	}
 }
 
+Type_Info
+union_get_biggest_type(Ast_Node *node)
+{
+	Ast_Variable *members = node->structure.members;
+	size_t member_count = SDCount(members);
+	Type_Info type = {};
+	type.type = T_INVALID;
+	size_t biggest_type = 0;
+	for(size_t i = 0; i < member_count; ++i)
+	{
+		size_t type_size = get_type_size(members[i].type);
+		if(type_size > biggest_type)
+		{
+			type = members[i].type;
+			biggest_type = type_size;
+		}
+	}
+	return type;
+}
+
 int
 get_type_alignment(Type_Info type)
 {
@@ -40,6 +60,8 @@ get_type_alignment(Type_Info type)
 		case T_STRUCT:
 		case T_ARRAY:
 		return sizeof(size_t) * 2;
+		case T_BOOLEAN:
+		return 1;
 		default:
 		{
 			LG_DEBUG("not implemented type alignment");
@@ -94,35 +116,47 @@ get_type_size(Type_Info type)
 	}
 	else if(type.type == T_STRUCT)
 	{
-		Ast_Variable *members = type.structure->structure.members;
-		size_t result = 0;
-		size_t memory_address = 1;
-		size_t member_count = SDCount(members);
-		size_t largest_member = 1;
-		b32 is_packed = type.is_packed;
-		for(size_t i = 0; i < member_count; ++i)
-		{
-			size_t member_size = get_type_size(members[i].type);
-			size_t align_size = member_size;
-			if(members[i].type.type == T_STRUCT)
-			{
-				align_size = get_struct_alignment(members[i].type);
-			}
-			if(align_size > largest_member)
-				largest_member = align_size;
-
-			if(is_packed && align_size % memory_address != 0)
-			{
-				size_t align_addr = (memory_address + align_size) - 
-					(memory_address % align_size);
-				member_size += align_addr - memory_address;
-			}
-
-			result += member_size;
-			memory_address += member_size;
+		if(type.structure->structure.is_union)
+		{	
+			Type_Info biggest_type = union_get_biggest_type(type.structure);
+			return get_type_size(biggest_type);
 		}
-		return result % largest_member == 0 ? result :
-			(result + largest_member) - (result % largest_member);
+		else
+		{
+			Ast_Variable *members = type.structure->structure.members;
+			size_t result = 0;
+			size_t memory_address = 1;
+			size_t member_count = SDCount(members);
+			size_t largest_member = 1;
+			b32 is_packed = type.is_packed;
+			for(size_t i = 0; i < member_count; ++i)
+			{
+				size_t member_size = get_type_size(members[i].type);
+				size_t align_size = member_size;
+				if(members[i].type.type == T_STRUCT)
+				{
+					align_size = get_struct_alignment(members[i].type);
+				}
+				else if(members[i].type.type == T_ARRAY)
+				{
+					align_size = get_type_alignment(*members[i].type.array.type);
+				}
+				if(align_size > largest_member)
+					largest_member = align_size;
+
+				if(is_packed && align_size % memory_address != 0)
+				{
+					size_t align_addr = (memory_address + align_size) - 
+						(memory_address % align_size);
+					member_size += align_addr - memory_address;
+				}
+
+				result += member_size;
+				memory_address += member_size;
+			}
+			return result % largest_member == 0 ? result :
+				(result + largest_member) - (result % largest_member);
+		}
 	}
 	else if(type.type == T_BOOLEAN)
 		return 1;
@@ -208,6 +242,8 @@ fix_type(File_Contents *f, Type_Info type)
 	else if(type.identifier)
 	{
 		result = get_type(f, type.identifier);
+		if(result.token.file == NULL)
+			result.token = type.token;
 	}
 	return result;
 }
@@ -264,7 +300,8 @@ b32
 is_rhs_valid(Type_Info type)
 {
 	Assert(type.type != T_INVALID);
-	if(type.type == T_STRUCT || type.type == T_ARRAY || type.type == T_POINTER
+	// @TODO: might wanna do something more with pointers
+	if(type.type == T_STRUCT || type.type == T_ARRAY /* || type.type == T_POINTER*/
 	   || type.type == T_VOID || type.type == T_STRING)
 		return false;
 	return true;

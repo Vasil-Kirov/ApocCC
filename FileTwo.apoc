@@ -6,6 +6,7 @@ func printf(format:* u8, ...) -> i32;
 func srand(seed: i32) ->;
 func rand() -> i32;
 func GetSystemTime(time:* SYSTEMTIME) ->;
+func puts(str:* u8) -> i32;
 
 SOME_NUM :: 10 + 2;
 

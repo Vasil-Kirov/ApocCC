@@ -36,8 +36,12 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root);
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/InstCombine/InstCombine.h>
-#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Utils.h>
 #include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Analysis/LoopAnalysisManager.h>
+#include <llvm/Analysis/CGSCCPassManager.h>
+#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Pass.h>
 #include <map>
 
@@ -66,7 +70,7 @@ struct Backend_State
 	std::map<std::string, GlobalVariable *> named_globals;
 	Struct_Table *struct_types;
 	Function_Table *func_table;
-	legacy::FunctionPassManager *func_pass;
+	//legacy::FunctionPassManager *func_pass;
 };
 
 struct Symbol_Info
@@ -96,7 +100,6 @@ struct Debug_Info
 	Stack scope;
 };
 
-
 llvm::Value *
 generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
 			 llvm::Value *rhs, b32 is_decl, Type_Info decl_type);
@@ -110,6 +113,9 @@ generate_signatures(File_Contents *f);
 
 llvm::Value *
 generate_expression(File_Contents *f, Ast_Node *node, Function *func);
+
+llvm::StructType *
+generate_union_type(File_Contents *f, Ast_Node *node);
 
 void
 generate_statement_list(File_Contents *f, Ast_Node *list);

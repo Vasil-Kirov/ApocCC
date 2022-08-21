@@ -109,7 +109,7 @@ pop_scope(File_Contents *f, Token_Iden scope_tok);
 void
 analyze(File_Contents *f, Ast_Node *ast_tree);
 
-void
+Type_Info
 add_primitive_type(File_Contents *f, const char *name, Var_Size size);
 
 Type_Info

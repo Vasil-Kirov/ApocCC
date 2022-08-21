@@ -3,8 +3,13 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Utils.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
 #include <LLVM_Helpers.h>
@@ -27,16 +32,10 @@ static Debug_Info debug;
 static Token_Iden emergency_token;
 
 //#define ONLY_IR
-
-Backend_State
-llvm_initialize(File_Contents *f)
+void
+do_passes()
 {
-	Backend_State backend = {};
-	backend.context = new LLVMContext();
-	backend.module = new Module(platform_path_to_file_name((char *)f->path), *backend.context);
-	backend.builder = new IRBuilder<>(*backend.context);
-
-
+	#if 0
 	// Create a new pass manager attached to it.
 	backend.func_pass = new legacy::FunctionPassManager(backend.module);
 
@@ -48,8 +47,60 @@ llvm_initialize(File_Contents *f)
 	backend.func_pass->add(createGVNPass());
 	// Simplify the control flow graph (deleting unreachable blocks, etc).
 	backend.func_pass->add(createCFGSimplificationPass());
+	// Eliminate redundant instructions
+	backend.func_pass->add(createEarlyCSEPass(true));
+	// Unroll loops
+	backend.func_pass->add(createLoopUnrollPass());
+	// Optimize memcpys and memsets
+	backend.func_pass->add(createMemCpyOptPass());	
+	// Couldn't tell you
+	backend.func_pass->add(createSCCPPass());
+	// Change memory refrences to registers
+	backend.func_pass->add(createPromoteMemoryToRegisterPass());
+	// For all exits of a for loop it creates one block to redistribute them or something
+	backend.func_pass->add(createUnifyLoopExitsPass());
+	// Removes Expect instrinsics which are bad or something
+	backend.func_pass->add(createLowerExpectIntrinsicPass());
 
 	backend.func_pass->doInitialization();
+#else
+	
+	// Create the analysis managers.
+	LoopAnalysisManager loop_analysis;
+	FunctionAnalysisManager func_analysis;
+	CGSCCAnalysisManager cg_analysis;
+	ModuleAnalysisManager module_analysis;
+
+	// Create the new pass manager builder.
+	// Take a look at the PassBuilder constructor parameters for more
+	// customization, e.g. specifying a TargetMachine or various debugging
+	// options.
+	PassBuilder pass_builder;
+
+	// Register all the basic analyses with the managers.
+	pass_builder.registerModuleAnalyses(module_analysis);
+	pass_builder.registerCGSCCAnalyses(cg_analysis);
+	pass_builder.registerFunctionAnalyses(func_analysis);
+	pass_builder.registerLoopAnalyses(loop_analysis);
+	pass_builder.crossRegisterProxies(loop_analysis, func_analysis,
+								cg_analysis, module_analysis);
+
+	// Create the pass manager.
+	// This one corresponds to a typical -O2 optimization pipeline.
+	auto mod_pass = pass_builder.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
+
+	mod_pass.run(*backend.module, module_analysis);
+#endif
+}
+
+Backend_State
+llvm_initialize(File_Contents *f)
+{
+	Backend_State backend = {};
+	backend.context = new LLVMContext();
+	backend.module = new Module(platform_path_to_file_name((char *)f->path), *backend.context);
+	backend.builder = new IRBuilder<>(*backend.context);
+
 
 	shdefault(backend.struct_types, 0);
 	
@@ -85,16 +136,6 @@ emit_location(unsigned int line, unsigned int col)
 	else
 		_internal_scope = stack_peek(debug.scope, DINode *);
 	backend.builder->SetCurrentDebugLocation(DILocation::get(_internal_scope->getContext(), line, col, _internal_scope)); 
-}
-
-void
-do_passes()
-{
-	size_t func_count = shlen(backend.func_table);
-	for(size_t i = 0; i < func_count; ++i)
-	{
-		backend.func_pass->run(*backend.func_table[i].value);	
-	}
 }
 
 void
@@ -180,6 +221,75 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root)
 	generate_obj(f);
 }
 
+llvm::StructType *
+generate_struct_type(File_Contents *f, Type_Info type)
+{
+	Assert(type.identifier);
+	auto maybe_generated = shget(backend.struct_types, type.identifier);
+	if(maybe_generated != NULL)
+		return maybe_generated;
+
+	llvm::Type *mem_types[REASONABLE_MAXIMUM];
+	DIType *debug_types[REASONABLE_MAXIMUM];
+
+	auto members = type.structure->structure.members;
+	auto member_count = type.structure->structure.member_count;
+	for (size_t i = 0; i < member_count; ++i)
+	{
+		DEBUG_INFO ( 
+				emit_location(type.token.line, type.token.column);
+				debug_types[i] = to_debug_type(members[i].type, &debug);
+				)
+		mem_types[i] = apoc_type_to_llvm(members[i].type, backend);
+		if(mem_types[i] == NULL)
+		{
+			if(members[i].type.type == T_STRUCT)
+				mem_types[i] = generate_struct_type(f, members[i].type);
+			else
+				Assert(false);
+		}
+	}
+	auto array_ref = makeArrayRef(mem_types, member_count);
+	llvm::StructType *def_type;
+	if(type.structure->structure.is_union)
+		def_type = generate_union_type(f, type.structure);
+	else
+		def_type = StructType::create(*backend.context, array_ref, StringRef((const char *)type.identifier), type.is_packed);
+
+	DEBUG_INFO (
+			Symbol_Info sym = {};
+			if(type.is_packed)
+			sym.allign_in_bits = 0;
+			else
+			sym.allign_in_bits = sizeof(size_t);
+
+			sym.flags = DINode::DIFlags::FlagPublic;
+			sym.file = debug.unit->getFile();
+			sym.line_number = type.token.line;
+			sym.name = StringRef((char *)type.identifier);
+			sym.scope = debug.unit->getScope();
+			sym.size_in_bits = get_type_size(type) * 8;
+			sym.node_array = debug.builder->getOrCreateArray(makeArrayRef((Metadata **)debug_types, member_count));
+			)
+
+	return def_type;
+}
+
+llvm::StructType *
+generate_union_type(File_Contents *f, Ast_Node *node)
+{
+	auto type = union_get_biggest_type(node);
+	if(type.type == T_INVALID)
+		return StructType::create(*backend.context, (char *)node->structure.struct_id.name);
+
+	llvm::Type *llvm_type = NULL;
+	if(type.type != T_STRUCT)
+		llvm_type = apoc_type_to_llvm(type, backend);
+	else
+		llvm_type = generate_struct_type(f, type);
+	auto array_ref = makeArrayRef(&llvm_type, 1);
+	return StructType::create(*backend.context, array_ref, (char *)node->structure.struct_id.name);
+}
 
 void
 generate_signatures(File_Contents *f)
@@ -191,40 +301,8 @@ generate_signatures(File_Contents *f)
 		Type_Info type = type_table[i].value;
 		if(type.type == T_STRUCT)
 		{
-			int struct_size = 0;
-			llvm::Type *mem_types[REASONABLE_MAXIMUM];
-			DIType *debug_types[REASONABLE_MAXIMUM];
-
-			auto members = type.structure->structure.members;
-			auto member_count = type.structure->structure.member_count;
-			for (size_t i = 0; i < member_count; ++i)
-			{
-				DEBUG_INFO ( 
-					emit_location(type.token.line, type.token.column);
-					struct_size += get_type_size(members[i].type);
-					debug_types[i] = to_debug_type(members[i].type, &debug);
-				)
-				mem_types[i] = apoc_type_to_llvm(members[i].type, backend);
-			}
-			auto array_ref = makeArrayRef(mem_types, member_count);
-			auto struct_type = StructType::create(*backend.context, array_ref, StringRef((const char *)type.identifier), type.is_packed);
-			shput(backend.struct_types, type.identifier, struct_type);
-
-			DEBUG_INFO (
-			Symbol_Info sym = {};
-			if(type.is_packed)
-				sym.allign_in_bits = 0;
-			else
-				sym.allign_in_bits = sizeof(size_t);
-		
-			sym.flags = DINode::DIFlags::FlagPublic;
-			sym.file = debug.unit->getFile();
-			sym.line_number = type.token.line;
-			sym.name = StringRef((char *)type.identifier);
-			sym.scope = debug.unit->getScope();
-			sym.size_in_bits = struct_size * 8;
-			sym.node_array = debug.builder->getOrCreateArray(makeArrayRef((Metadata **)debug_types, member_count));
-			)
+			auto def_type = generate_struct_type(f, type);
+			shput(backend.struct_types, type.identifier, def_type);
 		}
 	}
 	Scope_Info *scopes = f->scopes;
@@ -269,6 +347,28 @@ generate_statement(File_Contents *f, Ast_Node *node)
 				LG_FATAL(".");
 			}
 			Constant* const_val = interp_val_to_llvm(interp_val, backend, NULL);
+
+			Type_Info from = node->assignment.decl_type;
+			if(is_integer(from))
+			{
+				if(is_signed(from))
+				{
+					from.primitive.size = byte8;
+					from.identifier = (u8 *)"i64";
+				}
+				else
+				{
+					from.primitive.size = ubyte8;
+					from.identifier = (u8 *)"u64";
+				}
+			}
+			else if(is_float(from))
+			{
+				from.primitive.size = real64;
+				from.identifier = (u8 *)"f64";
+			}
+			const_val = (Constant *)create_cast(node->assignment.decl_type, from, const_val);
+
 			auto global_type = apoc_type_to_llvm(node->assignment.decl_type, backend);
 			auto global_var = new GlobalVariable(
 					*backend.module, global_type, node->assignment.is_const,
@@ -373,10 +473,7 @@ generate_boolean_expression(File_Contents *f, Ast_Node *expression, Function *fu
 	llvm::Value *evaluation = generate_expression(f, expression, func);
 	if (evaluation->getType() != Type::getInt1Ty(*backend.context))
 	{
-		Type_Info boolean_type = {};
-		boolean_type.type = T_BOOLEAN;
-
-		evaluation = backend.builder->CreateCast(Instruction::CastOps::Trunc, evaluation, apoc_type_to_llvm(boolean_type, backend), "boolean_expr");
+		evaluation = backend.builder->CreateCast(Instruction::CastOps::Trunc, evaluation, llvm::Type::getInt1Ty(*backend.context), "boolean_expr");
 	}
 	return evaluation;
 }
@@ -406,8 +503,7 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 			generate_block(f, list->statements.list[*idx], func,
 					for_false, "for_false", to_go, list, idx);
 
-		if(to_go)
-			backend.builder->CreateBr(to_go);
+		create_branch(for_false, to_go, backend);
 	}
 
 	if(loop_body->type == type_scope_start)
@@ -420,7 +516,7 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 		for_true = BasicBlock::Create(*backend.context, "for_true", func);
 		backend.builder->SetInsertPoint(for_true);
 		generate_block(f, loop_body, func, NULL, "for_true", jmp_block, list, idx);
-		backend.builder->CreateBr(jmp_block);
+		create_branch(for_true, jmp_block, backend);
 	}
 
 	backend.builder->SetInsertPoint(jmp_block);
@@ -435,6 +531,29 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	backend.builder->CreateCondBr(evaluation, for_true, for_false);
 }
 
+llvm::Value *
+generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
+{
+	// @TODO: func pointers
+	Assert(call_node->func_call.operand->type == type_identifier);
+	auto callee = FunctionCallee(shget(backend.func_table, call_node->func_call.operand->identifier.name));
+
+	size_t arg_count = SDCount(call_node->func_call.arguments);
+	llvm::Value *arg_exprs[arg_count];
+	auto arg_types = call_node->func_call.arg_types;
+	auto expr_types = call_node->func_call.expr_types;
+	for (size_t i = 0; i < arg_count; ++i)
+	{
+		arg_exprs[i] = generate_expression(f, call_node->func_call.arguments[i], func);
+		if(arg_types[i].type != T_DETECT)
+		{
+			//arg_exprs[i] = backend.builder->CreateCast(, Value *V, Type *DestTy)
+			arg_exprs[i] = create_cast(arg_types[i], expr_types[i], arg_exprs[i]);
+		}
+	}
+	return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+}
+
 BasicBlock *
 generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block,
 		const char *block_name, BasicBlock *to_go, Ast_Node *list, u64 *idx)
@@ -444,21 +563,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 	{
 		case type_func_call:
 		{
-			// @TODO: func pointers
-			Assert(node->func_call.operand->type == type_identifier);
-			auto callee = FunctionCallee(shget(backend.func_table, node->func_call.operand->identifier.name));
-
-			size_t arg_count = SDCount(node->func_call.arguments);
-			llvm::Value *arg_exprs[arg_count];
-			auto arg_types = node->func_call.arg_types;
-			auto expr_types = node->func_call.expr_types;
-			for (size_t i = 0; i < arg_count; ++i)
-			{
-				arg_exprs[i] = generate_expression(f, node->func_call.arguments[i], func);
-				if(arg_types[i].type != T_DETECT)
-					arg_exprs[i] = create_cast(arg_types[i], expr_types[i], arg_exprs[i]);
-			}
-			backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+			generate_func_call(f, node, func);
 		} break;
 		case type_assignment:
 		{
@@ -504,13 +609,24 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				{
 					to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
 					if_false = generate_blocks_from_list(f, else_node->scope_desc.body,
-							func, NULL, "else", to_go_if);
+							func, NULL, "else", NULL);
 					backend.builder->SetInsertPoint(to_go_if);
+					*idx += 1;
 					size_t count = SDCount(list->statements.list);
 
 					for(; *idx < count; *idx += 1)
 						generate_block(f, list->statements.list[*idx], func,
 								to_go_if, "to_go_if", to_go, list, idx);
+
+					backend.builder->SetInsertPoint(if_false);
+					if(to_go_if->empty())
+					{
+						create_branch(if_false, to_go, backend);
+						to_go_if->eraseFromParent();
+						to_go_if = if_false;
+					}
+					else
+						create_branch(if_false, to_go_if, backend);
 				}
 				else if(else_node->type == type_if)
 				{
@@ -524,7 +640,6 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 					if_false = BasicBlock::Create(*backend.context, "if_false", func);
 					backend.builder->SetInsertPoint(if_false);
 					generate_block(f, else_node, func, if_false, "", to_go_if, list, idx);
-					backend.builder->CreateBr(to_go_if);
 					*idx += 1;	
 					backend.builder->SetInsertPoint(to_go_if);
 					size_t count = SDCount(list->statements.list);
@@ -533,8 +648,16 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 						generate_block(f, list->statements.list[*idx], func, to_go_if, "to_go_if",
 								to_go, list, idx);
 					
-					if(to_go)
-						backend.builder->CreateBr(to_go);
+					create_branch(to_go_if, to_go, backend);
+					backend.builder->SetInsertPoint(if_false);
+					if(to_go_if->empty())
+					{
+						create_branch(if_false, to_go, backend);
+						to_go_if->eraseFromParent();
+						to_go_if = if_false;
+					}
+					else
+						create_branch(if_false, to_go_if, backend);
 				}
 			}
 			else	
@@ -547,9 +670,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 					generate_block(f, list->statements.list[*idx], func,
 							if_false, "if_false", to_go, list, idx);
 				
-				if(to_go)
-					backend.builder->CreateBr(to_go);
-
+				create_branch(if_false, to_go, backend);
 				to_go_if = if_false;
 			}
 
@@ -561,10 +682,13 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			else
 			{
 				if_true = BasicBlock::Create(*backend.context, "if_true", func);
-				backend.builder->SetInsertPoint(if_true);
-				generate_block(f, body_node, func, if_true, "if_true", to_go_if, list, idx);
 				if(if_true->getTerminator() == NULL)
-					backend.builder->CreateBr(to_go_if);
+				{
+					backend.builder->SetInsertPoint(if_true);
+					generate_block(f, body_node, func, if_true, "if_true", to_go_if, list, idx);
+					
+					create_branch(if_true, to_go_if, backend);
+				}
 			}
 			backend.builder->SetInsertPoint(passed_block);
 			backend.builder->CreateCondBr(evaluation, if_true, if_false);
@@ -594,12 +718,17 @@ generate_blocks_from_list(File_Contents *f, Ast_Node *list_node, Function *func,
 	backend.builder->SetInsertPoint(body_block);
 	size_t count = SDCount(list_node->statements.list);
 	auto list = list_node->statements.list;
+	Ast_Node *node;
 	for(size_t i = 0; i < count; ++i)
-		generate_block(f, list[i], func, body_block, block_name, to_go,
+	{
+		node = list[i];
+		generate_block(f, node, func, body_block, block_name, to_go,
 				list_node, &i);
+		if(node->type == type_return)
+			break;
+	}
 
-	if(to_go)
-		backend.builder->CreateBr(to_go);
+	create_branch(body_block, to_go, backend);
 	return body_block;
 }
 
@@ -676,8 +805,9 @@ generate_func(File_Contents *f, Ast_Node *node)
 	generate_blocks_from_list(f, node->function.body->scope_desc.body, func, body_block, "main", NULL);
 
 	std::error_code error_code;
-	raw_fd_ostream std_out_fd("-", error_code);
-	if (verifyFunction(*func, &std_out_fd))
+	auto std_out_fd = new raw_fd_ostream("-", error_code);
+	/**/
+	if (verifyFunction(*func, std_out_fd))
 	{
 #if !defined (ONLY_IR)
 		LG_FATAL("Incorrect function");
@@ -702,6 +832,67 @@ get_identifier(u8 *name, b32 *is_const_global)
 		return global_var;
 	}
 	return var_location;
+}
+
+llvm::Value *
+generate_selector(File_Contents *f, Ast_Node *node, Function *func)
+{
+	llvm::Value *operand = NULL;
+	Type_Info op_type = node->selector.operand_type;
+	if(op_type.type == T_POINTER)
+	{
+		if(node->selector.operand->type != type_identifier)
+			operand = generate_lhs(f, func, node->selector.operand,
+					NULL, false, (Type_Info){});
+		else
+			operand = backend.named_values[std::string(
+					(char *)node->selector.operand->identifier.name)];
+	}
+
+	while(op_type.type == T_POINTER)
+	{
+		auto llvm_type = apoc_type_to_llvm(op_type, backend);
+		operand = backend.builder->CreateLoad(llvm_type, operand, "derefrence struct");
+		op_type = *op_type.pointer.type;
+	}
+
+	if(op_type.type == T_STRUCT)
+	{
+		auto struct_type = shget(backend.struct_types, op_type.identifier);
+		if(!operand)
+		{
+			if(node->selector.operand->type == type_identifier)
+				operand = backend.named_values[
+					std::string((char *)node->selector.operand->identifier.name)];
+			else
+				operand = generate_lhs(f, func, node->selector.operand,
+						NULL, false, (Type_Info){});
+		}
+		if(op_type.structure->structure.is_union)
+		{
+			auto elem_ptr = backend.builder->CreateStructGEP(
+					struct_type, operand, 0,
+					"union member ptr");
+			return elem_ptr;
+		}
+		else 
+		{
+			auto elem_ptr = backend.builder->CreateStructGEP(
+					struct_type, operand, node->selector.selected_index,
+					"struct member ptr");
+			return elem_ptr;
+		}
+	}
+	else if(op_type.type == T_ENUM)
+	{
+		auto enumerator = op_type.enumerator.node->enumerator;
+		auto member = enumerator.members[node->selector.selected_index];
+		llvm::Value *val = interp_val_to_llvm(member->interp_val.val, backend, func);
+		return create_cast(enumerator.type, member->interp_val.val.type, val);
+	}
+	else
+		Assert(false);
+	return NULL;
 }
 
 llvm::Value *
@@ -768,21 +959,7 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_func_call:
 		{
-			// @TODO: function pointer
-			Assert(node->func_call.operand->type == type_identifier);
-			auto callee = FunctionCallee(shget(backend.func_table, node->func_call.operand->identifier.name));
-
-			size_t arg_count = SDCount(node->func_call.arguments);
-			llvm::Value *arg_exprs[arg_count];
-
-			auto arg_types = node->func_call.arg_types;
-			auto expr_types = node->func_call.expr_types;
-			for(size_t i = 0; i < arg_count; ++i)
-			{
-				arg_exprs[i] = generate_expression(f, node->func_call.arguments[i], func);
-				arg_exprs[i] = create_cast(arg_types[i], expr_types[i], arg_exprs[i]);
-			}
-			return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+			return generate_func_call(f, node, func);
 		} break;
 		case type_const_str:
 		{
@@ -809,52 +986,16 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_selector:
 		{
-
-			llvm::Value *operand = NULL;
-			Type_Info op_type = node->selector.operand_type;
-			if(op_type.type == T_POINTER)
+			if(node->selector.operand_type.type == T_ENUM)
 			{
-				if(node->selector.operand->type == type_struct_init)
-					operand = generate_expression(f, node->selector.operand, func);
-				else
-					operand = backend.named_values[std::string(
-							(char *)node->selector.operand->identifier.name)];
-			}
-
-			while(op_type.type == T_POINTER)
-			{
-				auto llvm_type = apoc_type_to_llvm(op_type, backend);
-				operand = backend.builder->CreateLoad(llvm_type, operand, "derefrence struct");
-				op_type = *op_type.pointer.type;
-			}
-
-			if(op_type.type == T_STRUCT)
-			{
-				auto struct_type = shget(backend.struct_types, op_type.identifier);
-				if(!operand)
-				{
-					if(node->selector.operand->type == type_struct_init)
-					{
-						operand = generate_expression(f, node->selector.operand, func);
-					}
-					else
-						operand = backend.named_values[std::string(
-								(char *)node->selector.operand->identifier.name)];
-				}
-				auto elem_ptr = backend.builder->CreateStructGEP(
-						struct_type, operand, node->selector.selected_index,
-						"struct_member_ptr");
-				auto llvm_op_type = apoc_type_to_llvm(node->selector.selected_type, backend);
-				return backend.builder->CreateLoad(llvm_op_type, elem_ptr, "struct_member");
-			}
-			else if(op_type.type == T_ENUM)
-			{
-				auto enumerator = op_type.enumerator.node->enumerator;
-				auto member = enumerator.members[node->selector.selected_index];
-				return interp_val_to_llvm(member->interp_val.val, backend, func);
+				return generate_selector(f, node, func);
 			}
 			else
-				Assert(false);
+			{
+				auto elem_ptr = generate_selector(f, node, func);
+				auto llvm_op_type = apoc_type_to_llvm(node->selector.selected_type, backend);
+				return backend.builder->CreateLoad(llvm_op_type, elem_ptr, "selected");
+			}
 		} break;
 		case type_array_list:
 		{
@@ -903,11 +1044,6 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			StructType *type = shget(backend.struct_types, node->struct_init.operand->identifier.name);
 			if(node->struct_init.is_empty_init)
 			{
-				auto data_layout = backend.module->getDataLayout();
-				auto struct_layout = data_layout.getStructLayout(type);
-				auto u8_zero = backend.builder->getInt8(0);
-				backend.builder->CreateMemSet(struct_loc, u8_zero, struct_layout->getSizeInBytes()
-						,struct_layout->getAlignment()); 
 			}
 			else
 			{
@@ -964,7 +1100,8 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 			} break;
 			case '*':
 			{
-				result = backend.builder->CreateLoad(apoc_type_to_llvm(expr_type, backend), expr);
+				Assert(expr_type.type == T_POINTER);
+				result = backend.builder->CreateLoad(apoc_type_to_llvm(*expr_type.pointer.type, backend), expr);
 			} break;
 			case tok_minus:
 			{
@@ -1048,7 +1185,6 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 {
 	if(node->type == type_binary_expr)
 	{
-		b32 has_casted = false;
 		// @TODO: potential u64
 		Type_Info untyped_int_type = {T_INTEGER};
 		untyped_int_type.primitive.size = byte8;
@@ -1057,38 +1193,13 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 		llvm::Value *left = generate_expression(f, node->left, func);
 		llvm::Value *right = generate_expression(f, node->right, func);
 
-		Type_Info from_cast = {};
-
-		if(is_untyped(node->binary_expr.left))
+		if(node->binary_expr.op == tok_logical_and || node->binary_expr.op == tok_logical_or)
 		{
-			has_casted = true;
-			if(is_untyped(node->binary_expr.right))
-				goto END_UNTYPED_CAST;
-			if(is_float(node->binary_expr.left))
-			{
-				from_cast = untyped_float_type;
-			}
-			else
-			{
-				from_cast = untyped_int_type;
-			}
-			left = create_cast(node->binary_expr.right, from_cast, left);
+			left  = backend.builder->CreateCast(Instruction::CastOps::Trunc, left , llvm::Type::getInt1Ty(*backend.context), "left_logical" );
+			right = backend.builder->CreateCast(Instruction::CastOps::Trunc, right, llvm::Type::getInt1Ty(*backend.context), "right_logical");
 		}
-
-		if(is_untyped(node->binary_expr.right))
-		{
-			has_casted = true;
-			if(is_float(node->binary_expr.right))
-			{
-				from_cast = untyped_float_type;
-			}
-			else
-			{
-				from_cast = untyped_int_type;
-			}
-			right = create_cast(node->binary_expr.left, from_cast, right);
-		}
-		END_UNTYPED_CAST:;
+		else
+			right = create_cast(node->binary_expr.left, node->binary_expr.right, right);
 
 		llvm::Value *result = NULL;
 		switch ((int)node->binary_expr.op)
@@ -1220,26 +1331,10 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 			} break;
 		}
 		Assert(result);
+		// @TODO: remove this? we already have generate_boolean_expression
 		if(is_logical_op(node->binary_expr.op))
 		{
-			Type_Info boolean_type = {};
-			boolean_type.type = T_BOOLEAN;
-
-			result = backend.builder->CreateCast(Instruction::CastOps::Trunc, result, apoc_type_to_llvm(boolean_type, backend), "boolean_expr");
-		}
-		else if(has_casted)
-		{
-			Type_Info to = {};
-			if(is_untyped(node->binary_expr.left))
-			{
-				if(is_untyped(node->binary_expr.right))
-					return result;
-				to = node->binary_expr.right;
-			}
-			else
-				to = node->binary_expr.left;
-			
-			result = create_cast(to, from_cast, result);
+			result = backend.builder->CreateCast(Instruction::CastOps::Trunc, result, llvm::Type::getInt1Ty(*backend.context), "boolean_expr");
 		}
 
 		return result;
@@ -1286,21 +1381,49 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
 		} break;
 		case type_selector:
 		{
-			auto selector =generate_lhs(f, func, lhs->selector.operand, rhs, is_decl, decl_type);
-			Type_Info op_type = lhs->selector.operand_type;
-			while(op_type.type == T_POINTER)
-			{
-				llvm::Type *llvm_op_type = apoc_type_to_llvm(op_type, backend);
-				selector = backend.builder->CreateLoad(llvm_op_type, selector);
-				op_type = *op_type.pointer.type;
-			}
-			auto struct_type = shget(backend.struct_types, op_type.identifier);
-			return backend.builder->CreateStructGEP(struct_type, selector,
-					lhs->selector.selected_index);
+			return generate_selector(f, lhs, func);
 		} break;
 	}
 	Assert(false);
 	return NULL;
+}
+
+b32
+expression_has_list(Ast_Node *node)
+{
+	if(!node)
+		return false;
+
+	switch((int)node->type)
+	{
+		case type_binary_expr:
+		{
+			b32 left  = expression_has_list(node->left);
+			b32 right = expression_has_list(node->right);
+			return left > right ? left : right;
+		} break;
+		case type_unary_expr:
+		{
+			return expression_has_list(node->unary_expr.expression);
+		} break;
+		case type_cast:
+		{
+			return expression_has_list(node->cast.expression);
+		} break;
+		case type_size:
+		{
+			return expression_has_list(node->size.operand);
+		} break;
+		case type_struct_init:
+		case type_array_list:
+		{
+			return true;
+		} break;
+		default:
+		{
+			return false;
+		} break;
+	}
 }
 
 void
@@ -1315,10 +1438,21 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 	else
 	{
 		Assert(node->assignment.is_declaration == true);
-		expression_value = backend.builder->getInt64(0);
+		if(node->assignment.decl_type.type == T_STRUCT)
+		{
+			expression_value = allocate_variable(func, (u8 *)"zero_init_struct",
+					node->assignment.decl_type, backend);
+		}
+		else
+		{
+			expression_value = backend.builder->getInt64(0);
+		}
 	}
+	// @TODO: remove this and place a flag field in generate_expression so we don't have to iterate the expression twice
+	b32 has_list = expression_has_list(node->assignment.rhs);
+
 	// @NOTE: structs and arrays are handled in their initialization
-	if(node->assignment.decl_type.type != T_STRUCT && node->assignment.decl_type.type != T_ARRAY)
+	if(!has_list)
 	{
 		llvm::Value *variable = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type);
 		if (is_untyped(node->assignment.rhs_type))

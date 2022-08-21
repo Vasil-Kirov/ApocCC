@@ -1,5 +1,6 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -23,6 +24,13 @@ static const char *type_names[] = {"", "i8", "i16",
 									"u32", "u64",
 									"f32", "f64"};
 
+void
+llvm_zero_out_memory(llvm::Value *ptr, u64 size, llvm::Align alignment, IRBuilder<> *builder)
+{
+	auto zero = builder->getInt8(0);
+	builder->CreateMemSet(ptr, zero, size, alignment);
+}
+
 AllocaInst *
 allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State backend)
 {
@@ -31,17 +39,24 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State ba
 		auto alloc_type = apoc_type_to_llvm(type, backend);
 		IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
 		auto location = temp_builder.CreateAlloca(alloc_type, 0, (char *)var_name);
-		location->setAlignment(Align(get_type_alignment(type)));
+		auto alignment = Align(get_type_alignment(type));
+		location->setAlignment(alignment);
+		llvm_zero_out_memory(location, get_type_size(type), alignment, backend.builder);
 		return location;
 	}
 	else
 	{
-		auto location = backend.builder->CreateAlloca(apoc_type_to_llvm(type, backend), 0, (char *)var_name);
-		location->setAlignment(Align(get_type_alignment(type)));
-		return location;
+		Assert(false);
+		return NULL;
 	}
 }
 
+void
+create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State backend)
+{
+	if(from && to && from->getTerminator() == NULL)
+		backend.builder->CreateBr(to);
+}
 
 // @TODO: remove Function * argument
 llvm::Constant *
@@ -77,6 +92,19 @@ interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func)
 			}
 			result = ConstantArray::get((ArrayType *)array_type, makeArrayRef((Constant **)array, elem_count));
 		} break;
+		case T_BOOLEAN:
+		{
+			result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val.ti64, false);
+		} break;
+		case T_POINTER:
+		{
+			result = ConstantInt::get(Type::getInt64Ty(*backend.context), (u64)val.pointed);
+			Type_Info int_type = {};
+			int_type.type = T_INTEGER;
+			int_type.primitive.size = ubyte8;
+			result = (Constant *)create_cast(val.type, int_type, result);
+			//result = ConstantExpr::getIntToPtr(result, PointerType::get(*backend.context, 0));
+		} break;
 		default:
 			Assert(false);
 	}
@@ -109,7 +137,7 @@ apoc_type_to_llvm(Type_Info type, Backend_State backend)
 	}
 	else if (type.type == T_BOOLEAN)
 	{
-		return llvm::Type::getInt1Ty(*backend.context);
+		return llvm::Type::getInt8Ty(*backend.context);
 	}
 	else if (type.type == T_STRING)
 	{
@@ -119,6 +147,8 @@ apoc_type_to_llvm(Type_Info type, Backend_State backend)
 	else if (type.type == T_POINTER)
 	{
 		llvm::Type *base_type = apoc_type_to_llvm(*type.pointer.type, backend);
+		if(!base_type)
+			return llvm::PointerType::get(*backend.context, 0);
 		return llvm::PointerType::get(base_type, 0);
 	}
 	else if (type.type == T_STRUCT)
@@ -337,6 +367,10 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			{
 				return Instruction::CastOps::PtrToInt;
 			}
+			else if(from.type == T_BOOLEAN)
+			{
+				return Instruction::CastOps::ZExt;
+			}
 			else
 			{
 				
@@ -383,6 +417,10 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 						return Instruction::CastOps::CastOpsEnd;
 					}
 				}
+			}
+			else if (from.type == T_POINTER)
+			{
+				return Instruction::CastOps::PtrToInt;
 			}
 			else
 			{
