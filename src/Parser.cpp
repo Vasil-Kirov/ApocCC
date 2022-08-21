@@ -990,14 +990,6 @@ parse_binary_expression(File_Contents *f, Token stop_at, int min_bp, b32 is_lhs)
 	return result;
 }
 
-b32
-type_is_invalid(Type_Info type)
-{
-	if(type.type == T_INVALID)
-		return true;
-	return false;
-}
-
 Ast_Node *
 parse_expression(File_Contents *f, Token stop_at, b32 is_lhs)
 {

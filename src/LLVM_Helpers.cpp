@@ -4,6 +4,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Metadata.h"
 #include <LLVM_Backend.h>
 #include <LLVM_Helpers.h>
 #include <Type.h>
@@ -246,6 +247,17 @@ to_debug_type(Type_Info type, Debug_Info *debug)
 		Symbol_Info sym = shget(debug->symbol_map, type.identifier);
 		return debug->builder->createStructType(sym.scope, sym.name, sym.file, sym.line_number, sym.size_in_bits, sym.allign_in_bits, 
 													sym.flags, sym.derived_from, sym.node_array);
+	}
+	else if (type.type == T_ARRAY)
+	{
+		DINodeArray *subscripts = new DINodeArray();
+		return debug->builder->createArrayType(type.array.elem_count, 16 * 8,
+				to_debug_type(*type.array.type, debug), *subscripts);
+	}
+	else if (type.type == T_VOID)
+	{
+		static auto void_ty = debug->builder->createUnspecifiedType("void");
+		return void_ty;
 	}
 	Assert(false);
 	return NULL;

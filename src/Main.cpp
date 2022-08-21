@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
 	f->build_commands = build_command;
 	f->build_commands.linker_command = build_command.linker_command;
 	f->build_commands.output_file = build_command.output_file;
-	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root), codegen_clock, codegen);
+	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
 	
 	f->build_commands.linker_command += " ";
 	f->build_commands.linker_command += f->obj_name;

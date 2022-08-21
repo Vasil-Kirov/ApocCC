@@ -54,7 +54,12 @@ typedef struct _entire_file
 #define GB(b) _GB((i64)b)
 
 
-#define Assert(expression) if(!(expression)) { LG_FATAL("%s (%d):\n\tAssertion failed.", __FILE__, __LINE__); }
+#if defined(DEBUG)
+#define Assert(expression) if(!(expression)) { assert_false(__FILE__, __FUNCTION__, __LINE__); }
+#elif 
+#define Asseert(expression)
+#endif
+
 #define ADD_LOGGER Assert(false)
 
 #include <stdlib/std.h>

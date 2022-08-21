@@ -1,12 +1,15 @@
 #include "llvm-c/Target.h"
 #include "llvm-c/TargetMachine.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils.h"
@@ -31,7 +34,7 @@ static Backend_State backend;
 static Debug_Info debug;
 static Token_Iden emergency_token;
 
-//#define ONLY_IR
+#define ONLY_IR
 void
 do_passes()
 {
@@ -94,7 +97,7 @@ do_passes()
 }
 
 Backend_State
-llvm_initialize(File_Contents *f)
+llvm_initialize(File_Contents *f, File_Contents **files)
 {
 	Backend_State backend = {};
 	backend.context = new LLVMContext();
@@ -104,38 +107,58 @@ llvm_initialize(File_Contents *f)
 
 	shdefault(backend.struct_types, 0);
 	
-	if(f->build_commands.debug_info) {
-		//char *file_name = platform_path_to_file_name((char *)f->path);
-		//char *debug_file = change_file_extension(file_name, "debug_info");
+	DEBUG_INFO (
 
 		backend.module->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
+#if defined (_WIN32)
+		backend.module->addModuleFlag(Module::Warning, "CodeView", 8);
+#elif defined (CM_LINUX)
+		backend.module->addModuleFlag(Module::Warning, "Dwarf Version", 13);
+#else
+#error Unkown debug fromat for this OS
+#endif
 
-		char *debug_file = platform_path_to_file_name((char *)f->path);
-		size_t path_len = vstd_strlen((char *)f->path);
-		char *file_path = (char *)AllocateCompileMemory(path_len);
-		memcpy(file_path, f->path, path_len);
-		char *scanner = file_path + path_len;
-		while(*scanner != '\\' && *scanner != '/') scanner--;
-		*(scanner + 1) = 0;
 		debug.builder = new DIBuilder(*backend.module);
-		auto file = debug.builder->createFile(debug_file, file_path);
-		debug.unit = debug.builder->createCompileUnit(dwarf::DW_LANG_C, file, "Apoc Compiler",
-			f->build_commands.optimization > OPT_NONE ? true : false,  "", 0);
 		debug.scope = stack_allocate(DINode *);
-	}
+		size_t file_count = SDCount(files);
+		for(size_t i = 0; i < file_count; ++i)
+		{
+			char *name = platform_path_to_file_name((char *)files[i]->path);
+			size_t file_name_len = vstd_strlen((char *)files[i]->path);
+			u8 *lookup_name = (u8 *)AllocateCompileMemory(file_name_len + 1);
+			memcpy(lookup_name, files[i]->path, file_name_len);
+			char *scanner = (char *)lookup_name + file_name_len;
+			while(*scanner != '\\' && *scanner != '/') --scanner;
+			*scanner = 0;
+
+			File_And_Unit result = {};
+			result.file = debug.builder->createFile(name, (char *)lookup_name);
+			result.unit = debug.builder->createCompileUnit(dwarf::DW_LANG_C99, 
+				result.file, "Apoc Compiler", f->build_commands.optimization > OPT_NONE,
+				"", 0);
+			shput(debug.file_map, files[i]->path, result);
+		}
+
+	)
 	
 	return backend;
 }
 
 void
-emit_location(unsigned int line, unsigned int col)
+emit_location(File_Contents *f, Token_Iden token)
 {
-	DINode *_internal_scope = NULL;
-	if(is_stack_empty(debug.scope))
-		_internal_scope = debug.unit;
-	else
-		_internal_scope = stack_peek(debug.scope, DINode *);
-	backend.builder->SetCurrentDebugLocation(DILocation::get(_internal_scope->getContext(), line, col, _internal_scope)); 
+	DEBUG_INFO (
+			if(token.file == NULL)
+				backend.builder->SetCurrentDebugLocation(DebugLoc());
+			else {
+				DIScope *scope = NULL;
+				if(debug.scope.top == -1)
+					scope = shget(debug.file_map, token.file).unit;
+				else
+					scope = stack_peek(debug.scope, DIScope *);
+				backend.builder->SetCurrentDebugLocation(DILocation::get(*backend.context, token.line, token.column, scope)); 
+			}
+	)
 }
 
 void
@@ -194,10 +217,9 @@ generate_obj(File_Contents *f)
 	LLVMSetDataLayout(file_mod, data_layout_str);
 	LLVMDisposeMessage(data_layout_str);
 
-	if (f->build_commands.debug_info)
-	{
-		debug.builder->finalize();
-	}
+	DEBUG_INFO (
+			debug.builder->finalize();
+		)
 	char *obj_file = change_file_extension(
 			platform_path_to_file_name((char *)f->path), (char *)"o");
 	f->obj_name = obj_file;
@@ -212,9 +234,9 @@ generate_obj(File_Contents *f)
 }
 
 void
-llvm_backend_generate(File_Contents *f, Ast_Node *root)
+llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files)
 {
-	backend = llvm_initialize(f);
+	backend = llvm_initialize(f, files);
 
 	generate_signatures(f);
 	generate_statement_list(f, root);
@@ -237,7 +259,7 @@ generate_struct_type(File_Contents *f, Type_Info type)
 	for (size_t i = 0; i < member_count; ++i)
 	{
 		DEBUG_INFO ( 
-				emit_location(type.token.line, type.token.column);
+				emit_location(f, type.token);
 				debug_types[i] = to_debug_type(members[i].type, &debug);
 				)
 		mem_types[i] = apoc_type_to_llvm(members[i].type, backend);
@@ -263,11 +285,12 @@ generate_struct_type(File_Contents *f, Type_Info type)
 			else
 			sym.allign_in_bits = sizeof(size_t);
 
+			auto desc = shget(debug.file_map, type.token.file);
 			sym.flags = DINode::DIFlags::FlagPublic;
-			sym.file = debug.unit->getFile();
+			sym.file = desc.file;
 			sym.line_number = type.token.line;
 			sym.name = StringRef((char *)type.identifier);
-			sym.scope = debug.unit->getScope();
+			sym.scope = desc.unit;
 			sym.size_in_bits = get_type_size(type) * 8;
 			sym.node_array = debug.builder->getOrCreateArray(makeArrayRef((Metadata **)debug_types, member_count));
 			)
@@ -416,7 +439,7 @@ create_cast(Type_Info to, Type_Info from, llvm::Value *castee)
 }
 
 DISubroutineType *
-create_func_type(Ast_Node *node)
+create_func_debug_type(Ast_Node *node)
 {
 	auto arguments = node->function.arguments;
 	size_t param_count = SDCount(node->function.arguments) + 1;
@@ -768,24 +791,24 @@ generate_func(File_Contents *f, Ast_Node *node)
 {
 	Function *func = generate_func_signature(f, node);
 
+	DISubprogram *subprogram = NULL;
+	File_And_Unit debug_unit = {};
+	if(f->build_commands.debug_info) {
+			auto debug_name = StringRef((char *)node->function.identifier.name, vstd_strlen((char *)node->function.identifier.name));
+			debug_unit = shget(debug.file_map, node->function.identifier.token.file);
+			Assert(debug_unit.file != NULL);
+			u64 line = node->function.identifier.token.line;
+			subprogram = debug.builder->createFunction(debug_unit.unit, debug_name, debug_name, debug_unit.file, line, create_func_debug_type(node), line);
+			Assert(subprogram);
+			func->setSubprogram(subprogram);
+			stack_push(debug.scope, subprogram);
+			emit_location(f, (Token_Iden){});
+	}
+
 	if(f->build_commands.target == TG_WASM)
 		func->addFnAttr( llvm::Attribute::get(*backend.context, "wasm-export-name", func->getName()) );
 
 	// @TODO: put source info in the function
-	DEBUG_INFO(
-		auto file_name = debug.unit->getFilename();
-		auto directory = debug.unit->getDirectory();
-		DIFile *unit = debug.builder->createFile(file_name,
-												 directory);
-		DIScope *context = (DIScope *)unit;
-
-		DISubprogram *debug_func = debug.builder->createFunction(context, (char *)node->function.identifier.name, StringRef(), unit,
-														node->function.identifier.token.line, create_func_type(node), 
-														node->function.identifier.token.line);
-
-		stack_push(debug.scope, debug_func);
-		emit_location(0, 0);
-		) // DEBUG_INFO
 	BasicBlock *body_block = BasicBlock::Create(*backend.context, "entry", func);
 	backend.builder->SetInsertPoint(body_block);
 	backend.named_values.clear();
@@ -794,15 +817,31 @@ generate_func(File_Contents *f, Ast_Node *node)
 		size_t arg_index = 0;
 		for (auto &arg : func->args())
 		{
+			auto apoc_arg = node->function.arguments[arg_index++];
 			auto arg_string = arg.getName().str();
-			auto variable = allocate_variable(func, (u8 *)arg_string.c_str(), node->function.arguments[arg_index++]->variable.type, backend);
-			backend.named_values[arg_string] = variable;
+			auto variable = allocate_variable(func, (u8 *)arg_string.c_str(), apoc_arg->variable.type, backend);
+			DEBUG_INFO (
+				DILocalVariable *debug_var = debug.builder->createParameterVariable(subprogram, arg_string,
+					arg_index - 1, debug_unit.file,
+					apoc_arg->variable.identifier.token.line, to_debug_type(apoc_arg->variable.type, &debug));
+				debug.builder->insertDeclare(variable, debug_var, debug.builder->createExpression(),
+					DILocation::get(subprogram->getContext(), apoc_arg->variable.identifier.token.line, 0, subprogram),
+					backend.builder->GetInsertBlock());
+			)
+
 			backend.builder->CreateStore(&arg, variable);
+			backend.named_values[arg_string] = variable;
 		}
 	}
+	DEBUG_INFO (
+			emit_location(f, node->function.identifier.token);
+			)
+
 	Assert(node->function.body);
 	
 	generate_blocks_from_list(f, node->function.body->scope_desc.body, func, body_block, "main", NULL);
+
+	DEBUG_INFO ( _stack_pop(&debug.scope); )
 
 	std::error_code error_code;
 	auto std_out_fd = new raw_fd_ostream("-", error_code);
@@ -813,11 +852,6 @@ generate_func(File_Contents *f, Ast_Node *node)
 		LG_FATAL("Incorrect function");
 #endif
 	}
-	DEBUG_INFO (
-		emit_location(emergency_token.line, emergency_token.column);
-		_stack_pop(&debug.scope);
-		//stack_pop(debug.scope, DINode *);
-	)
 }
 
 llvm::Value *

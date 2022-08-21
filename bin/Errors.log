@@ -1,7 +1,1 @@
-[FATAL] W:\Engine\src\sdl_bindings.apoc (463, 35):
-	Found unexpected token [ , ], expected [ ; ]
-
-{
->    WINDOW_FULLSCREEN = 0x00000001,         /**< fullscreen window */
-    WINDOW_OPENGL = 0x00000002,             /**< window usable with OpenGL context */
-                                  ^^^
+[FATAL] Incorrect function

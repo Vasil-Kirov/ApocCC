@@ -19,6 +19,9 @@ struct vstdRect
 };
 
 void
+assert_false(const char *file, const char *function, u64 line);
+
+void
 strcpy_secure(char *destination, size_t max_size, const char *source);
 
 u64

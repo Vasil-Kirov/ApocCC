@@ -2,9 +2,9 @@
 #include <Parser.h>
 #include <math.h>
 #include <Basic.h>
+#include <Stack.h>
 
-#include <stack>
-static std::stack<Interp_Table *> symbol_scope;
+static Stack symbol_scope;
 
 Interp_Table *
 create_scope()
@@ -17,8 +17,7 @@ create_scope()
 void
 destroy_scope()
 {
-	Interp_Table *old_table = symbol_scope.top();
-	symbol_scope.pop();
+	Interp_Table *old_table = stack_pop(symbol_scope, Interp_Table *);
 	shfree(old_table);
 }
 
@@ -105,28 +104,29 @@ perform_cast(Interp_Val operand, Type_Info cast)
 void
 interp_push_scope()
 {
-	symbol_scope.push(create_scope());
+	auto scope = create_scope();
+	stack_push(symbol_scope, scope);
 }
 
 void
 interp_add_symbol(u8 *identifier, Interp_Val value)
 {
-	auto scope = symbol_scope.top();
+	auto scope = stack_pop(symbol_scope, Interp_Table *);
 	shput(scope, identifier, value);
+	stack_push(symbol_scope, scope);
 }
 
 Interp_Val *
 interp_look_up_symbol(u8 *identifier)
 {
-	size_t scope_count = symbol_scope.size();
+	size_t scope_count = symbol_scope.top + 1;
 	Interp_Table *scopes[scope_count];
 	size_t scope_i = 0;
 	memset(scopes, 0, scope_count * sizeof(Interp_Table *));
 	Interp_Val *got = NULL;
-	while(!symbol_scope.empty())
+	while(!is_stack_empty(symbol_scope))
 	{
-		Interp_Table *table = symbol_scope.top();
-		symbol_scope.pop();
+		Interp_Table *table = stack_pop(symbol_scope, Interp_Table *);
 		scopes[scope_i++] = table;
 		ptrdiff_t id_idx = shgeti(table, identifier);
 		if(id_idx != -1)
@@ -137,7 +137,7 @@ interp_look_up_symbol(u8 *identifier)
 	
 	for(i64 i = scope_count - 1; i >= 0; --i)
 	{
-		symbol_scope.push(scopes[i]);
+		stack_push(symbol_scope, scopes[i]);
 	}
 	
 	return got;
@@ -146,8 +146,9 @@ interp_look_up_symbol(u8 *identifier)
 void
 initialize_interpreter()
 {
+	symbol_scope = stack_allocate(Interp_Table *);
 	Interp_Table *file_scope = create_scope();
-	symbol_scope.push(file_scope);
+	stack_push(symbol_scope, file_scope);
 }
 
 Interp_Val
@@ -483,8 +484,7 @@ str_to_interp_val(u8 *str)
 void
 interpret_add_function(Symbol func_sym)
 {
-	Interp_Table *top = symbol_scope.top();
-	symbol_scope.pop();
+	Interp_Table *top = stack_pop(symbol_scope, Interp_Table *);
 	Interp_Val func = {};
 	func.type.type = T_FUNC;
 	func.pointed = func_sym.node;
@@ -493,7 +493,7 @@ interpret_add_function(Symbol func_sym)
 	Assert(idx != -1);
 	
 	top[idx].value.location = &top[idx].value;
-	symbol_scope.push(top);
+	stack_push(symbol_scope, top);
 }
 
 Interp_Val

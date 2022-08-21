@@ -109,6 +109,15 @@ typedef struct
 
 typedef struct _Ast_Call Ast_Call;
 
+void
+destroy_scope();
+
+void
+interp_push_scope();
+
+void
+interp_add_symbol(u8 *identifier, Interp_Val value);
+
 Interp_Val
 interpret_expression(Ast_Node *expr, b32 *failed);
 

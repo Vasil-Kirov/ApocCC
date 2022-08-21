@@ -51,6 +51,7 @@ add_type(File_Contents *f, Ast_Node *structure)
 	Type_Info type_info = { T_STRUCT };
 	type_info.structure = structure;
 	type_info.identifier = structure->structure.struct_id.name;
+	type_info.token = structure->structure.struct_id.token;
 
 	/*Ast_Struct s = structure->structure;
 	
@@ -278,6 +279,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 	first_val.type.type = T_INTEGER;
 	first_val.type.primitive.size = byte8;
 	first_val.ti64 = 0;
+
 	if(first_rhs && first_rhs != last_rhs)
 	{
 		b32 failed = false;
@@ -326,6 +328,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		DO_OP(d, /, top, bot);
 	}
 
+	interp_push_scope();
 	for(size_t i = 0; i < member_count; ++i)
 	{
 		Ast_Assignment member = enumerator->members[i]->assignment;
@@ -367,7 +370,9 @@ verify_enum(File_Contents *f, Ast_Node *node)
 						"contains an incorrect constant expression",
 						i + 1, node->enumerator.id.name);
 		}
+		interp_add_symbol(member.lhs->identifier.name, enumerator->members[i]->interp_val.val);
 	}
+	destroy_scope();
 	
 	Type_Info *enum_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 	memcpy(enum_type, &node->enumerator.type, sizeof(Type_Info));
@@ -390,6 +395,12 @@ void
 verify_func(File_Contents *f, Ast_Node *node)
 {
 	Assert(node->function.type.identifier);
+
+	node->function.type = fix_type(f, node->function.type);
+	if(type_is_invalid(node->function.type))
+		raise_formated_semantic_error(f, node->function.identifier.token,
+				"Return type %s of function %s is not defined", node->function.type.identifier, node->function.identifier.name);
+
 	Token_Iden type_error_token = node->function.type.token;
 	node->function.type = fix_type(f, node->function.type);
 	size_t arg_count = SDCount(node->function.arguments);
@@ -441,7 +452,7 @@ verify_func(File_Contents *f, Ast_Node *node)
 		}
 	}
 	
-	if(node->function.type.type == T_INVALID)
+	if(type_is_invalid(node->function.type))
 	{
 		char error_msg[1024] = {};
 		vstd_sprintf(error_msg, "Undeclared type [%s]", node->function.type.identifier);
@@ -704,7 +715,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 	if(node->assignment.is_declaration && node->assignment.decl_type.type != T_DETECT)
 	{
 		node->assignment.decl_type = fix_type(f, node->assignment.decl_type);
-		if(node->assignment.decl_type.type == T_INVALID)
+		if(type_is_invalid(node->assignment.decl_type))
 			raise_formated_semantic_error(f, node->assignment.token, 
 					"Type %s, used in declaration, is undefined", var_type_to_name(node->assignment.decl_type));
 	}
@@ -988,6 +999,8 @@ verify_selector(File_Contents *f, Ast_Node *expression)
 				return enumerator.type;
 			}
 		}
+		raise_formated_semantic_error(f, expression->selector.dot_token, "%s is not a member of enumerator %s",
+				name, enumerator.id.name);
 	}
 	else
 		Assert(false);
@@ -1197,7 +1210,7 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *prev
 		{
 			op_type = get_type(f, expression->size.operand->identifier.name);
 		}
-		if(op_type.type == T_INVALID)
+		if(type_is_invalid(op_type))
 			op_type = get_expression_type(f, expression->size.operand,
 					expression->size.token, previous);
 
@@ -1208,7 +1221,7 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *prev
 	else if(expression->type == type_cast)
 	{
 		Type_Info cast_type = fix_type(f, expression->cast.type);
-		if(cast_type.type == T_INVALID)
+		if(type_is_invalid(cast_type))
 		{
 			raise_formated_semantic_error(f, expression->cast.token,
 					"Cast type %s is undefined", var_type_to_name(cast_type));
@@ -1587,7 +1600,7 @@ verify_struct(File_Contents *f, Ast_Node *struct_node)
 			raise_semantic_error(f, "You can't put a struct as it's own member variable, use a pointer",
 								 members[i].identifier.token);
 		}
-		else if(members[i].type.type == T_INVALID)
+		else if(type_is_invalid(members[i].type))
 			raise_formated_semantic_error(f, members[i].type.token, 
 					"Type of member %s in struct %s is not declared",
 					members[i].identifier.name, struct_node->structure.struct_id.name);

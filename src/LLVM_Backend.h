@@ -2,13 +2,14 @@
 #ifndef CODE_GEN_H
 #define CODE_GEN_H
 
+#include "llvm/IR/DebugInfoMetadata.h"
 #include <Basic.h>
 #include <Lexer.h>
 #include <Parser.h>
 
 
 void
-llvm_backend_generate(File_Contents *f, Ast_Node *root);
+llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files);
 
 #include <llvm-c/Core.h>
 #include <llvm-c/TargetMachine.h>
@@ -92,11 +93,23 @@ struct Debug_Symbol_Table
 	Symbol_Info value;
 };
 
+struct File_And_Unit
+{
+	DIFile *file;
+	DICompileUnit *unit;
+};
+
+struct Debug_File_Table
+{
+	u8 *key;
+	File_And_Unit value;
+};
+
 struct Debug_Info
 {
 	DIBuilder *builder;
-	DICompileUnit *unit;
 	Debug_Symbol_Table *symbol_map;
+	Debug_File_Table *file_map;
 	Stack scope;
 };
 

@@ -38,6 +38,38 @@ vstd_pow(f64 a, f64 b)
 	return a;
 }
 
+void
+assert_false(const char *file, const char *function, u64 line)
+{
+	char error_str[4096 * 2];
+	memset(error_str, 0, 4096 * 2);
+	
+	size_t file_size = platform_get_file_size((char *)file);
+	char file_data[file_size];
+	memset(file_data, 0, file_size);
+	char *at = file_data;
+
+	if(!platform_read_entire_file(file_data, &file_size, (char *)file))
+			LG_FATAL("Assertion failed in file %s in function %s at line %d",
+				file, function, line);
+	int line_counter = 1;
+	while(line_counter != line)
+	{
+		if(*at == '\n')
+			line_counter++;
+		at++;
+	}
+
+	char *copy = error_str;
+	while(*at != '\n' && *at != 0)
+	{
+		*copy = *at;
+		at++;
+		copy++;
+	}
+	LG_FATAL("Assert failed in file %s in function %s at line %d:\n\n%s", file, function, line, error_str);
+}
+
 char *
 vstd_strcat_multiple(char *output, int amount, ...)
 {

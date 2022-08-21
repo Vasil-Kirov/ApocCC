@@ -225,6 +225,18 @@ is_castable(Type_Info type, Type_Info cast)
 	return false;
 }
 
+b32
+type_is_invalid(Type_Info type)
+{
+	if(type.type == T_POINTER)
+		return type_is_invalid(*type.pointer.type);
+	else if(type.type == T_ARRAY)
+		return type_is_invalid(*type.array.type);
+	else if(type.type == T_INVALID)
+		return true;
+	return false;
+}
+
 Type_Info
 fix_type(File_Contents *f, Type_Info type)
 {
