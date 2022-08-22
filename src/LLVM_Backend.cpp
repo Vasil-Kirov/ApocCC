@@ -784,10 +784,10 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 					create_branch(if_true, to_go_if, backend);
 				}
 			}
+			backend.builder->SetInsertPoint(passed_block);
 			DEBUG_INFO (
 			emit_location(f, node->condition.token);
 			)
-			backend.builder->SetInsertPoint(passed_block);
 			backend.builder->CreateCondBr(evaluation, if_true, if_false);
 			result = to_go_if;
 		} break;
