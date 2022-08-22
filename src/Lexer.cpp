@@ -332,12 +332,10 @@ Token_Iden get_token(File_Contents *f)
 						raise_token_syntax_error(f, "Incorrect escaped charracter", (char *)f->path, start_line, start_col);
 					}
 					f->file_size--;
+					f->at++;
 				}
-				if(*f->at == '\\')
-				{
+				else
 					advance_buffer(f);
-				}
-				advance_buffer(f);
 			}
 			advance_buffer(f);
 			string_start++;

@@ -160,6 +160,8 @@ int main(int argc, char *argv[])
 	if(f->build_commands.target != TG_WASM)
 	{
 #if defined(_WIN32)
+	if(f->build_commands.debug_info)
+		f->build_commands.linker_command += " /DEBUG:FULL ";
 	f->build_commands.linker_command += " /OUT:" + f->build_commands.output_file;
 #elif defined (CM_LINUX)
 	f->build_commands.linker_command += " -o" + f->build_commands.output_file;

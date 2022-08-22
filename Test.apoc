@@ -1,77 +1,35 @@
- 
+
+global_var := 10;
+
 func _apoc_init() -> i32
 {
-	out_val := main();
-	printf("\nExit Code: %d\n", out_val);
-	-> out_val;
-}
-
-enum SDL_INIT_FLAGS
-{
-	TIMER          = 0x00000001;
-	AUDIO          = 0x00000010;
-	VIDEO          = 0x00000020;
-	JOYSTICK       = 0x00000200;
-	HAPTIC         = 0x00001000;
-	GAMECONTROLLER = 0x00002000;  /**< SDL_INIT_GAMECONTROLLER implies SDL_INIT_JOYSTICK */
-	EVENTS         = 0x00004000;
-	SENSOR         = 0x00008000;
-	NOPARACHUTE    = 0x00100000;  /**< compatibility; this flag is ignored. */
-	ALL            = 0x0010F231;
-}
-
-MY_VAR :i32 : 10;
-//func $interp foo() -> [256]u8 {
-//	my_arr :[256]u8 = {0};
-//	for i := 'A'; i <= 'Z'; ++i {
-//		my_arr[i - 'A'] = #u8 i;
-//	}
-//	-> my_arr;
-//}
-//
-//func factorial(x: i64) -> i64 {
-//	if x <= 1 -> 1;
-//	-> x * factorial(x - 1);
-//}
-
-struct Window {}
-struct RGBA_U8 {a: u8; b: u8; g: u8; r: u8}
-struct $union RGBA { c: RGBA_U8; rgba: u32 }
-
-true :: #bool 1;
-false :: #bool 0;
-
-func main() -> i32
-{
-	val := true;
-	printf("Is True?: %d", val);
-	for i := 0; val; ++i {
-		val = false;
+	a := My_Nums {40, 20, 10, 5};
+	c := $size My_Nums;
+	a.b = change_a(a.b);
+	if a.b == 3
+	{
+		puts("a");
+		-> 0;
 	}
-	-> 0;
+	else if a.b == 2
+		-> 1;
+	else
+		-> 0;
+	-> $size My_Nums;
 }
 
-func get_window(a: i32) ->* Window
+func puts(str:* u8) ->;
+
+func change_a(a: i32) -> i32
 {
-	window := #*Actual_Window mem_alloc($size Actual_Window);
-	window.a = a;
-	window.b = 10;
-	-> #*Window window;
+	-> a / 2;
 }
 
-struct Actual_Window {a: i32; b: i32;}
 
-func something(window:* Window) -> i32
+struct My_Nums
 {
-	actual_window := #*Actual_Window window;
-	-> actual_window.a;
-}
-
-struct Test {a: NUMS;}
-
-enum NUMS {
-	FIVE = 5;
-	TWELVE;
-	NINETEEN;
-	TWENTYSIX = 26;
-}
+	e: i8;	// 0 - 1
+	a: i32; // 4 - 7
+	c: i64; // 8 - 15
+	b: i32; // 16 - 19
+}           // allign to size of i64 (8) = 24

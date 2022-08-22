@@ -1439,14 +1439,11 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 			Token_Iden zero_tok = error_token;
 			Type_Info untyped_int = {T_UNTYPED_INTEGER};
 			zero_tok.identifier = (u8 *)"0";
-			for(size_t i = 0; i < member_count; ++i)
-			{
-				Ast_Node *result = alloc_node();
-				result->type = type_literal;
-				result->atom.identifier = pure_identifier(zero_tok);
-				SDPush(struct_init->struct_init.expressions, result);
-				SDPush(struct_init->struct_init.expr_types, untyped_int);
-			}
+			Ast_Node *result = alloc_node();
+			result->type = type_literal;
+			result->atom.identifier = pure_identifier(zero_tok);
+			SDPush(struct_init->struct_init.expressions, result);
+			SDPush(struct_init->struct_init.expr_types, untyped_int);
 		}
 	}
 	return struct_type;
@@ -1575,7 +1572,14 @@ check_type_compatibility(Type_Info a, Type_Info b)
 	if(a.type != b.type)
 		return false;
 	if(a.type == T_POINTER)
+	{
+		if(b.type == T_POINTER)
+		{
+			if(a.pointer.type->type == T_VOID || b.pointer.type->type == T_VOID)
+				return true;
+		}
 		return check_type_compatibility(*a.pointer.type, *b.pointer.type);
+	}
 	if(a.type == T_BOOLEAN && b.type == T_BOOLEAN)
 		return true;
 	if(!vstd_strcmp((char *)a.identifier, (char *)b.identifier))

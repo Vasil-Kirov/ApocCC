@@ -50,7 +50,7 @@ assert_false(const char *file, const char *function, u64 line)
 	char *at = file_data;
 
 	if(!platform_read_entire_file(file_data, &file_size, (char *)file))
-			LG_FATAL("Assertion failed in file %s in function %s at line %d",
+			LG_ERROR("Assertion failed in file %s in function %s at line %d",
 				file, function, line);
 	int line_counter = 1;
 	while(line_counter != line)
@@ -67,7 +67,7 @@ assert_false(const char *file, const char *function, u64 line)
 		at++;
 		copy++;
 	}
-	LG_FATAL("Assert failed in file %s in function %s at line %d:\n\n%s", file, function, line, error_str);
+	LG_ERROR("Assert failed in file %s in function %s at line %d:\n\n%s", file, function, line, error_str);
 }
 
 char *

@@ -1,2 +1,2 @@
 @echo off
-clang -S -emit-llvm main.c
+clang --debug -S -emit-llvm main.c

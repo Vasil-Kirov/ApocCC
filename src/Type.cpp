@@ -70,6 +70,7 @@ get_type_alignment(Type_Info type)
 		} break;
 	}
 }
+
 int
 get_struct_alignment(Type_Info struct_type)
 {
@@ -125,7 +126,7 @@ get_type_size(Type_Info type)
 		{
 			Ast_Variable *members = type.structure->structure.members;
 			size_t result = 0;
-			size_t memory_address = 1;
+			size_t memory_address = 0;
 			size_t member_count = SDCount(members);
 			size_t largest_member = 1;
 			b32 is_packed = type.is_packed;
@@ -144,7 +145,7 @@ get_type_size(Type_Info type)
 				if(align_size > largest_member)
 					largest_member = align_size;
 
-				if(is_packed && align_size % memory_address != 0)
+				if(!is_packed && memory_address % align_size != 0)
 				{
 					size_t align_addr = (memory_address + align_size) - 
 						(memory_address % align_size);
@@ -154,6 +155,9 @@ get_type_size(Type_Info type)
 				result += member_size;
 				memory_address += member_size;
 			}
+			if (is_packed)
+				return result;
+
 			return result % largest_member == 0 ? result :
 				(result + largest_member) - (result % largest_member);
 		}

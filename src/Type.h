@@ -97,6 +97,9 @@ union_get_biggest_type(Ast_Node *node);
 int
 get_type_alignment(Type_Info type);
 
+int
+get_struct_alignment(Type_Info struct_type);
+
 b32
 is_or_is_pointing_to(Type_Info type, Type_Type check);
 

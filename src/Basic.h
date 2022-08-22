@@ -55,7 +55,7 @@ typedef struct _entire_file
 
 
 #if defined(DEBUG)
-#define Assert(expression) if(!(expression)) { assert_false(__FILE__, __FUNCTION__, __LINE__); }
+#define Assert(expression) if(!(expression)) { assert_false(__FILE__, __FUNCTION__, __LINE__); __builtin_trap(); }
 #elif 
 #define Asseert(expression)
 #endif

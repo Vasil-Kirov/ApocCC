@@ -90,7 +90,7 @@ struct Symbol_Info
 struct Debug_Symbol_Table
 {
 	u8 *key;
-	Symbol_Info value;
+	llvm::DICompositeType *value;
 };
 
 struct File_And_Unit
@@ -108,14 +108,13 @@ struct Debug_File_Table
 struct Debug_Info
 {
 	DIBuilder *builder;
-	Debug_Symbol_Table *symbol_map;
+	Debug_Symbol_Table *struct_map;
 	Debug_File_Table *file_map;
 	Stack scope;
 };
 
 llvm::Value *
-generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
-			 llvm::Value *rhs, b32 is_decl, Type_Info decl_type);
+generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, b32 is_decl, Type_Info decl_type, u8 **out_identifier = NULL);
 
 // @TODO: remove
 llvm::Constant *
@@ -130,13 +129,13 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func);
 llvm::StructType *
 generate_union_type(File_Contents *f, Ast_Node *node);
 
-void
-generate_statement_list(File_Contents *f, Ast_Node *list);
+llvm::Function **
+generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count);
 
 Ast_Node *
 generate_statement(File_Contents *f, Ast_Node *root);
 
-void
+llvm::Function *
 generate_func(File_Contents *f, Ast_Node *node);
 
 void
@@ -150,11 +149,6 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node);
 
 llvm::Value *
 create_cast(Type_Info to, Type_Info from, llvm::Value *castee);
-
-llvm::Value *
-generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
-			 llvm::Value *rhs, b32 is_decl, Type_Info decl_type);
-
 
 BasicBlock *
 generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block,

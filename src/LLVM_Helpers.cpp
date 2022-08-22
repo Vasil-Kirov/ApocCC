@@ -1,6 +1,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -55,6 +56,7 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State ba
 void
 create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State backend)
 {
+
 	if(from && to && from->getTerminator() == NULL)
 		backend.builder->CreateBr(to);
 }
@@ -110,6 +112,148 @@ interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func)
 			Assert(false);
 	}
 	return result;
+}
+
+Metadata *
+create_struct_field(Debug_Info *debug, u8 *identifier,
+		Type_Info type, u64 offset_in_bits)
+{
+	auto desc = shget(debug->file_map, type.token.file);
+	auto name_ref = StringRef((char *)identifier, vstd_strlen((char *)identifier));
+
+	return debug->builder->createMemberType(desc.file, name_ref, desc.file, type.token.line,
+			get_type_size(type) * 8, get_type_alignment(type) * 8, offset_in_bits,
+			DINode::FlagZero, to_debug_type(type, debug));
+}
+
+DICompositeType *
+create_struct_type(Type_Info type, Debug_Info *debug)
+{
+	auto desc = shget(debug->file_map, type.token.file);
+	if(type.structure->structure.is_union)
+	{		
+		//Type_Info biggest_type = union_get_biggest_type(type.structure);
+		auto members = type.structure->structure.members;
+		size_t member_count = SDCount(members);
+		Metadata *member_data[member_count];
+		b32 to_fix[member_count];
+		for(size_t i = 0; i < member_count; ++i)
+		{
+			if(members[i].type.type == T_POINTER && members[i].type.pointer.type->type == T_STRUCT &&
+					vstd_strcmp((char *)members[i].type.pointer.type->identifier, (char *)type.identifier))
+			{
+				to_fix[i] = true;
+				Type_Info opaque_pointer = members[i].type;
+				opaque_pointer.pointer.type = NULL;
+				member_data[i] = create_struct_field(debug, members[i].identifier.name, opaque_pointer, 0);
+			}
+			else
+			{
+				to_fix[i] = false;
+
+				member_data[i] = create_struct_field(debug, members[i].identifier.name,
+					members[i].type, 0);
+			}
+		}
+		auto member_array = debug->builder->getOrCreateArray(
+				makeArrayRef((Metadata **)member_data, member_count)
+				);
+
+		auto created =  debug->builder->createStructType(desc.file, (char *)type.identifier,
+				desc.file,
+				type.token.line, get_type_size(type) * 8, 
+				get_struct_alignment(type) * 8,
+				DINode::FlagZero, nullptr,
+				member_array);
+
+		shput(debug->struct_map, type.identifier, created);
+		for(size_t i = 0; i < member_count; ++i)
+		{
+			if(to_fix[i])
+			{
+				auto new_metadata = create_struct_field(debug, members[i].identifier.name, members[i].type, 0);
+				member_array->replaceOperandWith(i, new_metadata);
+			}
+		}
+
+		// @TODO: check if needed
+		created->replaceElements(member_array);
+		return created;
+	}
+	else
+	{
+		Ast_Variable *members = type.structure->structure.members;
+		size_t memory_address = 0;
+		size_t member_count = SDCount(members);
+		b32 is_packed = type.is_packed;
+
+		Metadata *member_data[member_count];
+		b32 to_fix[member_count];
+		int member_locations[member_count];
+		for(size_t i = 0; i < member_count; ++i)
+		{
+			size_t member_size = get_type_size(members[i].type);
+			size_t actual_size = member_size;
+			size_t align_size = member_size;
+			if(members[i].type.type == T_STRUCT)
+			{
+				align_size = get_struct_alignment(members[i].type);
+			}
+			else if(members[i].type.type == T_ARRAY)
+			{
+				align_size = get_type_alignment(*members[i].type.array.type);
+			}
+			if(!is_packed && memory_address % align_size != 0)
+			{
+				size_t align_addr = (memory_address + align_size) - 
+					(memory_address % align_size);
+				member_size += align_addr - memory_address;
+			}
+
+			int offset_in_bits = (memory_address + member_size - actual_size) * 8;
+			member_locations[i] = offset_in_bits;
+			if(members[i].type.type == T_POINTER && members[i].type.pointer.type->type == T_STRUCT &&
+					vstd_strcmp((char *)members[i].type.pointer.type->identifier, (char *)type.identifier))
+			{
+				to_fix[i] = true;
+				Type_Info opaque_pointer = members[i].type;
+				opaque_pointer.pointer.type = NULL;
+				member_data[i] = create_struct_field(debug, members[i].identifier.name, opaque_pointer, 
+						offset_in_bits);
+			}
+			else
+			{
+				to_fix[i] = false;
+				member_data[i] = create_struct_field(debug, members[i].identifier.name,
+						members[i].type, offset_in_bits);
+			}
+
+			memory_address += member_size;
+		}	
+		auto member_array = debug->builder->getOrCreateArray(
+				makeArrayRef((Metadata **)member_data, member_count)
+				);
+		
+		auto created =  debug->builder->createStructType(desc.file, (char *)type.identifier,
+				desc.file,
+				type.token.line, get_type_size(type) * 8, 
+				get_struct_alignment(type) * 8,
+				DINode::FlagZero, nullptr,
+				member_array);
+
+		shput(debug->struct_map, type.identifier, created);
+		for(size_t i = 0; i < member_count; ++i)
+		{
+			if(to_fix[i])
+			{
+				auto new_metadata = create_struct_field(debug, members[i].identifier.name, members[i].type, member_locations[i]);
+				member_array->replaceOperandWith(i, new_metadata);
+			}
+		}
+
+		created->replaceElements(member_array);
+		return created;
+	}
 }
 
 llvm::Type *
@@ -180,9 +324,10 @@ to_debug_type(Type_Info type, Debug_Info *debug)
 		if (result)
 			return result;
 
+		int bytes = get_type_size(type);
 		if (is_signed(type))
 		{
-			result = debug->builder->createBasicType(type_names[type.primitive.size], 8 * type.primitive.size, dwarf::DW_ATE_signed);
+			result = debug->builder->createBasicType(type_names[type.primitive.size], 8 * bytes, dwarf::DW_ATE_signed);
 			debug_types[type.primitive.size] = result;
 			return result;
 		}
@@ -240,13 +385,19 @@ to_debug_type(Type_Info type, Debug_Info *debug)
 	else if (type.type == T_POINTER)
 	{
 		// @TODO: change for systems different than 64 bits
+		if(type.pointer.type == NULL)
+			return debug->builder->createPointerType(NULL, 64);
 		return debug->builder->createPointerType(to_debug_type(*type.pointer.type, debug),  64);
 	}
 	else if (type.type == T_STRUCT)
 	{
-		Symbol_Info sym = shget(debug->symbol_map, type.identifier);
-		return debug->builder->createStructType(sym.scope, sym.name, sym.file, sym.line_number, sym.size_in_bits, sym.allign_in_bits, 
-													sym.flags, sym.derived_from, sym.node_array);
+		auto got = shget(debug->struct_map, type.identifier);
+		if(got)
+			return got;
+
+		auto created = create_struct_type(type, debug);
+		Assert(created);
+		return created;
 	}
 	else if (type.type == T_ARRAY)
 	{

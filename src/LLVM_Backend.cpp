@@ -9,7 +9,10 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Metadata.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/GenericDomTreeConstruction.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils.h"
@@ -34,7 +37,7 @@ static Backend_State backend;
 static Debug_Info debug;
 static Token_Iden emergency_token;
 
-#define ONLY_IR
+//#define ONLY_IR
 void
 do_passes()
 {
@@ -109,14 +112,6 @@ llvm_initialize(File_Contents *f, File_Contents **files)
 	
 	DEBUG_INFO (
 
-		backend.module->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
-#if defined (_WIN32)
-		backend.module->addModuleFlag(Module::Warning, "CodeView", 8);
-#elif defined (CM_LINUX)
-		backend.module->addModuleFlag(Module::Warning, "Dwarf Version", 13);
-#else
-#error Unkown debug fromat for this OS
-#endif
 
 		debug.builder = new DIBuilder(*backend.module);
 		debug.scope = stack_allocate(DINode *);
@@ -139,6 +134,14 @@ llvm_initialize(File_Contents *f, File_Contents **files)
 			shput(debug.file_map, files[i]->path, result);
 		}
 
+	backend.module->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
+#if defined (_WIN32)
+	backend.module->addModuleFlag(Module::Warning, "CodeView", 1);
+#elif defined (CM_LINUX)
+	backend.module->addModuleFlag(Module::Warning, "Dwarf Version", 13);
+#else
+#error Unkown debug fromat for this OS
+#endif
 	)
 	
 	return backend;
@@ -147,23 +150,56 @@ llvm_initialize(File_Contents *f, File_Contents **files)
 void
 emit_location(File_Contents *f, Token_Iden token)
 {
+	if(f->build_commands.debug_info)
+	{
+		if(token.file == NULL)
+			backend.builder->SetCurrentDebugLocation(DebugLoc());
+		else {
+			DIScope *scope = NULL;
+			if(debug.scope.top == -1)
+				scope = shget(debug.file_map, token.file).unit;
+			else
+				scope = stack_peek(debug.scope, DIScope *);
+			// @NOTE: I think it's better to not use token.column
+			backend.builder->SetCurrentDebugLocation(DILocation::get(*backend.context, token.line, 0, scope)); 
+		}
+	}
+}
+
+void
+emit_global_var(File_Contents *f, Ast_Node *node, u8 *identifier, GlobalVariable *llvm_var)
+{
+	Assert(node->type == type_assignment);
+
 	DEBUG_INFO (
-			if(token.file == NULL)
-				backend.builder->SetCurrentDebugLocation(DebugLoc());
-			else {
-				DIScope *scope = NULL;
-				if(debug.scope.top == -1)
-					scope = shget(debug.file_map, token.file).unit;
-				else
-					scope = stack_peek(debug.scope, DIScope *);
-				backend.builder->SetCurrentDebugLocation(DILocation::get(*backend.context, token.line, token.column, scope)); 
-			}
+			auto desc  = shget(debug.file_map, node->assignment.token.file);
+			debug.builder->createGlobalVariableExpression(desc.file, StringRef((char *)identifier), StringRef(), desc.file,
+				node->assignment.token.line, to_debug_type(node->assignment.decl_type, &debug), true);
+			)
+}
+
+void
+emit_assignment(File_Contents *f, Ast_Node *node, llvm::Value *location, u8 *identifier)
+{
+	Assert(node->type == type_assignment);
+
+	DEBUG_INFO (
+		auto scope = stack_peek(debug.scope, DIScope *);
+		auto desc  = shget(debug.file_map, node->assignment.token.file);
+		DILocalVariable *debug_var = debug.builder->createAutoVariable(scope, StringRef((char *)identifier),
+			desc.file, node->assignment.token.line, to_debug_type(node->assignment.decl_type, &debug),
+			false, DINode::FlagZero, get_type_alignment(node->assignment.decl_type) * 8);
+
+		debug.builder->insertDeclare(location, debug_var, debug.builder->createExpression(), 
+			DILocation::get(*backend.context, node->assignment.token.line, node->assignment.token.column, scope),
+			backend.builder->GetInsertBlock());
 	)
 }
 
 void
 generate_obj(File_Contents *f)
 {
+	
 	if(f->build_commands.optimization != OPT_NONE)
 		do_passes();
 	llvm::Target a_target = {};
@@ -217,9 +253,6 @@ generate_obj(File_Contents *f)
 	LLVMSetDataLayout(file_mod, data_layout_str);
 	LLVMDisposeMessage(data_layout_str);
 
-	DEBUG_INFO (
-			debug.builder->finalize();
-		)
 	char *obj_file = change_file_extension(
 			platform_path_to_file_name((char *)f->path), (char *)"o");
 	f->obj_name = obj_file;
@@ -239,7 +272,24 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files)
 	backend = llvm_initialize(f, files);
 
 	generate_signatures(f);
-	generate_statement_list(f, root);
+	i32 func_count = 0;
+	generate_statement_list(f, root, &func_count);
+
+	DEBUG_INFO(
+		debug.builder->finalize();
+			)
+
+	std::error_code error_code;
+	auto std_out_fd = new raw_fd_ostream("-", error_code);
+	bool debug_info_error = false;
+	if(verifyModule(*backend.module, std_out_fd, &debug_info_error))
+	{
+#if !defined(ONLY_IR)
+		LG_FATAL("Module is incorrect");
+#endif
+	}
+	if(debug_info_error)
+		LG_ERROR("Debug Info Error");
 	generate_obj(f);
 }
 
@@ -259,7 +309,7 @@ generate_struct_type(File_Contents *f, Type_Info type)
 	for (size_t i = 0; i < member_count; ++i)
 	{
 		DEBUG_INFO ( 
-				emit_location(f, type.token);
+				// emit_location(f, type.token);
 				debug_types[i] = to_debug_type(members[i].type, &debug);
 				)
 		mem_types[i] = apoc_type_to_llvm(members[i].type, backend);
@@ -278,22 +328,10 @@ generate_struct_type(File_Contents *f, Type_Info type)
 	else
 		def_type = StructType::create(*backend.context, array_ref, StringRef((const char *)type.identifier), type.is_packed);
 
-	DEBUG_INFO (
-			Symbol_Info sym = {};
-			if(type.is_packed)
-			sym.allign_in_bits = 0;
-			else
-			sym.allign_in_bits = sizeof(size_t);
-
-			auto desc = shget(debug.file_map, type.token.file);
-			sym.flags = DINode::DIFlags::FlagPublic;
-			sym.file = desc.file;
-			sym.line_number = type.token.line;
-			sym.name = StringRef((char *)type.identifier);
-			sym.scope = desc.unit;
-			sym.size_in_bits = get_type_size(type) * 8;
-			sym.node_array = debug.builder->getOrCreateArray(makeArrayRef((Metadata **)debug_types, member_count));
-			)
+	if(f->build_commands.debug_info)
+	{
+		to_debug_type(type, &debug);
+	}
 
 	return def_type;
 }
@@ -398,6 +436,7 @@ generate_statement(File_Contents *f, Ast_Node *node)
 					GlobalValue::LinkageTypes::ExternalLinkage,
 					const_val, "global_var");
 			backend.named_globals[std::string((char *)node->assignment.token.identifier)] = global_var;
+			emit_global_var(f, node, node->assignment.token.identifier, global_var);
 		} break;
 		case type_enum: break;
 		case type_struct: break;
@@ -410,8 +449,8 @@ generate_statement(File_Contents *f, Ast_Node *node)
 	return NULL;
 }
 
-void
-generate_statement_list(File_Contents *f, Ast_Node *list)
+llvm::Function **
+generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count)
 {
 	Ast_Node **functions = SDCreate(Ast_Node *);
 	size_t list_size = SDCount(list->statements.list);
@@ -423,8 +462,12 @@ generate_statement_list(File_Contents *f, Ast_Node *list)
 	}
 	// @NOTE: delay function generation so all global symbols can be declared
 	size_t func_count = SDCount(functions);
+	auto func_results = (Function **)AllocateCompileMemory(sizeof(Function *) * func_count);
+	*out_func_count = func_count;
 	for(size_t i = 0; i < func_count; ++i)
-		generate_func(f, functions[i]);
+		func_results[i] = generate_func(f, functions[i]);
+
+	return func_results;
 }
 
 llvm::Value *
@@ -531,11 +574,17 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 
 	if(loop_body->type == type_scope_start)
 	{
+		DEBUG_INFO(
+			emit_location(f, node->for_loop.token);
+			)
 		for_true = generate_blocks_from_list(f, loop_body->scope_desc.body, func,
 				NULL, "for_true", jmp_block);
 	}
 	else
 	{
+		DEBUG_INFO(
+			emit_location(f, node->for_loop.token);
+			)
 		for_true = BasicBlock::Create(*backend.context, "for_true", func);
 		backend.builder->SetInsertPoint(for_true);
 		generate_block(f, loop_body, func, NULL, "for_true", jmp_block, list, idx);
@@ -546,6 +595,10 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 
 	if(node->for_loop.expr3)
 		generate_expression(f, node->for_loop.expr3, func);
+
+	DEBUG_INFO(
+			emit_location(f, node->for_loop.token);
+			)
 
 	auto inner_eval = generate_boolean_expression(f, node->for_loop.expr2, func);
 	backend.builder->CreateCondBr(inner_eval, for_true, for_false);
@@ -586,14 +639,23 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 	{
 		case type_func_call:
 		{
+			DEBUG_INFO (
+				emit_location(f, node->func_call.token);
+			)
 			generate_func_call(f, node, func);
 		} break;
 		case type_assignment:
 		{
+			DEBUG_INFO (
+				emit_location(f, node->assignment.token);
+			)
 			generate_assignment(f, func, node);
 		} break;
 		case type_return:
 		{
+			DEBUG_INFO (
+			emit_location(f, node->ret.token);
+			)
 			if(node->ret.expression)
 			{
 				llvm::Value *ret_val = generate_expression(f, node->ret.expression, func);
@@ -608,10 +670,16 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 		} break;
 		case type_for:
 		{
+			DEBUG_INFO(
+			emit_location(f, node->for_loop.token);
+			)
 			generate_for_loop(f, node, func, passed_block, to_go, list,idx);
 		} break;
 		case type_if:
 		{
+			DEBUG_INFO (
+					emit_location(f, node->condition.token);
+			)
 			llvm::Value *evaluation =
 				generate_boolean_expression(f, node->condition.expr, func);
 
@@ -685,6 +753,9 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			}
 			else	
 			{
+				DEBUG_INFO(
+						emit_location(f, node->condition.token);
+						)
 				if_false = BasicBlock::Create(*backend.context, "if_false", func);
 				backend.builder->SetInsertPoint(if_false);
 				size_t count = SDCount(list->statements.list);
@@ -713,6 +784,9 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 					create_branch(if_true, to_go_if, backend);
 				}
 			}
+			DEBUG_INFO (
+			emit_location(f, node->condition.token);
+			)
 			backend.builder->SetInsertPoint(passed_block);
 			backend.builder->CreateCondBr(evaluation, if_true, if_false);
 			result = to_go_if;
@@ -786,7 +860,7 @@ generate_index(File_Contents *f, Ast_Node *node, Function *func, llvm::Value *rh
 	return NULL;
 }
 
-void
+llvm::Function *
 generate_func(File_Contents *f, Ast_Node *node)
 {
 	Function *func = generate_func_signature(f, node);
@@ -794,11 +868,14 @@ generate_func(File_Contents *f, Ast_Node *node)
 	DISubprogram *subprogram = NULL;
 	File_And_Unit debug_unit = {};
 	if(f->build_commands.debug_info) {
+			Assert(node->function.body);
 			auto debug_name = StringRef((char *)node->function.identifier.name, vstd_strlen((char *)node->function.identifier.name));
 			debug_unit = shget(debug.file_map, node->function.identifier.token.file);
 			Assert(debug_unit.file != NULL);
 			u64 line = node->function.identifier.token.line;
-			subprogram = debug.builder->createFunction(debug_unit.unit, debug_name, debug_name, debug_unit.file, line, create_func_debug_type(node), line);
+			u64 scope_line = node->function.body->scope_desc.token.line;
+			subprogram = debug.builder->createFunction((DIScope *)debug_unit.file, debug_name, StringRef(),
+					debug_unit.file, line, create_func_debug_type(node), scope_line, DINode::FlagPrototyped, DISubprogram::SPFlagDefinition);
 			Assert(subprogram);
 			func->setSubprogram(subprogram);
 			stack_push(debug.scope, subprogram);
@@ -833,25 +910,18 @@ generate_func(File_Contents *f, Ast_Node *node)
 			backend.named_values[arg_string] = variable;
 		}
 	}
+	Assert(node->function.body);
+
 	DEBUG_INFO (
-			emit_location(f, node->function.identifier.token);
+			emit_location(f, node->function.body->scope_desc.token);
 			)
 
-	Assert(node->function.body);
 	
 	generate_blocks_from_list(f, node->function.body->scope_desc.body, func, body_block, "main", NULL);
 
 	DEBUG_INFO ( _stack_pop(&debug.scope); )
-
-	std::error_code error_code;
-	auto std_out_fd = new raw_fd_ostream("-", error_code);
-	/**/
-	if (verifyFunction(*func, std_out_fd))
-	{
-#if !defined (ONLY_IR)
-		LG_FATAL("Incorrect function");
-#endif
-	}
+		debug.builder->finalizeSubprogram(subprogram);
+		return func;
 }
 
 llvm::Value *
@@ -1378,8 +1448,7 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 }
 
 llvm::Value *
-generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
-			 llvm::Value *rhs, b32 is_decl, Type_Info decl_type)
+generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, b32 is_decl, Type_Info decl_type, u8 **out_identifier)
 {
 	switch((int)lhs->type)
 	{
@@ -1395,6 +1464,8 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs,
 		} break;
 		case type_identifier:
 		{
+			if(out_identifier)
+				*out_identifier = lhs->identifier.name;
 			llvm::Value *result;
 			if(is_decl)
 			{
@@ -1464,8 +1535,8 @@ void
 generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 {
 	Assert(node->type == type_assignment);
-	
-	
+
+	u8 *identifier = NULL;
 	llvm::Value *expression_value;
 	if(node->assignment.rhs)
 		expression_value = generate_expression(f, node->assignment.rhs, func);
@@ -1482,13 +1553,14 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 			expression_value = backend.builder->getInt64(0);
 		}
 	}
+	llvm::Value *location = NULL;
 	// @TODO: remove this and place a flag field in generate_expression so we don't have to iterate the expression twice
 	b32 has_list = expression_has_list(node->assignment.rhs);
 
 	// @NOTE: structs and arrays are handled in their initialization
 	if(!has_list)
 	{
-		llvm::Value *variable = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type);
+		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type, &identifier);
 		if (is_untyped(node->assignment.rhs_type))
 		{
 			Type_Info var_type = node->assignment.decl_type;
@@ -1497,26 +1569,18 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 			expression_value = create_cast(var_type, cast_type, expression_value);
 		}
 
-		backend.builder->CreateStore(expression_value, variable);
+		backend.builder->CreateStore(expression_value, location);
 	}
 	else
 	{
 		Assert(node->assignment.is_declaration);
+		location = expression_value;
 		// @TODO: change to find identifier in case of use with arrays
+		identifier = node->assignment.token.identifier;
 		backend.named_values[std::string((char *)node->assignment.token.identifier)] = (llvm::AllocaInst *)expression_value;
 	}
-/*
-	DEBUG_INFO ( node->assignment.token.line, node->assignment.token.column,
-		DIScope *scope = NULL;
-		if(is_stack_empty(debug.scope))
-			scope = debug.unit;
-		else
-			scope = stack_peek(debug.scope, DIScope *);
-
-		debug.builder->createAutoVariable(scope, (char *)node->assignment.token.identifier, debug.unit->getFile(), node->assignment.token.line,
-			to_debug_type(node->assignment.decl_type, &debug));
-	)*/
-
 	// @TODO: Implement volatile variable
+	
+	emit_assignment(f, node, location, identifier);
 }
 
