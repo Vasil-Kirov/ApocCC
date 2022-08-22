@@ -161,7 +161,8 @@ emit_location(File_Contents *f, Token_Iden token)
 			else
 				scope = stack_peek(debug.scope, DIScope *);
 			// @NOTE: I think it's better to not use token.column
-			backend.builder->SetCurrentDebugLocation(DILocation::get(*backend.context, token.line, 0, scope)); 
+			//backend.builder->SetCurrentDebugLocation(DILocation::get(*backend.context, token.line, 0, scope)); 
+			backend.builder->SetCurrentDebugLocation(DILocation::get(*backend.context, token.line, token.column, scope));
 		}
 	}
 }
@@ -582,11 +583,12 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	}
 	else
 	{
+		for_true = BasicBlock::Create(*backend.context, "for_true", func);
+		backend.builder->SetInsertPoint(for_true);
+
 		DEBUG_INFO(
 			emit_location(f, node->for_loop.token);
 			)
-		for_true = BasicBlock::Create(*backend.context, "for_true", func);
-		backend.builder->SetInsertPoint(for_true);
 		generate_block(f, loop_body, func, NULL, "for_true", jmp_block, list, idx);
 		create_branch(for_true, jmp_block, backend);
 	}
@@ -596,14 +598,15 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	if(node->for_loop.expr3)
 		generate_expression(f, node->for_loop.expr3, func);
 
-	DEBUG_INFO(
-			emit_location(f, node->for_loop.token);
-			)
 
 	auto inner_eval = generate_boolean_expression(f, node->for_loop.expr2, func);
 	backend.builder->CreateCondBr(inner_eval, for_true, for_false);
 
 	backend.builder->SetInsertPoint(block);
+	DEBUG_INFO(
+			emit_location(f, node->for_loop.token);
+			)
+
 	backend.builder->CreateCondBr(evaluation, for_true, for_false);
 }
 
@@ -698,6 +701,9 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				auto else_node = list->statements.list[*idx];
 				if(else_node->type == type_scope_start)
 				{
+					DEBUG_INFO(
+						emit_location(f, else_node->scope_desc.token);
+							)
 					to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
 					if_false = generate_blocks_from_list(f, else_node->scope_desc.body,
 							func, NULL, "else", NULL);
@@ -770,6 +776,9 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 
 			if(body_node->type == type_scope_start)
 			{
+				DEBUG_INFO(
+						emit_location(f, body_node->scope_desc.token);
+						)
 				if_true = generate_blocks_from_list(f, body_node->scope_desc.body, func,
 						NULL, "if_true", to_go_if);
 			}
@@ -784,14 +793,15 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 					create_branch(if_true, to_go_if, backend);
 				}
 			}
-			backend.builder->SetInsertPoint(passed_block);
 			DEBUG_INFO (
-			emit_location(f, node->condition.token);
+					emit_location(f, node->condition.token);
 			)
+			backend.builder->SetInsertPoint(passed_block);
 			backend.builder->CreateCondBr(evaluation, if_true, if_false);
 			result = to_go_if;
 		} break;
-		case type_scope_end: {} break;
+		case type_scope_start: { DEBUG_INFO ( emit_location(f, node->scope_desc.token); ) } break;
+		case type_scope_end: { DEBUG_INFO ( emit_location(f, node->scope_desc.token); ) } break;
 		default:
 		{
 			LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
