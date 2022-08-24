@@ -20,10 +20,12 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 {
 	Build_Commands build_commands = {};
 	build_commands.call_linker = true;
-	build_commands.linker_command = std::string();
-	build_commands.output_file = std::string("");
+	build_commands.linker_command = NULL;
+	build_commands.output_file = NULL;
 
-	std::string linker_commands;
+	std::string tmp_output_file;
+	std::string linker_command;
+	std::string linker_append;
 	std::string args[c_argc - 1];
 	
 	for (size_t i  = 1; i < c_argc; ++i)
@@ -67,8 +69,8 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 			{
 				while(++i < ARR_SIZE(args))
 				{
-					linker_commands += " ";
-					linker_commands += args[i];
+					linker_append += " ";
+					linker_append += args[i];
 				}
 			}
 			else if(arg == "--debug")
@@ -77,7 +79,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 			}
 			else if(arg == "--out")
 			{
-				build_commands.output_file = std::string(args[++i]);
+				tmp_output_file = std::string(args[++i]);
 			}
 			else if(arg == "--no-link")
 			{
@@ -97,38 +99,44 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	if(build_commands.target != TG_WASM)
 	{
 #if defined(_WIN32)
-	build_commands.linker_command += "LINK -nologo ";
+	linker_command += "LINK -nologo ";
 #elif defined (CM_LINUX)
-	build_commands.linker_command += "ld ";
+	linker_command += "ld ";
 #else
 #error Linker for this platform is not defined
 #endif
 	}
 	else
-		build_commands.linker_command += "wasm-ld ";
+		linker_command += "wasm-ld ";
 
-	build_commands.linker_command += linker_commands;
+	linker_command += linker_append;
 
 	if(build_commands.optimization == 0)
 		build_commands.optimization = OPT_NONE;
 	if(build_commands.target == 0)
 		build_commands.target = TG_X64;
-	if(build_commands.output_file.length() == 0)
+	if(tmp_output_file.length() == 0)
 	{
-		build_commands.output_file += "a";
+		tmp_output_file += "a";
 		if(build_commands.target == TG_WASM)
-			build_commands.output_file += ".wasm ";
+			tmp_output_file += ".wasm ";
 		else
 		{		
 #if defined(_WIN32)
-			build_commands.output_file += ".exe ";
+			tmp_output_file += ".exe ";
 #elif defined (CM_LINUX)
-			build_commands.linker_command += ".out ";
+			linker_command += ".out ";
 #else
 #error File extension for this platform is not defined
 #endif
 		}
 			
 	}
+
+	build_commands.output_file = (u8 *)AllocateCompileMemory(4096);
+	build_commands.linker_command = (u8 *)AllocateCompileMemory(4096);
+	memcpy(build_commands.output_file, tmp_output_file.c_str(), tmp_output_file.size());
+	memcpy(build_commands.linker_command, linker_command.c_str(), linker_command.size());
 	return build_commands;
 }
+

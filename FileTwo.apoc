@@ -3,9 +3,9 @@ func memset(dst:* void, val: i32, count: u64) ->* void;
 func scanf(format:* u8, ...) -> i32;
 func printf(format:* u8, ...) -> i32;
 //func atoi(num_str:* u8) -> i32;
-func srand(seed: i32) ->;
+func srand(seed: i32);
 func rand() -> i32;
-func GetSystemTime(time:* SYSTEMTIME) ->;
+func GetSystemTime(time:* SYSTEMTIME);
 func puts(str:* u8) -> i32;
 
 SOME_NUM :: 10 + 2;

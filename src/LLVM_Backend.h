@@ -2,7 +2,7 @@
 #ifndef CODE_GEN_H
 #define CODE_GEN_H
 
-#include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/GlobalVariable.h"
 #include <Basic.h>
 #include <Lexer.h>
 #include <Parser.h>
@@ -50,6 +50,14 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files);
 
 using namespace llvm;
 
+enum Variable_Types
+{
+	ID_LOCAL,
+	ID_GLOBAL,
+	ID_CONST_GLOBAL,
+	ID_FUNCTION
+};
+
 struct Struct_Table
 {
 	u8 *key;
@@ -62,13 +70,25 @@ struct Function_Table
 	Function *value;
 };
 
+struct Alloca_Table
+{
+	u8 *key;
+	AllocaInst *value;
+};
+
+struct Global_Table
+{
+	u8 *key;
+	GlobalVariable *value;
+};
+
 struct Backend_State
 {
 	LLVMContext *context;
 	IRBuilder<> *builder;
 	Module *module;
-	std::map<std::string, AllocaInst *> named_values;
-	std::map<std::string, GlobalVariable *> named_globals;
+	Alloca_Table *named_values;
+	Global_Table *named_globals;
 	Struct_Table *struct_types;
 	Function_Table *func_table;
 	//legacy::FunctionPassManager *func_pass;
@@ -127,7 +147,7 @@ llvm::Value *
 generate_expression(File_Contents *f, Ast_Node *node, Function *func);
 
 llvm::StructType *
-generate_union_type(File_Contents *f, Ast_Node *node);
+generate_union_type(File_Contents *f, Type_Info passed_type);
 
 llvm::Function **
 generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count);

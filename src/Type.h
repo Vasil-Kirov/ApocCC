@@ -8,7 +8,7 @@ struct _Ast_Identifier;
 struct _Type_Info;
 typedef struct _abstract_syntax_tree Ast_Node;
 
-typedef enum
+typedef enum : i32
 {
 	invalid_type = 0xFFFF,
 	byte1  = 1,
@@ -26,7 +26,7 @@ typedef enum
 	detect // @TODO: Remove
 } Var_Size;
 
-typedef enum
+typedef enum : i32
 {
 	T_UNTYPED_INTEGER = 1 ,
 	T_UNTYPED_FLOAT   = 2 ,
@@ -35,13 +35,13 @@ typedef enum
 	T_STRUCT          = 5 ,
 	T_ARRAY           = 6 ,
 	T_POINTER         = 7 ,
-	T_DETECT          = 8 ,
-	T_INVALID         = 9 ,
-	T_VOID            = 10,
-	T_STRING          = 11,
-	T_BOOLEAN		  = 12,
-	T_FUNC            = 13,
-	T_ENUM            = 14,
+	T_VOID            = 8 ,
+	T_STRING          = 9 ,
+	T_BOOLEAN		  = 10,
+	T_FUNC            = 11,
+	T_ENUM            = 12,
+	T_DETECT          = 13,
+	T_INVALID         = 14,
 } Type_Type;
 
 typedef enum
@@ -62,9 +62,13 @@ typedef struct _Type_Info
 		} primitive;
 		struct 
 		{
-			Ast_Node *structure;
+			int member_count;
+			b32 is_union;
 			b32 is_packed;
-		};
+			u8 *name;
+			u8 **member_names;
+			struct _Type_Info *member_types;
+		} structure;
 		struct
 		{
 			struct _Type_Info *type;
@@ -85,14 +89,19 @@ typedef struct _Type_Info
 			Ast_Node *node;
 			struct _Type_Info *type;
 		} enumerator;
-		Ast_Node *func;
+		struct
+		{
+			struct _Type_Info *param_types; // SDArray
+			struct _Type_Info *return_type;
+			int calling_convention;
+		} func;
 	};
 	u8 *identifier;
 	b32 is_const;
 } Type_Info;
 
 Type_Info
-union_get_biggest_type(Ast_Node *node);
+union_get_biggest_type(Type_Info type);
 
 int
 get_type_alignment(Type_Info type);
@@ -105,9 +114,6 @@ is_or_is_pointing_to(Type_Info type, Type_Type check);
 
 int
 get_type_size(Type_Info type);
-
-Type_Info
-fix_type(File_Contents *f, Type_Info type);
 
 b32
 is_string_pointer(Type_Info type);
@@ -138,6 +144,9 @@ is_rhs_valid(Type_Info type);
 
 b32
 is_pointer_rhs_compatible(Type_Info type);
+
+Type_Info
+fix_type(File_Contents *f, Type_Info type, b32 is_fixing_struct = false);
 
 
 #endif //_TYPE_H

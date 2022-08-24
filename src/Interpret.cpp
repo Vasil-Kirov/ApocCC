@@ -157,8 +157,8 @@ interpret_func_call(Ast_Node *node, b32 *failed)
 	Interp_Val operand = interpret_expression(node->func_call.operand, failed);
 	Interp_Val result = interpret_function(operand, node->func_call, failed);
 	if(*failed)
-		LG_ERROR("Cannot interpret function %s, it might be an external function",
-				operand.type.func->function.identifier.name);
+		LG_ERROR("Cannot interpret function call at (%d:%d), it might be an external function",
+				node->func_call.token.line, node->func_call.token.column);
 	return result;
 }
 

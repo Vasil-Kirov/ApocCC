@@ -250,6 +250,10 @@ parse_file_level_statement(File_Contents *f)
 		{
 			result = parse_enum(f);
 		} break;
+		case tok_overload:
+		{
+			result = parse_overload(f);
+		} break;
 		case tok_func:
 		{
 			result = parse_func(f);
@@ -266,7 +270,11 @@ parse_file_level_statement(File_Contents *f)
 		{
 			reached_eof = true;
 			return NULL;
-		}break;
+		} break;
+		case tok_run:
+		{
+			result = ast_run(advance_token(f), parse_expression(f, NO_EXPECT, false));
+		} break;
 		default:
 		{
 			advance_token(f);
@@ -288,6 +296,25 @@ parse_file_level_statement_list(File_Contents *f)
 		SDPush(result->statements.list, statement);
 	}
 	return result;
+}
+
+Call_Conv
+parse_call_conv(File_Contents *f)
+{
+	if(f->curr_token->type != tok_identifier)
+	{
+		advance_token(f);
+		raise_parsing_unexpected_token("calling convention (ex. $call c_decl)", f);
+	}
+	char *convention = (char *)f->curr_token->identifier;
+	if(vstd_strcmp(convention, (char *)"apoc"))
+		return CALL_APOC;
+	else if(vstd_strcmp(convention, (char *)"c_decl"))
+		return CALL_C_DECL;
+	else
+		raise_parsing_unexpected_token("calling convention", f);
+	Assert(false);
+	return CALL_APOC;
 }
 
 Ast_Node *
@@ -1025,6 +1052,15 @@ ptr_to_identifier(Type_Info ptr)
 	}
 }
 
+Ast_Node *
+parse_type_ast(File_Contents *f)
+{
+	Ast_Node *result = alloc_node();
+	result->type = type_only_type;
+	result->only_type.type = parse_type(f);
+	return result;
+}
+
 Type_Info
 parse_type(File_Contents *f)
 {
@@ -1039,7 +1075,6 @@ parse_type(File_Contents *f)
 		Type_Info pointed = parse_type(f);
 		result.pointer.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 		memcpy(result.pointer.type, &pointed, sizeof(Type_Info));
-		result.identifier = ptr_to_identifier(result);
 	}
 	else if(pointer_or_type.type == tok_identifier)
 	{
@@ -1051,15 +1086,16 @@ parse_type(File_Contents *f)
 	}
 	else if(pointer_or_type.type == '[')
 	{
+		advance_token(f);
 		result.type = T_ARRAY;
 		result.identifier = (u8 *)"array_list";
-		result.token = advance_token(f);
 
 		// @NOTE: not implemented, should it even be implemented?
 		if(f->curr_token->type == ']')
 		{
 			result.array.array_type = ARR_DYNAMIC;
 			result.array.optional_expression = NULL;
+			Assert(false);
 		}
 		else
 		{
@@ -1079,12 +1115,51 @@ parse_type(File_Contents *f)
 		result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 		memcpy(result.array.type, &arr_type, sizeof(Type_Info));
 	}
+	else if(pointer_or_type.type == tok_func)
+	{
+		advance_token(f);
+		if(f->curr_token->type == tok_call_conv)
+		{
+			advance_token(f);
+			result.func.calling_convention = parse_call_conv(f);
+			advance_token(f);
+		}
+		else
+			result.func.calling_convention = CALL_APOC;
+		result.type = T_FUNC;
+		result.func.param_types = SDCreate(Type_Info);
+		Ast_Node **types = delimited(f, '(', ')', ',', parse_type_ast);
+		size_t type_count = SDCount(types);
+		for(size_t i = 0; i < type_count; ++i)
+		{
+			SDPush(result.func.param_types, types[i]->only_type.type);
+		}
+		if(f->curr_token->type == tok_arrow)
+		{
+			advance_token(f);
+			auto return_type = parse_type(f);
+			auto allocated_ret_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			memcpy(allocated_ret_type, &return_type, sizeof(Type_Info));
+			result.func.return_type = allocated_ret_type;
+		}
+		else
+		{
+			auto allocated_ret_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			allocated_ret_type->type = T_VOID;
+			allocated_ret_type->identifier = (u8 *)"void";
+			allocated_ret_type->token = *f->prev_token;
+			allocated_ret_type->primitive.size = empty_void;
+			result.func.return_type = allocated_ret_type;
+		}
+		result.identifier = var_type_to_name(result, false);
+	}
 	else
 	{
 		advance_token(f);
 		raise_parsing_unexpected_token("type", f);
 		//result = (Type_Info){.type = T_INVALID};
 	}
+	result.identifier = var_type_to_name(result, false);
 	result.token = pointer_or_type;
 	return result;
 }
@@ -1153,18 +1228,101 @@ parse_func_arg(File_Contents *f)
 }
 
 Ast_Node *
-parse_func(File_Contents *f)
+parse_overload(File_Contents *f)
 {
-	b32 is_interpret_only = false;
-	parser_eat(f, tok_func);
-	if(f->curr_token->type == tok_interp)
+	Ast_Overload overload = {};
+	overload.token = *f->curr_token;
+	parser_eat(f, tok_overload);
+
+	switch ((int)f->curr_token->type)
 	{
-		is_interpret_only = true;
-		advance_token(f);
+		case '[':
+		{
+			overload.overloaded = O_INDEX;
+			advance_token(f);
+			parser_eat(f, (Token)']');
+		} break;
+		case '.':
+		{
+			overload.overloaded = O_SELECTOR;
+			advance_token(f);
+		} break;
+		default:
+		{
+			int prec = get_precedence(f->curr_token->type, true, false);
+			if(prec == 0 || f->curr_token->type == '(')
+				raise_parsing_unexpected_token("overloadable operand", f);
+			overload.overloaded = O_OP;
+			overload.op = advance_token(f).type;
+		} break;
 	}
 
 	Ast_Func this_func = {};
-	this_func.is_interpret_only = is_interpret_only;
+	this_func.arguments = delimited(f, '(', ')', ',', parse_func_arg);
+	size_t arg_count = SDCount(this_func.arguments);
+	if(arg_count == 0);
+		raise_parsing_unexpected_token("arguments", f);
+	if(arg_count != 2 && arg_count != 1)
+		raise_semantic_error(f, "operator overload must accepts either 1 or 2 arguments", 
+				this_func.arguments[0]->variable.identifier.token);
+	
+	Type_Info func_type = {};
+	if(f->curr_token->type == tok_arrow)
+	{
+		advance_token(f);
+		Token_Iden maybe_type = *f->curr_token;
+		if (maybe_type.type != '{' && maybe_type.type != ';')
+		{
+			func_type = parse_type(f);
+		}
+		else
+		{
+			advance_token(f);
+			raise_parsing_unexpected_token("function return type", f);
+		}
+	}
+	else
+	{
+		func_type.type = T_VOID;
+		func_type.identifier = (u8 *)"void";
+	}
+	this_func.type = func_type;
+	this_func.conv = CALL_APOC;
+	this_func.identifier = pure_identifier(overload.token);
+	this_func.body = parse_body(f, true, invalid_token);
+	Ast_Node *function = alloc_node();
+	function->function = this_func;
+}
+
+Ast_Node *
+parse_func(File_Contents *f)
+{
+	parser_eat(f, tok_func);
+	Ast_Func this_func = {};
+	while(f->curr_token->type == tok_interp || f->curr_token->type == tok_intrinsic || f->curr_token->type == tok_call_conv)
+	{
+		switch((int)f->curr_token->type)
+		{
+			case tok_interp:
+			{
+				this_func.flags |= FF_IS_INTERP_ONLY;
+			} break;
+			case tok_intrinsic:
+			{
+				this_func.flags |= FF_IS_INTRINSIC;
+			} break;
+			case tok_call_conv:
+			{
+				advance_token(f);
+				this_func.conv = parse_call_conv(f);
+			} break;
+		}
+		advance_token(f);
+	}
+
+	if(this_func.conv == 0)
+		this_func.conv = CALL_APOC;
+
 	Ast_Node *func_id = ast_identifier(f, advance_token(f));
 	this_func.identifier = func_id->identifier;
 	this_func.arguments = delimited(f, '(', ')', ',', parse_func_arg);
@@ -1172,17 +1330,24 @@ parse_func(File_Contents *f)
 	for(size_t i = 0; i < arg_count; ++i)
 	{
 		if(this_func.arguments[i]->variable.type.type == T_DETECT)
-			this_func.has_var_args = true;
+			this_func.flags |= FF_HAS_VAR_ARGS;
 	}
 	
 	
-	parser_eat(f, tok_arrow);
-
 	Type_Info func_type = {};
-	Token_Iden maybe_type = *f->curr_token;
-	if (maybe_type.type != '{' && maybe_type.type != ';')
+	if(f->curr_token->type == tok_arrow)
 	{
-		func_type = parse_type(f);
+		advance_token(f);
+		Token_Iden maybe_type = *f->curr_token;
+		if (maybe_type.type != '{' && maybe_type.type != ';')
+		{
+			func_type = parse_type(f);
+		}
+		else
+		{
+			advance_token(f);
+			raise_parsing_unexpected_token("function return type", f);
+		}
 	}
 	else
 	{
@@ -1191,6 +1356,7 @@ parse_func(File_Contents *f)
 	}
 	this_func.type = func_type;
 
+
 	Token_Iden body = *f->curr_token;
 
 	Ast_Node *result = alloc_node();
@@ -1198,11 +1364,15 @@ parse_func(File_Contents *f)
 	result->function = this_func;
 
 	{
+		Type_Info sym_type = {};
+		sym_type.type = T_FUNC;
+		sym_type.func.calling_convention = this_func.conv;
+
 		Symbol this_symbol = {S_FUNCTION};
 		this_symbol.token = func_id->identifier.token;
 		this_symbol.node = result;
 		this_symbol.identifier = this_func.identifier.name;
-		this_symbol.type = func_type;
+		this_symbol.type = sym_type;
 		add_symbol(f, this_symbol);
 		interpret_add_function(this_symbol);
 	}

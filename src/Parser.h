@@ -20,6 +20,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_only_type    = -66,
 	type_union        = -65,
 	type_interp_val   = -64,
 	type_enum         = -63,
@@ -135,14 +136,27 @@ typedef struct
 	Type_Info func_type; // @NOTE: after analysis
 } Ast_Return;
 
+typedef enum
+{
+	FF_HAS_VAR_ARGS   = 1 << 0,
+	FF_IS_INTERP_ONLY = 1 << 1,
+	FF_IS_INTRINSIC   = 1 << 2,
+} Func_Flags;
+
+typedef enum
+{
+	CALL_APOC   = 1,
+	CALL_C_DECL = 2,
+} Call_Conv;
+
 typedef struct
 {
 	Type_Info type;
 	Ast_Identifier identifier;
 	Ast_Node **arguments; // Simple DArray
 	Ast_Node *body;
-	b32 has_var_args;
-	b32 is_interpret_only;
+	Call_Conv conv;
+	i32 flags;
 } Ast_Func;
 
 typedef struct
@@ -181,10 +195,27 @@ typedef struct _Ast_Call
 {
 	Ast_Node *operand;
 	Ast_Node **arguments; // Simple DArray of expressions
-	Token_Iden token;
 	Type_Info *expr_types;
 	Type_Info *arg_types;
+	Type_Info operand_type;
+	Token_Iden token;
 } Ast_Call;
+
+typedef enum
+{
+	INVALID,
+	O_INDEX,
+	O_SELECTOR,
+	O_OP
+} Overloaded;
+
+typedef struct
+{
+	Overloaded overloaded;
+	Token op;
+	Ast_Node *function;
+	Token_Iden token;
+} Ast_Overload;
 
 typedef enum
 {
@@ -289,6 +320,11 @@ typedef struct
 	Interp_Val val;
 } Ast_Interp_Val;
 
+typedef struct
+{
+	Type_Info type;
+} Ast_Type_Only;
+
 struct _abstract_syntax_tree
 {
 	Ast_Type type;
@@ -309,6 +345,7 @@ struct _abstract_syntax_tree
 		Ast_Binary_Expr binary_expr;
 		Ast_Assignment assignment;
 		Ast_Variable variable;
+		Ast_Type_Only only_type;
 		Ast_Call func_call;
 		Ast_Atom atom;
 		Ast_Identifier identifier;
@@ -322,6 +359,9 @@ struct _abstract_syntax_tree
 	Ast_Node *left;
 	Ast_Node *right;
 };
+
+Ast_Identifier
+pure_identifier(Token_Iden token);
 
 Ast_Node *
 ast_union(File_Contents *f);
@@ -361,6 +401,9 @@ parse_struct(File_Contents *f);
 
 Ast_Node *
 parse_enum(File_Contents *f);
+
+Ast_Node *
+parse_func_arg(File_Contents *f);
 
 Ast_Node **
 delimited(File_Contents *f, char start, char stop, char seperator, Ast_Node *(*parser)(File_Contents *));

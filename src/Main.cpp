@@ -154,27 +154,34 @@ int main(int argc, char *argv[])
 	f->build_commands.output_file = build_command.output_file;
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
 	
-	f->build_commands.linker_command += " ";
-	f->build_commands.linker_command += f->obj_name;
+	u8 *final_linker_command = (u8 *)AllocatePermanentMemory(4096);
+	vstd_strcat((char *)final_linker_command, (char *)f->build_commands.linker_command);
+	vstd_strcat((char *)final_linker_command, (char *)" ");
+	vstd_strcat((char *)final_linker_command, f->obj_name);
 
 	if(f->build_commands.target != TG_WASM)
 	{
 #if defined(_WIN32)
 	if(f->build_commands.debug_info)
-		f->build_commands.linker_command += " /DEBUG:FULL ";
-	f->build_commands.linker_command += " /OUT:" + f->build_commands.output_file;
+		vstd_strcat((char *)final_linker_command, (char *)" /DEBUG:FULL ");
+
+	vstd_strcat((char *)final_linker_command, (char *)" /OUT:");
 #elif defined (CM_LINUX)
-	f->build_commands.linker_command += " -o" + f->build_commands.output_file;
+	vstd_strcat((char *)final_linker_command, (char *)" -o");
 #else
 #error Linker for this platform is not defined
 #endif
 	}
 	else
-		f->build_commands.linker_command += " -o" + f->build_commands.output_file;
+	{
+		vstd_strcat((char *)final_linker_command, (char *)" -o");
+	}
+
+	vstd_strcat((char *)final_linker_command, (char *)f->build_commands.output_file);
 
 	if(f->build_commands.call_linker)
 	{
-		TIME_FUNC(timers, platform_call_and_wait(f->build_commands.linker_command.c_str()),
+		TIME_FUNC(timers, platform_call_and_wait((char *)final_linker_command),
 				linking_clock, linking);
 	}
 

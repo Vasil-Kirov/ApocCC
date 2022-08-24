@@ -1,0 +1,101 @@
+
+enum Call_Conv: i32
+{
+	CALL_APOC   = 1;
+	CALL_C_DECL = 2;
+}
+
+enum Var_Size: i32
+{
+	byte1        = 1;
+	byte2        = 2;
+	byte4        = 3;
+	byte8        = 4;
+	ubyte1       = 5;
+	ubyte2       = 6;
+	ubyte4       = 7;
+	ubyte8       = 8;
+	real32       = 9;
+	real64       = 10;
+	empty_void   = 11;
+	logical_bit  = 12;
+}
+
+enum Type_Type: i32
+{
+	T_INTEGER = 3;
+	T_FLOAT;
+	T_STRUCT;
+	T_ARRAY;
+	T_POINTER;
+	T_VOID;
+	T_STRING;
+	T_BOOLEAN;
+	T_FUNC;
+	T_ENUM   = 12;
+}
+
+struct Va_List
+{
+	ptr:*i8;
+}
+
+struct __Internal_Context {
+	type_table:* Type_Info;
+}
+
+struct Any {
+	type:*  Type_Info;
+	value:* void;
+}
+
+struct $union Type_Info {
+	kind:       Type_Type;
+	primitive:  Type_Primitive;
+	structure:  Type_Struct;
+	array:      Type_Array;
+	pointer:    Type_Pointer;
+	enumerator: Type_Enum;
+	function:   Type_Func;
+}
+
+struct Type_Primitive {
+	kind: Type_Type;
+	size: Var_Size
+}
+
+struct Type_Struct {
+	kind:           Type_Type;
+	member_count:   i32;
+	is_union:       bool;
+	is_packed:      bool;
+	name:*          u8;
+	member_names:** u8;
+	member_types:*  Type_Info;
+}
+
+struct Type_Array {
+	kind:  Type_Type;
+	type:* Type_Info;
+	elem_count: u64;
+}
+
+struct Type_Pointer {
+	kind:     Type_Type;
+	pointed:* Type_Info;
+}
+
+struct Type_Enum {
+	kind:    Type_Type;
+	type:    Type_Primitive;
+	names:** u8;
+	values:* u64;
+}
+
+struct Type_Func {
+	kind:               Type_Type;
+	param_types:*       Type_Info;
+	return_type:*       Type_Info;
+	calling_convention: Call_Conv;
+}
+

@@ -9,7 +9,6 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
-#include "llvm/Support/CommandLine.h"
 #include <LLVM_Backend.h>
 #include <LLVM_Helpers.h>
 #include <Type.h>
@@ -223,6 +222,7 @@ write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_t
 		to_write.primitive.size = real64;
 	}
 
+	backend.builder->CreateStore(backend.builder->getInt32(to_write.type), ptr);
 	gep_and_write_val_int(ptr, (StructType *)llvm_type, backend, 0, to_write.type, 32);
 
 	switch(to_write.type)
@@ -329,7 +329,8 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 		b32 to_fix[member_count];
 		for(size_t i = 0; i < member_count; ++i)
 		{
-			if(members[i].type == T_POINTER && members[i].pointer.type->type == T_STRUCT)
+			if(members[i].type == T_POINTER && members[i].pointer.type->type == T_STRUCT &&
+					vstd_strcmp((char *)members[i].pointer.type->identifier, (char *)type.identifier))
 			{
 				to_fix[i] = true;
 				Type_Info opaque_pointer = members[i];
@@ -401,7 +402,8 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 
 			int offset_in_bits = (memory_address + member_size - actual_size) * 8;
 			member_locations[i] = offset_in_bits;
-			if(members[i].type == T_POINTER && members[i].pointer.type->type == T_STRUCT)
+			if(members[i].type == T_POINTER && members[i].pointer.type->type == T_STRUCT &&
+					vstd_strcmp((char *)members[i].pointer.type->identifier, (char *)type.identifier))
 			{
 				to_fix[i] = true;
 				Type_Info opaque_pointer = members[i];
@@ -618,17 +620,9 @@ to_debug_type(Type_Info type, Debug_Info *debug)
 	}
 	else if (type.type == T_ARRAY)
 	{
-		Metadata *subscripts[1] = {};
-		subscripts[0] = debug->builder->getOrCreateSubrange(0, type.array.elem_count);
-
-		auto subscript_array = debug->builder->getOrCreateArray(subscripts);
-
-		auto array_size = get_type_size(*type.array.type) * 8 * type.array.elem_count;
-		auto align      = get_type_alignment(*type.array.type) * 8;
-		auto array_type = debug->builder->createArrayType(array_size, align, to_debug_type(*type.array.type, debug), subscript_array);
-		
-		Assert(array_type);
-		return array_type;
+		DINodeArray *subscripts = new DINodeArray();
+		return debug->builder->createArrayType(type.array.elem_count, 16 * 8,
+				to_debug_type(*type.array.type, debug), *subscripts);
 	}
 	else if (type.type == T_VOID)
 	{

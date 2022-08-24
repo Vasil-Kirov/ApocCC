@@ -2,9 +2,24 @@
 #ifndef _LLVM_HELPERS_H
 #define _LLVM_HELPERS_H
 #include <LLVM_Backend.h>
+#include <llvm-c/DebugInfo.h>
+
+llvm::FunctionType *
+type_to_func_type(Type_Info type, Backend_State backend);
+
+void
+write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_type,
+		Backend_State backend, llvm::Function *func);
+
+llvm::StructType *
+get_type_info_kind(const char *name, Backend_State backend);
 
 void
 create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State backend);
+
+AllocaInst *
+allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
+		u64 align, u64 size_in_bytes);
 
 AllocaInst *
 allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State backend);

@@ -23,19 +23,19 @@ primitive_size_to_alignment(i64 size)
 }
 
 Type_Info
-union_get_biggest_type(Ast_Node *node)
+union_get_biggest_type(Type_Info union_type)
 {
-	Ast_Variable *members = node->structure.members;
-	size_t member_count = SDCount(members);
+	auto member_types = union_type.structure.member_types;
+	size_t member_count = union_type.structure.member_count;
 	Type_Info type = {};
 	type.type = T_INVALID;
 	size_t biggest_type = 0;
 	for(size_t i = 0; i < member_count; ++i)
 	{
-		size_t type_size = get_type_size(members[i].type);
+		size_t type_size = get_type_size(member_types[i]);
 		if(type_size > biggest_type)
 		{
-			type = members[i].type;
+			type = member_types[i];
 			biggest_type = type_size;
 		}
 	}
@@ -55,6 +55,7 @@ get_type_alignment(Type_Info type)
 		{
 			return primitive_size_to_alignment(type.primitive.size);
 		} break;
+		case T_FUNC:
 		case T_POINTER:
 		return sizeof(size_t);
 		case T_STRUCT:
@@ -76,15 +77,15 @@ get_struct_alignment(Type_Info struct_type)
 {
 	Assert(struct_type.type == T_STRUCT);
 	size_t biggest_member = 1;
-	auto members = struct_type.structure->structure.members;
-	size_t member_count = SDCount(members);
+	auto member_types = struct_type.structure.member_types;
+	size_t member_count = struct_type.structure.member_count;
 	for(size_t i = 0; i < member_count; ++i)
 	{
 		int this_member = 1;
-		if(members[i].type.type == T_STRUCT)
-			this_member = get_struct_alignment(members[i].type);
+		if(member_types[i].type == T_STRUCT)
+			this_member = get_struct_alignment(member_types[i]);
 		else
-			this_member = get_type_size(members[i].type);
+			this_member = get_type_size(member_types[i]);
 		
 		if(this_member > biggest_member) biggest_member = this_member;
 	}
@@ -105,7 +106,7 @@ get_type_size(Type_Info type)
 		// but it doesn't feel nice
 		return primitive_size_to_alignment(type.primitive.size);
 	}
-	else if(type.type == T_POINTER)
+	else if(type.type == T_POINTER || type.type == T_FUNC)
 		return sizeof(size_t);
 	else if(type.type == T_ARRAY)
 	{
@@ -117,30 +118,30 @@ get_type_size(Type_Info type)
 	}
 	else if(type.type == T_STRUCT)
 	{
-		if(type.structure->structure.is_union)
+		if(type.structure.is_union)
 		{	
-			Type_Info biggest_type = union_get_biggest_type(type.structure);
+			Type_Info biggest_type = union_get_biggest_type(type);
 			return get_type_size(biggest_type);
 		}
 		else
 		{
-			Ast_Variable *members = type.structure->structure.members;
+			auto members = type.structure.member_types;
 			size_t result = 0;
 			size_t memory_address = 0;
-			size_t member_count = SDCount(members);
+			size_t member_count = type.structure.member_count;
 			size_t largest_member = 1;
-			b32 is_packed = type.is_packed;
+			b32 is_packed = type.structure.is_packed;
 			for(size_t i = 0; i < member_count; ++i)
 			{
-				size_t member_size = get_type_size(members[i].type);
+				size_t member_size = get_type_size(members[i]);
 				size_t align_size = member_size;
-				if(members[i].type.type == T_STRUCT)
+				if(members[i].type == T_STRUCT)
 				{
-					align_size = get_struct_alignment(members[i].type);
+					align_size = get_struct_alignment(members[i]);
 				}
-				else if(members[i].type.type == T_ARRAY)
+				else if(members[i].type == T_ARRAY)
 				{
-					align_size = get_type_alignment(*members[i].type.array.type);
+					align_size = get_type_alignment(*members[i].array.type);
 				}
 				if(align_size > largest_member)
 					largest_member = align_size;
@@ -242,7 +243,7 @@ type_is_invalid(Type_Info type)
 }
 
 Type_Info
-fix_type(File_Contents *f, Type_Info type)
+fix_type(File_Contents *f, Type_Info type, b32 is_fixing_struct)
 {
 	Type_Info result = type;
 	if(result.type == T_POINTER)
@@ -253,13 +254,21 @@ fix_type(File_Contents *f, Type_Info type)
 		result.pointer.type = to_store;
 		return result;
 	}
-	else if(!type_is_invalid(result))
-		return result;
+	if(!type_is_invalid(result))
+	{}
 	else if(type.identifier)
 	{
 		result = get_type(f, type.identifier);
 		if(result.token.file == NULL)
 			result.token = type.token;
+	}
+	if(result.type == T_STRUCT && !is_fixing_struct)
+	{
+		size_t member_count = result.structure.member_count;
+		for(size_t i = 0; i < member_count; ++i)
+		{
+			result.structure.member_types[i] = fix_type(f, result.structure.member_types[i], true);
+		}
 	}
 	return result;
 }

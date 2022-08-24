@@ -67,13 +67,13 @@ typedef struct
 {
 	Optimization_Level optimization;
 	Target_Arch target;
-	std::string output_file;
-	std::string linker_command;
+	u8 *output_file;
+	u8 *linker_command;
 	b32 debug_info;
 	b32 call_linker;
 } Build_Commands;
 
-// @NOTE: this is poorly names, should probably be changed to something like `compile_state`
+// @NOTE: this is poorly named, should probably be changed to something like `compile_state`
 typedef struct _File_Contents
 {
 	Token_Iden *prev_token;
@@ -119,9 +119,6 @@ void
 add_type(File_Contents *f, Ast_Node *structure);
 
 void
-update_type(Ast_Struct structure);
-
-void
 add_symbol(File_Contents *f, Symbol symbol);
 
 void
@@ -134,7 +131,7 @@ void
 analyze_file_level_statement_list(File_Contents *f, Ast_Node *node);
 
 u8 *
-var_type_to_name(Type_Info type);
+var_type_to_name(Type_Info type, b32 bracket = true);
 
 Symbol *
 get_symbol_spot(File_Contents *f, Token_Iden token);
@@ -178,6 +175,9 @@ is_scope_stack_empty(File_Contents *f);
 
 Type_Info
 untyped_to_type(Type_Info type);
+
+void
+func_fix_types(File_Contents *f, Ast_Node *node);
 
 b32
 is_logical_op(Token op);
