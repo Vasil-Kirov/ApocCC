@@ -1,5 +1,5 @@
 -g
--O0
+-O2
 -Wall
 -DCM_LINUX
 -mavx

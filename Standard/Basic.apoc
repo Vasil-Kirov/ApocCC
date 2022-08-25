@@ -1,4 +1,7 @@
 
+true  :: #bool 1;
+false :: #bool 0;
+
 enum Call_Conv: i32
 {
 	CALL_APOC   = 1;
@@ -57,6 +60,13 @@ struct $union Type_Info {
 	pointer:    Type_Pointer;
 	enumerator: Type_Enum;
 	function:   Type_Func;
+}
+
+func mem_alloc(size: u64) ->* void
+{
+	result := malloc(size);
+	memset(result, 0, size);
+	-> result;
 }
 
 struct Type_Primitive {

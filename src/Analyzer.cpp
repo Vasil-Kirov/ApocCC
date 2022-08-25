@@ -1,10 +1,12 @@
 #include <Analyzer.h>
 #include <Log.h>
+#include <functional>
 #include <stdlib/std.h>
 #include <Memory.h>
 #include <Type.h>
 #include <Errors.h>
 #include <Interpret.h>
+#include <vcruntime_typeinfo.h>
 
 void
 initialize_analyzer(File_Contents *f)
@@ -155,9 +157,10 @@ pop_scope(File_Contents *f, Token_Iden scope_tok)
 				Symbol b = scanning_table[j];
 				if(vstd_strcmp((char *)a.identifier, (char *)b.identifier))
 				{
-					char *error = (char *)AllocateCompileMemory(2048);
-					vstd_sprintf(error, "Redifinition of symbol %s", a.identifier);
-					raise_semantic_error(f, error, b.token);
+					u8 *previous_definition = get_error_segment(a.token);
+					raise_formated_semantic_error(f, b.token,
+							"Redifinition of symbol %s, previously declared at %s(%d:%d):\n%s",
+										  a.identifier, a.token.file, a.token.line, a.token.column, previous_definition);
 				}
 			}
 		}
@@ -183,9 +186,11 @@ add_symbol(File_Contents *f, Symbol symbol)
 	{
 		if(vstd_strcmp((char *)symbol_table[i].identifier, (char *)identifier))
 		{
+			Token_Iden prev = symbol_table[i].token;
+			u8 *previous_definition = get_error_segment(prev);
 			raise_formated_semantic_error(f, symbol.token,
-										  "Redifinition of symbol %s",
-										  identifier);
+							"Redifinition of symbol %s, previously declared at %s(%d:%d):\n%s",
+										  identifier, prev.file, prev.line, prev.column, previous_definition);
 		}
 	}
 	SDPush(symbol_table, symbol);
@@ -210,6 +215,81 @@ analyze(File_Contents *f, Ast_Node *ast_tree)
 }
 
 void
+overload_fix_types(File_Contents *f, Ast_Node *overload) 
+{
+	Ast_Node *func = overload->overload.function;
+	func->function.type = fix_type(f, func->function.type);
+	if(func->function.type.type == T_VOID)
+		raise_semantic_error(f, "Overloaded operand must return a value",
+				func->function.identifier.token);
+	if(type_is_invalid(func->function.type))
+		raise_formated_semantic_error(f, func->function.identifier.token,
+				"Return type %s of function %s is not defined", func->function.type.identifier,
+				func->function.identifier.name);
+
+	Type_Info *return_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	memcpy(return_type, &func->function.type, sizeof(Type_Info));
+	func->function.type.type = T_FUNC;
+	func->function.type.func.return_type = return_type;
+	func->function.type.func.param_types = SDCreate(Type_Info);
+	auto func_param_types = func->function.type.func.param_types;
+	size_t arg_count = SDCount(func->function.arguments);
+	
+	for(size_t i = 0; i < arg_count; ++i)
+	{
+		Ast_Variable arg = func->function.arguments[i]->variable;
+		if(arg.type.type == T_DETECT)
+		{
+			SDPush(func_param_types, arg.type);
+		}
+		else
+		{
+			auto fixed_type = fix_type(f, arg.type);
+			SDPush(func_param_types, fixed_type);
+		}
+	}
+	func->function.type.identifier = var_type_to_name(func->function.type, false);
+}
+
+void
+verify_overload(File_Contents *f, Ast_Node *overload)
+{
+	Ast_Node *func = overload->overload.function;
+	size_t arg_count = SDCount(func->function.arguments);
+	for (size_t i = 0; i < arg_count; i++)
+	{
+		Ast_Variable arg = func->function.arguments[i]->variable;
+		// @NOTE: add argument to symbol table
+		Symbol arg_symbol = {S_FUNC_ARG};
+
+		arg_symbol.token = func->function.identifier.token;
+		arg_symbol.node = func->function.arguments[i];
+
+		Assert(arg.type.type != T_DETECT);
+		arg_symbol.identifier = arg.identifier.name;
+		arg_symbol.type = fix_type(f, arg.type);
+		arg_symbol.node->variable.type = arg_symbol.type;
+		SDPush(f->to_add_next_scope, arg_symbol);
+	}
+	func->function.type = *func->function.type.func.return_type;
+	if(overload->overload.overloaded == O_INDEX)
+	{
+		if(arg_count != 2)
+			raise_semantic_error(f, "Index overload needs exactly 2 arguemnts", overload->overload.token);
+		auto left_arg = func->function.arguments[0]->variable;
+		if(left_arg.type.type == T_ARRAY || left_arg.type.type == T_POINTER)
+			raise_semantic_error(f, "Cannot overload the index of an array or pointer type", overload->overload.token);
+	}
+	else
+	{
+		auto left_arg = func->function.arguments[0]->variable;
+		if(is_type_primitive(left_arg.type))
+			raise_semantic_error(f, "Cannot overload primitive type", overload->overload.token);
+	}
+	verify_func_level_statement_list(f, func->function.body, func);
+}
+
+void
 analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 {
 	Assert(node->type == type_statements);
@@ -228,6 +308,8 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 	{
 		if(functions[i]->type == type_func)
 			func_fix_types(f, functions[i]);
+		else if(functions[i]->type == type_overload)
+			overload_fix_types(f, functions[i]);
 		else if(functions[i]->type == type_run)
 		{
 			get_expression_type(f, node->run.to_run, node->run.token, node);
@@ -254,6 +336,11 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 		if(functions[i]->type == type_func)
 			verify_func(f, functions[i]);
 	}
+	for(size_t i = 0; i < func_count; ++i)
+	{
+		if(functions[i]->type == type_overload)
+			verify_overload(f, functions[i]);
+	}
 }
 
 Ast_Node *
@@ -269,6 +356,10 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 		case type_enum:
 		{
 			verify_enum(f, node);
+		} break;
+		case type_overload:
+		{
+			return node;
 		} break;
 		case type_func:
 		{
@@ -1136,13 +1227,31 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 		{
 			Type_Info operand_type = fix_type(f, get_expression_type(f,
 						expression->index.operand, expression->index.token, NULL));
+			Type_Info index_type = fix_type(f, get_expression_type(f,
+						expression->index.expression, expression->index.token, NULL));
+
+			if(type_is_invalid(operand_type))
+			{
+				raise_semantic_error(f, "Indexing expression is invalid", expression->index.token);
+			}
 			expression->index.operand_type = operand_type;
 			if(operand_type.type != T_ARRAY && operand_type.type != T_POINTER)
 			{
-				raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
+				i32 index = 0;
+				auto overload = get_overload(f, &operand_type, &index_type, expression, &index);
+				if(overload)
+				{
+					overload->overload.index = index;
+					auto left_expr = expression->index.operand;
+					auto right_expr = expression->index.expression;
+					Token_Iden token = expression->index.token;
+					overload_overwrite(token, expression, left_expr, right_expr,
+							&operand_type, &index_type, overload);
+					return *overload->overload.function->function.type.func.return_type;
+				}
+				else
+					raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
 			}
-			Type_Info index_type = fix_type(f, get_expression_type(f,
-						expression->index.expression, expression->index.token, NULL));
 			if(!is_integer(index_type))
 			{
 				raise_semantic_error(f, "Non integer used for indexing", expression->index.token);
@@ -1340,6 +1449,84 @@ check_types_error(File_Contents *f, Token_Iden token, Type_Info a, Type_Info b)
 	}
 }
 
+Ast_Node *
+get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, i32 *index)
+{
+	auto overloads = f->overloads;
+	size_t overload_count = SDCount(overloads);
+	size_t arg_count = 2;
+	if(!right)
+		arg_count = 1;
+	if(op->type == type_index)
+	{
+		for(size_t i = 0; i < overload_count; ++i)
+		{
+			*index = i;
+			if(overloads[i]->overload.overloaded == O_INDEX)
+			{
+				u8 *left_id = overloads[i]->overload.function->function.arguments[0]->variable.type.identifier;
+				Type_Info right_type = overloads[i]->overload.function->function.arguments[1]->variable.type;
+				if(vstd_strcmp((char *)left->identifier, (char *)left_id) &&
+						check_type_compatibility(right_type, *right))
+				{
+					return overloads[i];
+				}
+			}
+		}
+	}
+	else
+	{
+		Token used_op;
+		if(op->type == type_unary_expr)
+			used_op = op->unary_expr.op.type;
+		else if(op->type == type_binary_expr)
+			used_op = op->binary_expr.op;
+		else
+			Assert(false);
+		for(size_t i = 0; i < overload_count; ++i)
+		{
+			*index = i;
+			if(overloads[i]->overload.op == used_op &&
+					SDCount(overloads[i]->overload.function->function.arguments) == arg_count)
+			{
+				if(vstd_strcmp((char *)left->identifier,
+							(char *)overloads[i]->overload.function->function.arguments[0]->variable.type.identifier))
+				{
+					if(arg_count == 1)
+						return overloads[i];
+					else
+						if(check_type_compatibility(overloads[i]->overload.function->function.arguments[1]->variable.type,
+									*right))
+							return overloads[i];
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
+void
+overload_overwrite(Token_Iden token, Ast_Node *expression, Ast_Node *left_expr, Ast_Node *right_expr, Type_Info *left, Type_Info *right, Ast_Node *overload)
+{
+
+	expression->type = type_func_call;
+	expression->func_call.token = token;
+	expression->func_call.operand = overload;
+	expression->func_call.operand_type = overload->overload.function->function.type;
+	expression->func_call.arguments = SDCreate(Ast_Node *);
+	expression->func_call.arg_types = SDCreate(Type_Info);
+	expression->func_call.expr_types = SDCreate(Type_Info);
+	SDPush(expression->func_call.arguments, left_expr);
+	if(right_expr)
+		SDPush(expression->func_call.arguments, right_expr);
+	SDPush(expression->func_call.arg_types, *left);
+	if(right)
+	SDPush(expression->func_call.arg_types, overload->overload.function->function.arguments[1]->variable.type);
+	SDPush(expression->func_call.expr_types, *left);
+	if(right)
+	SDPush(expression->func_call.expr_types, *right);
+}
+
 Type_Info
 get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Ast_Node *previous)
 {
@@ -1355,13 +1542,27 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_toke
 	if(type_is_invalid(left) || type_is_invalid(right))
 		raise_semantic_error(f, "invalid type in expression", desc_token);
 
-	check_types_error(f, desc_token, left, right);
 	if(!are_op_compatible(left, right))
 	{
-		raise_formated_semantic_error(f, expression->binary_expr.token,
-				"Cannot perform a binary operation with types %s and %s",
-				var_type_to_name(left), var_type_to_name(right));
+		i32 index = 0;
+		Ast_Node *overload = get_overload(f, &left, &right, expression, &index);
+		if(overload)
+		{
+			overload->overload.index = index;
+			auto left_expr = expression->left;
+			auto right_expr = expression->right;
+			Token_Iden token = expression->binary_expr.token;
+			overload_overwrite(token, expression, left_expr, right_expr, &left, &right, overload);
+			return *overload->overload.function->function.type.func.return_type;
+		}
+		else
+		{
+			raise_formated_semantic_error(f, expression->binary_expr.token,
+					"Cannot perform a binary operation with types %s and %s",
+					var_type_to_name(left), var_type_to_name(right));
+		}
 	}
+	check_types_error(f, desc_token, left, right);
 	expression->binary_expr.left = left;
 	expression->binary_expr.right = right;
 
@@ -1437,7 +1638,7 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, A
 	for(size_t i = 0; i < expr_count; ++i)
 	{
 		Type_Info expr_type = fix_type(f, get_expression_type(f, passed_expr[i], expr_token, NULL));
-		Type_Info arg_type = fix_type(f, param_types[i]);
+		Type_Info arg_type = fix_type(f, param_types[j]);
 		
 		SDPush(func_call->func_call.expr_types, expr_type);
 		SDPush(func_call->func_call.arg_types, arg_type);

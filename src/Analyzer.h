@@ -5,7 +5,7 @@
 #include <Lexer.h>
 #include <Parser.h>
 #include <string>
-
+#include <LLVM_Backend.h>
 
 typedef struct
 {
@@ -82,6 +82,8 @@ typedef struct _File_Contents
 	Token_Iden *saved_token;
 	Token_Iden *token_buffer;
 	Type_Table *type_table;
+	Ast_Node  **overloads;
+	Function  **overload_gens;
 	Stack		scope_stack;
 	Scope_Info *scopes;
 	u64         file_size;
@@ -99,6 +101,12 @@ typedef struct _File_Contents
 
 Type_Info
 number_to_untyped_type(u8 *number);
+
+Ast_Node *
+get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, i32 *index);
+
+void
+overload_overwrite(Token_Iden token, Ast_Node *expression, Ast_Node *left_expr, Ast_Node *right_expr, Type_Info *left, Type_Info *right, Ast_Node *overload);
 
 void
 push_scope(File_Contents *f, Scope_Info current_scope);

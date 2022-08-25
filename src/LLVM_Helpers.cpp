@@ -73,7 +73,7 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State ba
 void
 create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State backend)
 {
-
+	backend.builder->SetInsertPoint(from);
 	if(from && to && from->getTerminator() == NULL)
 		backend.builder->CreateBr(to);
 }
@@ -246,6 +246,10 @@ write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_t
 		case T_ARRAY:
 		{
 			write_array_to_llvm(to_write, ptr, backend, func);
+		} break;
+		default:
+		{
+			Assert(false);
 		} break;
 	}
 }

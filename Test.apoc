@@ -1,28 +1,15 @@
 
 func $intrinsic var_arg_start(list:** Any);
 
-func test_var_args(a: i32, ...) -> i32
-{
-	list:* Any;
-	var_arg_start(@list);
-	if(list[0].type.kind == Type_Type.T_INTEGER)
-		-> *#*i32 list[0].value;
-	-> a;
-}
-
-
 func _apoc_init() -> i32
 {
-	printf("%d", test_var_args(10, 34));
+	my_str := to_string("some_text");
+	my_str += " more text";
+	my_str += " even more text";
+	if my_str == "some_text more text even more text"
+		-> 1;
+	print(my_str);
 	-> 0;
 }
-
-overload [](a: Any, B: Any) -> Any
-{
-
-}
-
-func $call c_decl printf(format:* u8, ...) -> i32;
-func $call c_decl puts(format:* u8);
 
 

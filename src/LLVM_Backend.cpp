@@ -1,4 +1,6 @@
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Value.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
@@ -15,7 +17,6 @@
   LLVMInitialize ## X ## Target();        \
   LLVMInitialize ## X ## TargetMC();      \
  } while(0)
-
 
 static Backend_State backend;
 static Debug_Info debug;
@@ -240,12 +241,15 @@ generate_obj(File_Contents *f)
 	f->obj_name = obj_file;
 #if !defined(ONLY_IR)
 	LLVMTargetMachineEmitToFile(machine, file_mod, obj_file, LLVMObjectFile, &error);
-	LLVMTargetMachineEmitToFile(machine, file_mod, "asm.s", LLVMAssemblyFile, &error);
+	LLVMTargetMachineEmitToFile(machine, file_mod, (char *)"asm.s", LLVMAssemblyFile, &error);
 #endif	
 
+#if defined(DEBUG)
 	std::error_code std_err;
 	raw_fd_ostream ir_dest("test.ll", std_err);
+
 	backend.module->print(ir_dest, nullptr);
+#endif
 }
 
 void
@@ -261,6 +265,7 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files)
 		debug.builder->finalize();
 			)
 
+#if defined(DEBUG)
 	std::error_code error_code;
 	auto std_out_fd = new raw_fd_ostream("-", error_code);
 	bool debug_info_error = false;
@@ -272,6 +277,7 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files)
 	}
 	if(debug_info_error)
 		LG_ERROR("Debug Info Error");
+#endif
 	generate_obj(f);
 }
 
@@ -365,6 +371,14 @@ generate_signatures(File_Contents *f)
 			}
 		}
 	}
+	f->overload_gens = SDCreate(Function *);
+	size_t overload_count = SDCount(f->overloads);
+	for(size_t i = 0; i < overload_count; ++i)
+	{	
+		auto func = generate_func(f, f->overloads[i]->overload.function);
+		func->addFnAttr(Attribute::AlwaysInline);
+		SDPush(f->overload_gens, func);
+	}
 }
 
 Ast_Node *
@@ -421,6 +435,7 @@ generate_statement(File_Contents *f, Ast_Node *node)
 		case type_enum: break;
 		case type_struct: break;
 		case type_scope_start: break;
+		case type_overload: break;
 		default:
 		{
 			LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
@@ -514,7 +529,7 @@ generate_func_signature(File_Contents *f, Ast_Node *node)
 	FunctionType *func_type = FunctionType::get(ret_type, params_ref, has_var_args);
 	Function *func = Function::Create(func_type, Function::ExternalLinkage,
 									  (char *)node->function.identifier.name, backend.module);
-
+	
 	size_t arg_index = 0;
 	for (auto &arg : func->args())
 		arg.setName((char *)node->function.arguments[arg_index++]->variable.identifier.name);
@@ -578,67 +593,58 @@ generate_boolean_expression(File_Contents *f, Ast_Node *expression, Function *fu
 
 void
 generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
-		BasicBlock *block, BasicBlock *to_go, Ast_Node *list, u64 *idx)
+		BasicBlock *block, BasicBlock *to_go, Ast_Node *statements, u64 *idx)
 {
 	if(node->for_loop.expr1)
 		generate_assignment(f, func, node->for_loop.expr1);
 
-	auto evaluation = generate_boolean_expression(f, node->for_loop.expr2, func);
+	BasicBlock *cond = BasicBlock::Create(*backend.context, "for.cond", func);
+	BasicBlock *body = BasicBlock::Create(*backend.context, "for.body", func);
+	BasicBlock *incr = NULL;
+	BasicBlock *aftr = BasicBlock::Create(*backend.context, "for.aftr", func);
+	backend.builder->CreateBr(cond);
 
-	BasicBlock *jmp_block = BasicBlock::Create(*backend.context, "for_true_jump", func);
-	BasicBlock *for_false = NULL;
-	BasicBlock *for_true  = NULL;
-	
-	*idx += 1;
-	auto loop_body = list->statements.list[*idx];
-	*idx += 1;
+	if(node->for_loop.expr3)
 	{
-		for_false = BasicBlock::Create(*backend.context, "for_false", func);
-		backend.builder->SetInsertPoint(for_false);
-		size_t count = SDCount(list->statements.list);
-
-		for(; *idx < count; *idx += 1)
-			generate_block(f, list->statements.list[*idx], func,
-					for_false, "for_false", to_go, list, idx);
-
-		create_branch(for_false, to_go, backend);
+		incr = BasicBlock::Create(*backend.context, "for.incr", func);
+		backend.builder->SetInsertPoint(incr);
+		generate_expression(f, node->for_loop.expr3, func);
+		backend.builder->CreateBr(cond);
 	}
 
-	if(loop_body->type == type_scope_start)
+	backend.builder->SetInsertPoint(cond);
+	auto eval = generate_boolean_expression(f, node->for_loop.expr2, func);
+	backend.builder->CreateCondBr(eval, body, aftr);
+	
+	auto list = statements->statements.list;
+	*idx += 1;
+
+	auto after_body = incr ? incr : cond;
+	backend.builder->SetInsertPoint(body);
+	if(list[*idx]->type == type_scope_start)
 	{
-		DEBUG_INFO(
-			emit_location(f, node->for_loop.token);
-			)
-		for_true = generate_blocks_from_list(f, loop_body->scope_desc.body, func,
-				NULL, "for_true", jmp_block);
+		generate_blocks_from_list(f, list[*idx]->scope_desc.body, func, body, "for.body",
+				after_body);
 	}
 	else
 	{
-		for_true = BasicBlock::Create(*backend.context, "for_true", func);
-		backend.builder->SetInsertPoint(for_true);
+		generate_block(f, list[*idx], func, body, "for.body", after_body, statements, idx);
+	}
+	if(body->getTerminator() == NULL)
+		backend.builder->CreateBr(after_body);
 
-		DEBUG_INFO (
-				emit_location(f, node->for_loop.token);
-				)
-		generate_block(f, loop_body, func, NULL, "for_true", jmp_block, list, idx);
-		create_branch(for_true, jmp_block, backend);
+	backend.builder->SetInsertPoint(aftr);
+	if(aftr->getTerminator() == NULL)
+	{
+		size_t count = SDCount(list);
+		for(; *idx < count; *idx += 1)
+			generate_block(f, list[*idx], func, body, "for.body", aftr, statements, idx);
 	}
 
-	backend.builder->SetInsertPoint(jmp_block);
 
-	if(node->for_loop.expr3)
-		generate_expression(f, node->for_loop.expr3, func);
-
-
-	auto inner_eval = generate_boolean_expression(f, node->for_loop.expr2, func);
-	backend.builder->CreateCondBr(inner_eval, for_true, for_false);
-
-	backend.builder->SetInsertPoint(block);
 	DEBUG_INFO(
 			emit_location(f, node->for_loop.token);
 			)
-
-	backend.builder->CreateCondBr(evaluation, for_true, for_false);
 }
 
 llvm::Value *
@@ -710,6 +716,14 @@ llvm::Value *
 generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 {
 	Assert(call_node->func_call.operand_type.type == T_FUNC);
+	llvm::Value *operand = NULL;
+
+	if(call_node->func_call.operand->type == type_overload)
+	{
+		auto overload = call_node->func_call.operand;
+		operand = f->overload_gens[overload->overload.index];
+	}
+
 	if(call_node->func_call.operand->type == type_identifier)
 	{
 		auto sym = get_symbol_spot(f, call_node->func_call.operand->identifier.token);
@@ -721,7 +735,8 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 			}
 		}
 	}
-	auto operand = generate_expression(f, call_node->func_call.operand, func);
+	if(!operand)
+		operand = generate_expression(f, call_node->func_call.operand, func);
 	auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
 	auto callee = FunctionCallee(func_pointer_type, operand);
 
@@ -813,7 +828,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 
 			llvm::BasicBlock *if_true = NULL;
 			llvm::BasicBlock *if_false = NULL;
-			llvm::BasicBlock *to_go_if = NULL;
+			llvm::BasicBlock *to_go_if = to_go ? to_go : NULL;
 
 			*idx += 1;
 			auto body_node = list->statements.list[*idx];
@@ -829,16 +844,20 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 					DEBUG_INFO(
 						emit_location(f, else_node->scope_desc.token);
 							)
-					to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
+					if(!to_go_if)
+						to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
 					if_false = generate_blocks_from_list(f, else_node->scope_desc.body,
 							func, NULL, "else", NULL);
 					backend.builder->SetInsertPoint(to_go_if);
 					*idx += 1;
 					size_t count = SDCount(list->statements.list);
 
-					for(; *idx < count; *idx += 1)
-						generate_block(f, list->statements.list[*idx], func,
-								to_go_if, "to_go_if", to_go, list, idx);
+					if(!to_go)
+					{
+						for(; *idx < count; *idx += 1)
+							generate_block(f, list->statements.list[*idx], func,
+									to_go_if, "to_go_if", to_go, list, idx);
+					}
 
 					backend.builder->SetInsertPoint(if_false);
 					if(to_go_if->empty())
@@ -858,17 +877,21 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				}
 				else
 				{
-					to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
+					if(!to_go_if)
+						to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
 					if_false = BasicBlock::Create(*backend.context, "if_false", func);
 					backend.builder->SetInsertPoint(if_false);
 					generate_block(f, else_node, func, if_false, "", to_go_if, list, idx);
-					*idx += 1;	
+					*idx += 1;
 					backend.builder->SetInsertPoint(to_go_if);
 					size_t count = SDCount(list->statements.list);
 
-					for(; *idx < count; *idx += 1)
-						generate_block(f, list->statements.list[*idx], func, to_go_if, "to_go_if",
-								to_go, list, idx);
+					if(!to_go)
+					{
+						for(; *idx < count; *idx += 1)
+							generate_block(f, list->statements.list[*idx], func, to_go_if,
+									"to_go_if",to_go, list, idx);
+					}
 					
 					create_branch(to_go_if, to_go, backend);
 					backend.builder->SetInsertPoint(if_false);
@@ -886,17 +909,24 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			{
 				DEBUG_INFO(
 						emit_location(f, node->condition.token);
-						)
-				if_false = BasicBlock::Create(*backend.context, "if_false", func);
+						);
+				if(to_go_if)
+					if_false = to_go_if;
+				else
+					if_false = BasicBlock::Create(*backend.context, "if_false", func);
 				backend.builder->SetInsertPoint(if_false);
 				size_t count = SDCount(list->statements.list);
 
-				for(; *idx < count; *idx += 1)
-					generate_block(f, list->statements.list[*idx], func,
-							if_false, "if_false", to_go, list, idx);
+				if(!to_go)
+				{
+					for(; *idx < count; *idx += 1)
+						generate_block(f, list->statements.list[*idx], func,
+								if_false, "if_false", to_go, list, idx);
+					to_go_if = if_false;
+				}
+				else 
+					if_false = to_go;
 				
-				create_branch(if_false, to_go, backend);
-				to_go_if = if_false;
 			}
 
 			if(body_node->type == type_scope_start)
@@ -1177,8 +1207,9 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 					zero,
 					zero
 				};
-				auto first_elem = backend.builder->CreateGEP(llvm_type, location, 
-						idx_list, "", true);
+				//auto first_elem = backend.builder->CreateGEP(llvm_type, location, 
+				//		idx_list, "", true);
+				auto first_elem = backend.builder->CreateInBoundsGEP(llvm_type, location, idx_list);
 				const DataLayout layout = backend.module->getDataLayout();
 				auto alignment = location->getAlign();//Align(get_type_alignment(val_type));
 				backend.builder->CreateMemCpy(first_elem, alignment, to_global, alignment, get_type_size(node->run.ran_val.type));

@@ -1,0 +1,78 @@
+
+struct string
+{
+	text:* u8;
+	len:   u64;
+}
+
+overload [](str: string, index: u64) -> u8
+{
+	-> str.text[index];
+}
+
+overload +(str: string, text:* u8) -> string
+{
+	out: string;
+	text_len := len(text);
+	out.len = str.len + text_len;
+	out.text = mem_alloc(out.len);
+	copy(out.text, str.text, str.len);
+	copy(@out.text[str.len], text, text_len);
+	-> out;
+}
+
+overload ==(str: string, text:* u8) -> bool
+{
+	str2 := string { text, len(text) };
+	-> compare(str, str2);
+}
+
+func compare(str1: string, str2: string) -> bool
+{
+	if str1.len != str2.len
+		-> false;
+
+	for i :u64= 0; i < str1.len; ++i
+		if str1.text[i] != str2.text[i] -> false;
+	-> true;
+}
+
+func to_string(text:* u8) -> string
+{
+	text_len := len(text);
+	allocated := mem_alloc(text_len);
+	copy(allocated, text, text_len);
+	str := string { allocated, text_len };
+	-> str;
+}
+
+func terminate_string(str: string) -> string
+{
+	out: string;
+	out.len = str.len + 1;
+	out.text = mem_alloc(out.len);
+	copy(out.text, str.text, str.len);
+	out.text[out.len] = 0;
+	-> out;
+}
+
+func print(str: string)
+{
+	to_print := terminate_string(str);
+	printf(to_print.text);
+}
+
+func copy(dst:* void, src:* void, size: u64)
+{
+	a0 := #*u8 dst;
+	a1 := #*u8 src;
+	for i :u64 = 0; i < size; ++i
+		a0[i] = a1[i];
+}
+
+func len(text:* u8) -> u64
+{
+	result: u64 = 0;
+	for result = 0; text[result] != 0; ++result {}
+	-> result;
+}

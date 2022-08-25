@@ -220,6 +220,7 @@ parse(File_Contents *f)
 	Ast_Node *root = alloc_node();
 	root->type = type_root;
 	// NOTE(Vasko): nothing special about root, it doesn't contain data
+	f->overloads = SDCreate(Ast_Node *);
 
 	Token_Iden *info_tok = f->curr_token;
 
@@ -253,6 +254,7 @@ parse_file_level_statement(File_Contents *f)
 		case tok_overload:
 		{
 			result = parse_overload(f);
+			SDPush(f->overloads, result);
 		} break;
 		case tok_func:
 		{
@@ -553,11 +555,10 @@ parse_statement(File_Contents *f)
 		} break;
 		case '}':
 		{
-			advance_token(f);
-			pop_scope(f, *f->curr_token);
 			result = alloc_node();
 			result->type = type_scope_end;
-			result->scope_desc.token = *f->curr_token;
+			result->scope_desc.token = advance_token(f);
+			pop_scope(f, result->scope_desc.token);
 			return result;
 		} break;
 		default:
@@ -612,7 +613,7 @@ delimited(File_Contents *f, char start, char stop, char seperator, Ast_Node *(*p
 	return result;
 }
 
-	int
+int
 get_precedence(Token op, b32 on_left, b32 is_lhs)
 {
 	switch ((int)op)
@@ -1233,6 +1234,7 @@ parse_overload(File_Contents *f)
 	Ast_Overload overload = {};
 	overload.token = *f->curr_token;
 	parser_eat(f, tok_overload);
+	u8 *identifier = NULL;
 
 	switch ((int)f->curr_token->type)
 	{
@@ -1241,11 +1243,7 @@ parse_overload(File_Contents *f)
 			overload.overloaded = O_INDEX;
 			advance_token(f);
 			parser_eat(f, (Token)']');
-		} break;
-		case '.':
-		{
-			overload.overloaded = O_SELECTOR;
-			advance_token(f);
+			identifier = (u8 *)"overload[]";
 		} break;
 		default:
 		{
@@ -1254,18 +1252,27 @@ parse_overload(File_Contents *f)
 				raise_parsing_unexpected_token("overloadable operand", f);
 			overload.overloaded = O_OP;
 			overload.op = advance_token(f).type;
+			identifier = (u8 *)AllocatePermanentMemory(256);
+			vstd_strcat((char *)identifier, "overload");
+			if(overload.op > 32 && 127 > overload.op)
+			{
+				char to_cat[] = {(char)overload.op};
+				vstd_strcat((char *)identifier, to_cat);
+			}
 		} break;
 	}
 
 	Ast_Func this_func = {};
+	this_func.identifier.token = overload.token;
+	this_func.identifier.name = identifier;
 	this_func.arguments = delimited(f, '(', ')', ',', parse_func_arg);
 	size_t arg_count = SDCount(this_func.arguments);
-	if(arg_count == 0);
+	if(arg_count == 0)
 		raise_parsing_unexpected_token("arguments", f);
 	if(arg_count != 2 && arg_count != 1)
 		raise_semantic_error(f, "operator overload must accepts either 1 or 2 arguments", 
 				this_func.arguments[0]->variable.identifier.token);
-	
+
 	Type_Info func_type = {};
 	if(f->curr_token->type == tok_arrow)
 	{
@@ -1288,10 +1295,15 @@ parse_overload(File_Contents *f)
 	}
 	this_func.type = func_type;
 	this_func.conv = CALL_APOC;
-	this_func.identifier = pure_identifier(overload.token);
 	this_func.body = parse_body(f, true, invalid_token);
 	Ast_Node *function = alloc_node();
+	function->type = type_func;
 	function->function = this_func;
+	overload.function = function;
+	Ast_Node *overload_result = alloc_node();
+	overload_result->type = type_overload;
+	overload_result->overload = overload;
+	return overload_result;
 }
 
 Ast_Node *

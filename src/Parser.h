@@ -20,6 +20,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_overload     = -67,
 	type_only_type    = -66,
 	type_union        = -65,
 	type_interp_val   = -64,
@@ -215,6 +216,7 @@ typedef struct
 	Token op;
 	Ast_Node *function;
 	Token_Iden token;
+	i32 index;    // when a call happense the analyzer puts the index of this overload here
 } Ast_Overload;
 
 typedef enum
@@ -330,6 +332,7 @@ struct _abstract_syntax_tree
 	Ast_Type type;
 	union
 	{
+		Ast_Overload overload;
 		Ast_Interp_Val interp_val;
 		Ast_Enum enumerator;
 		Ast_Size size;
@@ -365,6 +368,9 @@ pure_identifier(Token_Iden token);
 
 Ast_Node *
 ast_union(File_Contents *f);
+
+Ast_Node *
+parse_overload(File_Contents *f);
 
 Ast_Node *
 parse_identifier_statement(File_Contents *f, Token ends_with);

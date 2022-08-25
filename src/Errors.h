@@ -6,6 +6,9 @@
 struct _Token_Iden;
 typedef struct _File_Contents File_Contents;
 
+u8 *
+get_error_segment(struct _Token_Iden error_token);
+
 void
 raise_semantic_error(File_Contents *f, const char *error_msg, struct _Token_Iden token);
 
