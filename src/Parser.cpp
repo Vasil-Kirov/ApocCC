@@ -613,6 +613,27 @@ delimited(File_Contents *f, char start, char stop, char seperator, Ast_Node *(*p
 	return result;
 }
 
+b32
+is_op_equals(Token tok)
+{
+	switch((int)tok)
+	{
+		case tok_plus_equals:
+		case tok_minus_equals:
+		case tok_mult_equals:
+		case tok_div_equals:
+		case tok_mod_equals:
+		case tok_lshift_equals:
+		case tok_rshift_equals:
+		case tok_and_equals:
+		case tok_xor_equals:
+		case tok_or_equals:
+		return true; break;
+		default:
+		return false; break;
+	}
+}
+
 int
 get_precedence(Token op, b32 on_left, b32 is_lhs)
 {
@@ -1247,17 +1268,26 @@ parse_overload(File_Contents *f)
 		} break;
 		default:
 		{
-			int prec = get_precedence(f->curr_token->type, true, false);
-			if(prec == 0 || f->curr_token->type == '(')
-				raise_parsing_unexpected_token("overloadable operand", f);
-			overload.overloaded = O_OP;
-			overload.op = advance_token(f).type;
-			identifier = (u8 *)AllocatePermanentMemory(256);
-			vstd_strcat((char *)identifier, "overload");
-			if(overload.op > 32 && 127 > overload.op)
+			if(is_op_equals(f->curr_token->type))
 			{
-				char to_cat[] = {(char)overload.op};
-				vstd_strcat((char *)identifier, to_cat);
+				overload.overloaded = O_OP_EQUALS;
+				overload.op = advance_token(f).type;
+				identifier = (u8 *)"overload[x]=";
+			}
+			else
+			{
+				int prec = get_precedence(f->curr_token->type, true, false);
+				if(prec == 0 || f->curr_token->type == '(')
+					raise_parsing_unexpected_token("overloadable operand", f);
+				overload.overloaded = O_OP;
+				overload.op = advance_token(f).type;
+				identifier = (u8 *)AllocatePermanentMemory(256);
+				vstd_strcat((char *)identifier, "overload");
+				if(overload.op > 32 && 127 > overload.op)
+				{
+					char to_cat[] = {(char)overload.op};
+					vstd_strcat((char *)identifier, to_cat);
+				}
 			}
 		} break;
 	}

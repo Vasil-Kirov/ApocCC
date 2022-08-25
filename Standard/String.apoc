@@ -1,8 +1,17 @@
 
+STRING_BUFFER_SIZE :: 512;
+
 struct string
 {
 	text:* u8;
 	len:   u64;
+}
+
+struct String_Builder
+{
+	buffer:[STRING_BUFFER_SIZE] u8;
+	len: u64;
+	next:* String_Builder;
 }
 
 overload [](str: string, index: u64) -> u8
@@ -19,6 +28,11 @@ overload +(str: string, text:* u8) -> string
 	copy(out.text, str.text, str.len);
 	copy(@out.text[str.len], text, text_len);
 	-> out;
+}
+
+overload +=(str: String_Builder, text:* u8)
+{
+	text_len := len(text);
 }
 
 overload ==(str: string, text:* u8) -> bool

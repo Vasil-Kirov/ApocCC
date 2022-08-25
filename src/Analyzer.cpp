@@ -1,3 +1,4 @@
+#include "llvm/IR/Type.h"
 #include <Analyzer.h>
 #include <Log.h>
 #include <functional>
@@ -219,8 +220,14 @@ overload_fix_types(File_Contents *f, Ast_Node *overload)
 {
 	Ast_Node *func = overload->overload.function;
 	func->function.type = fix_type(f, func->function.type);
-	if(func->function.type.type == T_VOID)
-		raise_semantic_error(f, "Overloaded operand must return a value",
+	if(overload->overload.overloaded == O_OP_EQUALS)
+	{
+		if(func->function.type.type != T_VOID)
+			raise_semantic_error(f, "Overload of type [op]= cannot return a value", 
+					func->function.identifier.token);
+	}
+	else if(func->function.type.type == T_VOID)
+		raise_semantic_error(f, "Overload must return a value unless it's of type [op]=",
 				func->function.identifier.token);
 	if(type_is_invalid(func->function.type))
 		raise_formated_semantic_error(f, func->function.identifier.token,
@@ -890,7 +897,24 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 
 	if(node->assignment.assign_type != '=')
 	{
-		node->assignment.rhs = get_assign_type_expression(f, node);
+		Type_Info left = fix_type(f, get_symbol_spot(f, node->assignment.token)->type);
+		Type_Info right = fix_type(f, get_expression_type(f, node->assignment.rhs, node->assignment.token, NULL));
+		i32 index = 0;
+		auto overload = get_overload(f, &left, &right, node, &index);
+		if(overload)
+		{
+			Token_Iden at_tok = node->assignment.token;
+			at_tok.type = (Token)'@';
+			auto left_expr = alloc_node();
+			left_expr->type = type_unary_expr;
+			left_expr->unary_expr.expression = node->assignment.lhs;
+			left_expr->unary_expr.expr_type = left;
+			left_expr->unary_expr.op = at_tok;
+			overload_overwrite(node->assignment.token, node, left_expr, node->assignment.rhs, &left, &right, overload);
+			return;
+		}
+		else
+			node->assignment.rhs = get_assign_type_expression(f, node);
 	}
 	if(node->assignment.is_declaration && node->assignment.rhs == NULL)
 	{
@@ -1474,6 +1498,30 @@ get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, 
 			}
 		}
 	}
+	else if(op->type == type_assignment)
+	{
+		Token used_op = op->assignment.assign_type;
+		Type_Info left_ptr = {};
+		left_ptr.type = T_POINTER;
+		left_ptr.pointer.type = left;
+		left_ptr.identifier = var_type_to_name(left_ptr, false);
+		for(size_t i = 0; i < overload_count; ++i)
+		{
+			*index = i;
+			if(overloads[i]->overload.op == used_op &&
+					SDCount(overloads[i]->overload.function->function.arguments) == arg_count)
+			{
+				auto args      = overloads[i]->overload.function->function.arguments;
+				auto left_arg  = args[0]->variable;
+				auto right_arg = args[1]->variable;
+				if(vstd_strcmp((char *)left_ptr.identifier, (char *)left_arg.type.identifier))
+				{
+					if(check_type_compatibility(right_arg.type, *right))
+						return overloads[i];
+				}
+			}
+		}
+	}
 	else
 	{
 		Token used_op;
@@ -1489,13 +1537,16 @@ get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, 
 			if(overloads[i]->overload.op == used_op &&
 					SDCount(overloads[i]->overload.function->function.arguments) == arg_count)
 			{
+				auto args      = overloads[i]->overload.function->function.arguments;
+				auto left_arg  = args[0]->variable;
+				auto right_arg = args[1]->variable;
 				if(vstd_strcmp((char *)left->identifier,
-							(char *)overloads[i]->overload.function->function.arguments[0]->variable.type.identifier))
+							(char *)left_arg.type.identifier))
 				{
 					if(arg_count == 1)
 						return overloads[i];
 					else
-						if(check_type_compatibility(overloads[i]->overload.function->function.arguments[1]->variable.type,
+						if(check_type_compatibility(right_arg.type,
 									*right))
 							return overloads[i];
 				}
@@ -1508,7 +1559,6 @@ get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, 
 void
 overload_overwrite(Token_Iden token, Ast_Node *expression, Ast_Node *left_expr, Ast_Node *right_expr, Type_Info *left, Type_Info *right, Ast_Node *overload)
 {
-
 	expression->type = type_func_call;
 	expression->func_call.token = token;
 	expression->func_call.operand = overload;

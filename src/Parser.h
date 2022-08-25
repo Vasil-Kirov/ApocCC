@@ -207,6 +207,7 @@ typedef enum
 	INVALID,
 	O_INDEX,
 	O_SELECTOR,
+	O_OP_EQUALS,
 	O_OP
 } Overloaded;
 
