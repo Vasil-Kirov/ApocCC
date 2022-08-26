@@ -2,14 +2,22 @@
 #include <stdio.h>
 typedef unsigned char u8;
 
-int test_var_args(int a, ...)
+typedef struct 
 {
-	va_list ap;
-	va_start(ap, a);
-	return va_arg(ap, int);
+	u8 text[1024];
+	long long len;
+} My_Builder;
+
+My_Builder get_struct(const char *text)
+{
+	My_Builder out = {};
+	for(size_t i = 0; text[i] != 0; ++i)
+		out.text[i] = text[i];
+	return out;
 }
 
 int main()
 {
-	printf("Zero: %d", test_var_args(1, 10));
+	My_Builder str = get_struct("A lot  of fucking text");
+	printf("%s", str.text);
 }

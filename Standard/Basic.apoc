@@ -1,6 +1,7 @@
 
-true  :: #bool 1;
-false :: #bool 0;
+true  :: #bool  1;
+false :: #bool  0;
+null  :: #*void 0;
 
 enum Call_Conv: i32
 {
@@ -44,7 +45,7 @@ struct Va_List
 }
 
 struct __Internal_Context {
-	type_table:* Type_Info;
+	return_val:* void;
 }
 
 struct Any {

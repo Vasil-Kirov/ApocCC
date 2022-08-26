@@ -18,6 +18,10 @@ void
 create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State backend);
 
 AllocaInst *
+allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
+		u64 align);
+
+AllocaInst *
 allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
 		u64 align, u64 size_in_bytes);
 

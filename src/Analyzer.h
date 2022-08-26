@@ -83,7 +83,7 @@ typedef struct _File_Contents
 	Token_Iden *token_buffer;
 	Type_Table *type_table;
 	Ast_Node  **overloads;
-	Function  **overload_gens;
+	llvm::Function  **overload_gens;
 	Stack		scope_stack;
 	Scope_Info *scopes;
 	u64         file_size;

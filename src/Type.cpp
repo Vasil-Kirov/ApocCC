@@ -165,6 +165,8 @@ get_type_size(Type_Info type)
 	}
 	else if(type.type == T_BOOLEAN)
 		return 1;
+	else if(type.type == T_VOID)
+		return 0;
 	Assert(false);
 	return 0;
 }
@@ -248,7 +250,7 @@ fix_type(File_Contents *f, Type_Info type, b32 is_fixing_struct)
 	Type_Info result = type;
 	if(result.type == T_POINTER)
 	{
-		auto pointed = fix_type(f, *result.pointer.type);
+		auto pointed = fix_type(f, *result.pointer.type, is_fixing_struct);
 		Type_Info *to_store = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 		memcpy(to_store, &pointed, sizeof(Type_Info));
 		result.pointer.type = to_store;

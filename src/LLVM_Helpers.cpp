@@ -38,14 +38,24 @@ llvm_zero_out_memory(llvm::Value *ptr, u64 size, llvm::Align alignment, IRBuilde
 }
 
 AllocaInst *
-allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
-		u64 align, u64 size_in_bytes)
+allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
+		u64 align)
 {
 	Assert(func);
 	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
 	auto location = temp_builder.CreateAlloca(type, 0, (char *)var_name);
 	auto alignment = Align(align);
 	location->setAlignment(alignment);
+	return location;
+}
+
+AllocaInst *
+allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
+		u64 align, u64 size_in_bytes)
+{
+	Assert(func);
+	auto location = allocate_with_llvm_no_zero(func, var_name, type, backend, align);
+	auto alignment = Align(align);
 	llvm_zero_out_memory(location, size_in_bytes, alignment, backend.builder);
 	return location;
 }
@@ -451,13 +461,21 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 llvm::FunctionType *
 type_to_func_type(Type_Info type, Backend_State backend)
 {
+	b32 is_apoc = type.func.calling_convention == CALL_APOC;
 	size_t param_count = SDCount(type.func.param_types);
+	if(is_apoc)
+		param_count++;
 	llvm::Type *param_types[param_count];
 	memset(param_types, 0, param_count);
 	b32 has_var_args = false;
-	for (size_t i = 0; i < param_count; ++i)
+	size_t i = 0;
+	if(is_apoc)
 	{
-		Type_Info param_type = type.func.param_types[i];
+		param_types[i++] = PointerType::get(get_context_type(), 0);
+	}
+	for (; i < param_count; ++i)
+	{
+		Type_Info param_type = type.func.param_types[i - (is_apoc ? 1 : 0)];
 		if (param_type.type == T_DETECT)
 		{
 			has_var_args = true;
@@ -855,3 +873,4 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 	*should_cast = false;
 	return Instruction::CastOps::ZExt;
 }
+

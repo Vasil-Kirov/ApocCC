@@ -3,6 +3,8 @@ source_filename = "main.c"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc19.32.31329"
 
+%struct.My_Builder = type { [1024 x i8], i64 }
+
 $sprintf = comdat any
 
 $vsprintf = comdat any
@@ -21,9 +23,12 @@ $__local_stdio_printf_options = comdat any
 
 $_vfprintf_l = comdat any
 
-$"??_C@_08JAGANHFK@Zero?3?5?$CFd?$AA@" = comdat any
+$"??_C@_0BH@PLEBLAPI@A?5lot?5?5of?5fucking?5text?$AA@" = comdat any
 
-@"??_C@_08JAGANHFK@Zero?3?5?$CFd?$AA@" = linkonce_odr dso_local unnamed_addr constant [9 x i8] c"Zero: %d\00", comdat, align 1
+$"??_C@_02DKCKIIND@?$CFs?$AA@" = comdat any
+
+@"??_C@_0BH@PLEBLAPI@A?5lot?5?5of?5fucking?5text?$AA@" = linkonce_odr dso_local unnamed_addr constant [23 x i8] c"A lot  of fucking text\00", comdat, align 1
+@"??_C@_02DKCKIIND@?$CFs?$AA@" = linkonce_odr dso_local unnamed_addr constant [3 x i8] c"%s\00", comdat, align 1
 @__local_stdio_printf_options._OptionsStorage = internal global i64 0, align 8
 
 ; Function Attrs: noinline nounwind optnone uwtable
@@ -101,25 +106,56 @@ define linkonce_odr dso_local i32 @_vsnprintf(ptr noundef %0, i64 noundef %1, pt
 }
 
 ; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @test_var_args(i32 noundef %0, ...) #0 {
-  %2 = alloca i32, align 4
+define dso_local void @get_struct(ptr noalias sret(%struct.My_Builder) align 8 %0, ptr noundef %1) #0 {
   %3 = alloca ptr, align 8
-  store i32 %0, ptr %2, align 4
-  call void @llvm.va_start(ptr %3)
-  %4 = load ptr, ptr %3, align 8
-  %5 = getelementptr inbounds i8, ptr %4, i64 8
-  store ptr %5, ptr %3, align 8
-  %6 = load i32, ptr %4, align 8
-  ret i32 %6
+  %4 = alloca ptr, align 8
+  %5 = alloca i64, align 8
+  store ptr %0, ptr %3, align 8
+  store ptr %1, ptr %4, align 8
+  call void @llvm.memset.p0.i64(ptr align 8 %0, i8 0, i64 1032, i1 false)
+  store i64 0, ptr %5, align 8
+  br label %6
+
+6:                                                ; preds = %21, %2
+  %7 = load ptr, ptr %4, align 8
+  %8 = load i64, ptr %5, align 8
+  %9 = getelementptr inbounds i8, ptr %7, i64 %8
+  %10 = load i8, ptr %9, align 1
+  %11 = sext i8 %10 to i32
+  %12 = icmp ne i32 %11, 0
+  br i1 %12, label %13, label %24
+
+13:                                               ; preds = %6
+  %14 = load ptr, ptr %4, align 8
+  %15 = load i64, ptr %5, align 8
+  %16 = getelementptr inbounds i8, ptr %14, i64 %15
+  %17 = load i8, ptr %16, align 1
+  %18 = getelementptr inbounds %struct.My_Builder, ptr %0, i32 0, i32 0
+  %19 = load i64, ptr %5, align 8
+  %20 = getelementptr inbounds [1024 x i8], ptr %18, i64 0, i64 %19
+  store i8 %17, ptr %20, align 1
+  br label %21
+
+21:                                               ; preds = %13
+  %22 = load i64, ptr %5, align 8
+  %23 = add i64 %22, 1
+  store i64 %23, ptr %5, align 8
+  br label %6, !llvm.loop !4
+
+24:                                               ; preds = %6
+  ret void
 }
 
-; Function Attrs: nocallback nofree nosync nounwind willreturn
-declare void @llvm.va_start(ptr) #1
+; Function Attrs: argmemonly nocallback nofree nounwind willreturn writeonly
+declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @main() #0 {
-  %1 = call i32 (i32, ...) @test_var_args(i32 noundef 1, i32 noundef 10)
-  %2 = call i32 (ptr, ...) @printf(ptr noundef @"??_C@_08JAGANHFK@Zero?3?5?$CFd?$AA@", i32 noundef %1)
+  %1 = alloca %struct.My_Builder, align 8
+  call void @get_struct(ptr sret(%struct.My_Builder) align 8 %1, ptr noundef @"??_C@_0BH@PLEBLAPI@A?5lot?5?5of?5fucking?5text?$AA@")
+  %2 = getelementptr inbounds %struct.My_Builder, ptr %1, i32 0, i32 0
+  %3 = getelementptr inbounds [1024 x i8], ptr %2, i64 0, i64 0
+  %4 = call i32 (ptr, ...) @printf(ptr noundef @"??_C@_02DKCKIIND@?$CFs?$AA@", ptr noundef %3)
   ret i32 0
 }
 
@@ -140,6 +176,9 @@ define linkonce_odr dso_local i32 @printf(ptr noundef %0, ...) #0 comdat {
   ret i32 %9
 }
 
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare void @llvm.va_start(ptr) #2
+
 ; Function Attrs: noinline nounwind optnone uwtable
 define linkonce_odr dso_local i32 @_vsprintf_l(ptr noundef %0, ptr noundef %1, ptr noundef %2, ptr noundef %3) #0 comdat {
   %5 = alloca ptr, align 8
@@ -159,7 +198,7 @@ define linkonce_odr dso_local i32 @_vsprintf_l(ptr noundef %0, ptr noundef %1, p
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
-declare void @llvm.va_end(ptr) #1
+declare void @llvm.va_end(ptr) #2
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define linkonce_odr dso_local i32 @_vsnprintf_l(ptr noundef %0, i64 noundef %1, ptr noundef %2, ptr noundef %3, ptr noundef %4) #0 comdat {
@@ -200,7 +239,7 @@ define linkonce_odr dso_local i32 @_vsnprintf_l(ptr noundef %0, i64 noundef %1, 
   ret i32 %27
 }
 
-declare dso_local i32 @__stdio_common_vsprintf(i64 noundef, ptr noundef, i64 noundef, ptr noundef, ptr noundef, ptr noundef) #2
+declare dso_local i32 @__stdio_common_vsprintf(i64 noundef, ptr noundef, i64 noundef, ptr noundef, ptr noundef, ptr noundef) #3
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define linkonce_odr dso_local ptr @__local_stdio_printf_options() #0 comdat {
@@ -227,13 +266,14 @@ define linkonce_odr dso_local i32 @_vfprintf_l(ptr noundef %0, ptr noundef %1, p
   ret i32 %15
 }
 
-declare dso_local ptr @__acrt_iob_func(i32 noundef) #2
+declare dso_local ptr @__acrt_iob_func(i32 noundef) #3
 
-declare dso_local i32 @__stdio_common_vfprintf(i64 noundef, ptr noundef, ptr noundef, ptr noundef, ptr noundef) #2
+declare dso_local i32 @__stdio_common_vfprintf(i64 noundef, ptr noundef, ptr noundef, ptr noundef, ptr noundef) #3
 
 attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
-attributes #1 = { nocallback nofree nosync nounwind willreturn }
-attributes #2 = { "frame-pointer"="none" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
+attributes #1 = { argmemonly nocallback nofree nounwind willreturn writeonly }
+attributes #2 = { nocallback nofree nosync nounwind willreturn }
+attributes #3 = { "frame-pointer"="none" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 
 !llvm.module.flags = !{!0, !1, !2}
 !llvm.ident = !{!3}
@@ -242,3 +282,5 @@ attributes #2 = { "frame-pointer"="none" "no-trapping-math"="true" "stack-protec
 !1 = !{i32 7, !"PIC Level", i32 2}
 !2 = !{i32 7, !"uwtable", i32 2}
 !3 = !{!"clang version 15.0.0"}
+!4 = distinct !{!4, !5}
+!5 = !{!"llvm.loop.mustprogress"}

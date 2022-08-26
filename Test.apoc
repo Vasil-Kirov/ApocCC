@@ -3,11 +3,10 @@ func $intrinsic var_arg_start(list:** Any);
 
 func _apoc_init() -> i32
 {
-	my_str := to_string("some_text");
-	my_str += " more text";
-	my_str += " even more text";
-	if my_str == "some_text more text even more text"
-		-> 1;
+	// if and for are completely broken
+	builder := init_builder("my text");
+	builder += "more text";
+	my_str := builder_to_string(builder);
 	print(my_str);
 	-> 0;
 }

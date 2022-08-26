@@ -133,6 +133,9 @@ struct Debug_Info
 	Stack scope;
 };
 
+llvm::StructType *
+get_context_type();
+
 llvm::Value *
 generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, b32 is_decl, Type_Info decl_type, u8 **out_identifier = NULL);
 
@@ -162,7 +165,7 @@ void
 generate_prototyes(File_Contents *f);
 
 Function *
-generate_func_signature(File_Contents *f, Ast_Node *node);
+generate_func_signature(File_Contents *f, Ast_Node *node, b32 is_overload = false);
 
 void
 generate_assignment(File_Contents *f, Function *func, Ast_Node *node);

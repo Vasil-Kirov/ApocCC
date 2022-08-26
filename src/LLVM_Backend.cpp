@@ -1,6 +1,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Value.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
@@ -371,14 +372,6 @@ generate_signatures(File_Contents *f)
 			}
 		}
 	}
-	f->overload_gens = SDCreate(Function *);
-	size_t overload_count = SDCount(f->overloads);
-	for(size_t i = 0; i < overload_count; ++i)
-	{	
-		auto func = generate_func(f, f->overloads[i]->overload.function);
-		func->addFnAttr(Attribute::AlwaysInline);
-		SDPush(f->overload_gens, func);
-	}
 }
 
 Ast_Node *
@@ -455,6 +448,16 @@ generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count)
 		if(maybe_func)
 			SDPush(functions, maybe_func);
 	}
+	
+	f->overload_gens = SDCreate(Function *);
+	size_t overload_count = SDCount(f->overloads);
+	for(size_t i = 0; i < overload_count; ++i)
+	{	
+		auto func = generate_func(f, f->overloads[i]->overload.function);
+		func->addFnAttr(Attribute::AlwaysInline);
+		SDPush(f->overload_gens, func);
+	}
+
 	// @NOTE: delay function generation so all global symbols can be declared
 	size_t func_count = SDCount(functions);
 	auto func_results = (Function **)AllocateCompileMemory(sizeof(Function *) * func_count);
@@ -500,21 +503,39 @@ create_func_debug_type(Ast_Node *node)
 }
 
 Function *
-generate_func_signature(File_Contents *f, Ast_Node *node)
+generate_func_signature(File_Contents *f, Ast_Node *node, b32 is_overload)
 {
 	Assert(node->type == type_func);
 	Function *signature = shget(backend.func_table, node->function.identifier.name);
 	if(signature)
 		return signature;
-
 	
+	b32 is_apoc = node->function.conv == CALL_APOC && !is_overload;
+	if(is_apoc && get_type_size(node->function.type) > 8)
+	{
+		Type_Info void_ty = {};
+		void_ty.type = T_VOID;
+		void_ty.identifier = (u8 *)"void";
+		void_ty.token = node->function.type.token;
+		void_ty.primitive.size = empty_void;
+		node->function.type = void_ty;
+	}
 	size_t param_count = SDCount(node->function.arguments);
+	size_t i = 0;
+	if(is_apoc)
+	{
+		param_count++;
+		i++;
+	}
 	llvm::Type *param_types[param_count];
 	memset(param_types, 0, param_count);
+	if(is_apoc)
+		param_types[0] = PointerType::get(get_context_type(), 0);
 	b32 has_var_args = false;
-	for (size_t i = 0; i < param_count; ++i)
+	size_t arg_i = 0;
+	for (; i < param_count; ++i)
 	{
-		Type_Info param_type = node->function.arguments[i]->variable.type;
+		Type_Info param_type = node->function.arguments[arg_i]->variable.type;
 		if (param_type.type == T_DETECT)
 		{
 			has_var_args = true;
@@ -522,6 +543,7 @@ generate_func_signature(File_Contents *f, Ast_Node *node)
 		}
 		else
 			param_types[i] = apoc_type_to_llvm(param_type, backend);
+		++arg_i;
 	}
 
 	llvm::ArrayRef<llvm::Type *> params_ref = makeArrayRef((llvm::Type **)param_types, has_var_args ? param_count - 1 : param_count);
@@ -532,7 +554,13 @@ generate_func_signature(File_Contents *f, Ast_Node *node)
 	
 	size_t arg_index = 0;
 	for (auto &arg : func->args())
-		arg.setName((char *)node->function.arguments[arg_index++]->variable.identifier.name);
+	{
+		if(is_apoc && arg_index == 0)
+			arg.setName("__apoc_internal_context");
+		else
+			arg.setName((char *)node->function.arguments[arg_index - (is_apoc ? 1 : 0)]->variable.identifier.name);
+		arg_index++;
+	}
 	
 	return func;
 }
@@ -559,25 +587,34 @@ generate_type_info(Type_Info type, llvm::Function *func)
 	write_type_info_to_llvm(type, ptr, llvm_type, backend, func);
 	return ptr;
 }
-#if 0
-llvm::Value *
-get_context(llvm::Function *func)
+
+llvm::StructType *
+get_context_type()
 {
-	auto got = shget(backend.named_values, "__apoc_internal_context");
-	if(got)
-		return got;
 	auto type = shget(backend.struct_types, "__Internal_Context");
 	if(!type)
 		LG_FATAL("__Internal_Context struct is not defined, it is necessary for using\n"
 				"apoc calling convention functions");
+	return type;
+}
 
+llvm::Value *
+create_context(llvm::Function *func)
+{
+	auto type = get_context_type();
 	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
-	auto location = temp_builder.CreateAlloca(type, 0, (char *)"__Internal_Context");
+	auto location = temp_builder.CreateAlloca(type, 0, (char *)"__apoc_internal_context");
 	location->setAlignment(Align(16));
 	backend.builder->CreateStructGEP(type, location, 0);
 	return location;
 }
-#endif
+
+llvm::Value *
+get_context(llvm::Function *func)
+{
+	auto got = shget(backend.named_values, "__apoc_internal_context");
+	return got;
+}
 
 
 llvm::Value *
@@ -604,14 +641,6 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	BasicBlock *aftr = BasicBlock::Create(*backend.context, "for.aftr", func);
 	backend.builder->CreateBr(cond);
 
-	if(node->for_loop.expr3)
-	{
-		incr = BasicBlock::Create(*backend.context, "for.incr", func);
-		backend.builder->SetInsertPoint(incr);
-		generate_expression(f, node->for_loop.expr3, func);
-		backend.builder->CreateBr(cond);
-	}
-
 	backend.builder->SetInsertPoint(cond);
 	auto eval = generate_boolean_expression(f, node->for_loop.expr2, func);
 	backend.builder->CreateCondBr(eval, body, aftr);
@@ -619,7 +648,10 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	auto list = statements->statements.list;
 	*idx += 1;
 
-	auto after_body = incr ? incr : cond;
+	if(node->for_loop.expr3)
+		incr = BasicBlock::Create(*backend.context, "for.incr", func);
+
+	auto after_body = node->for_loop.expr3 ? incr : cond;
 	backend.builder->SetInsertPoint(body);
 	if(list[*idx]->type == type_scope_start)
 	{
@@ -632,6 +664,14 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	}
 	if(body->getTerminator() == NULL)
 		backend.builder->CreateBr(after_body);
+
+	if(node->for_loop.expr3)
+	{
+		backend.builder->SetInsertPoint(incr);
+		generate_expression(f, node->for_loop.expr3, func);
+		backend.builder->CreateBr(cond);
+	}
+
 
 	backend.builder->SetInsertPoint(aftr);
 	if(aftr->getTerminator() == NULL)
@@ -737,22 +777,59 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	}
 	if(!operand)
 		operand = generate_expression(f, call_node->func_call.operand, func);
+
+	Type_Info saved_ret = {};
+	b32 ret_ptr = false;
+	b32 is_apoc = false;
+	if(get_type_size(*call_node->func_call.operand_type.func.return_type) > 8)
+	{
+		ret_ptr = true;
+		saved_ret = *call_node->func_call.operand_type.func.return_type;
+		Type_Info void_ty = {};
+		void_ty.type = T_VOID;
+		void_ty.identifier = (u8 *)"void";
+		void_ty.token = saved_ret.token;
+		void_ty.primitive.size = empty_void;
+		*call_node->func_call.operand_type.func.return_type = void_ty;
+	}
+	if(call_node->func_call.operand_type.func.calling_convention == CALL_APOC)
+		is_apoc = true;
+
 	auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
 	auto callee = FunctionCallee(func_pointer_type, operand);
-
 	size_t arg_count = SDCount(call_node->func_call.arguments);
+	size_t i = 0;
+	size_t j = 0;
+	if(is_apoc)
+	{
+		++i;
+		arg_count++;
+	}
 	llvm::Value *arg_exprs[arg_count];
+	llvm::Value *context_ret = NULL;
+	if(is_apoc)
+	{
+		auto func_context = create_context(func);
+		if(ret_ptr)
+		{
+			auto context_type = get_context_type();
+			auto ret = allocate_variable(func, (u8 *)"to_return", saved_ret, backend);
+			context_ret = backend.builder->CreateStructGEP(context_type, func_context, 0);
+			backend.builder->CreateStore(ret, context_ret);
+		}
+		arg_exprs[0] = func_context;
+	}
 	auto arg_types = call_node->func_call.arg_types;
 	auto expr_types = call_node->func_call.expr_types;
 	
 	b32 found_var_args = false;
-	size_t j = 0;
-	for (size_t i = 0; i < arg_count; ++i)
+	for (; i < arg_count; ++i)
 	{
-		arg_exprs[i] = generate_expression(f, call_node->func_call.arguments[i], func);
+		b32 expr_i = i - (is_apoc ? 1 : 0);
+		arg_exprs[i] = generate_expression(f, call_node->func_call.arguments[expr_i], func);
 		if(arg_types[j].type != T_DETECT)
 		{
-			arg_exprs[i] = create_cast(arg_types[j], expr_types[i], arg_exprs[i]);
+			arg_exprs[i] = create_cast(arg_types[j], expr_types[expr_i], arg_exprs[i]);
 		}
 		else
 		{
@@ -769,7 +846,15 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		if(!found_var_args)
 			j++;
 	}
-	return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+	if(ret_ptr)
+	{
+		backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+		auto ret_type = apoc_type_to_llvm(saved_ret,
+				backend);
+		return backend.builder->CreateLoad(ret_type, context_ret);
+	}
+	else
+		return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
 }
 #endif
 
@@ -799,7 +884,21 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			DEBUG_INFO (
 			emit_location(f, node->ret.token);
 			)
-			if(node->ret.expression)
+			if(apoc_type_to_llvm(node->ret.func_type, backend) != func->getReturnType())
+			{
+				Assert(node->ret.expression);
+				auto context = get_context(func);
+				Assert(context);
+				auto ret_ptr = backend.builder->CreateStructGEP(get_context_type(), context, 0, "ret_ptr");
+				auto to_ret = generate_expression(f, node->ret.expression, func);
+				if(!to_ret->getType()->isPointerTy())
+					to_ret = generate_lhs(f, func, node->ret.expression, NULL, false,
+							(Type_Info){});
+				auto alignment = Align(get_type_alignment(node->ret.func_type));
+				backend.builder->CreateMemCpy(ret_ptr, alignment, to_ret, alignment, get_type_size(node->ret.func_type));
+				backend.builder->CreateRetVoid();
+			}
+			else if(node->ret.expression)
 			{
 				llvm::Value *ret_val = generate_expression(f, node->ret.expression, func);
 				if (is_untyped(node->ret.expression_type))
@@ -826,134 +925,51 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			llvm::Value *evaluation =
 				generate_boolean_expression(f, node->condition.expr, func);
 
-			llvm::BasicBlock *if_true = NULL;
-			llvm::BasicBlock *if_false = NULL;
-			llvm::BasicBlock *to_go_if = to_go ? to_go : NULL;
-
+			llvm::BasicBlock *b_true = BasicBlock::Create(*backend.context, "if.true", func);
+			llvm::BasicBlock *b_aftr = to_go ? to_go : BasicBlock::Create(*backend.context, "if.aftr", func);
+			llvm::BasicBlock *b_else = NULL;
 			*idx += 1;
-			auto body_node = list->statements.list[*idx];
-			*idx += 1;
-			auto next_node = list->statements.list[*idx];
-			
-			if(next_node->type == type_else)
+			auto body = list->statements.list[*idx];
+			if(body->type == type_scope_start)
 			{
-				*idx += 1;
-				auto else_node = list->statements.list[*idx];
-				if(else_node->type == type_scope_start)
-				{
-					DEBUG_INFO(
-						emit_location(f, else_node->scope_desc.token);
-							)
-					if(!to_go_if)
-						to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
-					if_false = generate_blocks_from_list(f, else_node->scope_desc.body,
-							func, NULL, "else", NULL);
-					backend.builder->SetInsertPoint(to_go_if);
-					*idx += 1;
-					size_t count = SDCount(list->statements.list);
-
-					if(!to_go)
-					{
-						for(; *idx < count; *idx += 1)
-							generate_block(f, list->statements.list[*idx], func,
-									to_go_if, "to_go_if", to_go, list, idx);
-					}
-
-					backend.builder->SetInsertPoint(if_false);
-					if(to_go_if->empty())
-					{
-						create_branch(if_false, to_go, backend);
-						to_go_if->eraseFromParent();
-						to_go_if = if_false;
-					}
-					else
-						create_branch(if_false, to_go_if, backend);
-				}
-				else if(else_node->type == type_if)
-				{
-					if_false = BasicBlock::Create(*backend.context, "if_false", func);
-					backend.builder->SetInsertPoint(if_false);
-					to_go_if = generate_block(f, else_node, func, if_false, "", to_go_if, list, idx);
-				}
-				else
-				{
-					if(!to_go_if)
-						to_go_if = BasicBlock::Create(*backend.context, "to_go_if", func);
-					if_false = BasicBlock::Create(*backend.context, "if_false", func);
-					backend.builder->SetInsertPoint(if_false);
-					generate_block(f, else_node, func, if_false, "", to_go_if, list, idx);
-					*idx += 1;
-					backend.builder->SetInsertPoint(to_go_if);
-					size_t count = SDCount(list->statements.list);
-
-					if(!to_go)
-					{
-						for(; *idx < count; *idx += 1)
-							generate_block(f, list->statements.list[*idx], func, to_go_if,
-									"to_go_if",to_go, list, idx);
-					}
-					
-					create_branch(to_go_if, to_go, backend);
-					backend.builder->SetInsertPoint(if_false);
-					if(to_go_if->empty())
-					{
-						create_branch(if_false, to_go, backend);
-						to_go_if->eraseFromParent();
-						to_go_if = if_false;
-					}
-					else
-						create_branch(if_false, to_go_if, backend);
-				}
-			}
-			else	
-			{
-				DEBUG_INFO(
-						emit_location(f, node->condition.token);
-						);
-				if(to_go_if)
-					if_false = to_go_if;
-				else
-					if_false = BasicBlock::Create(*backend.context, "if_false", func);
-				backend.builder->SetInsertPoint(if_false);
-				size_t count = SDCount(list->statements.list);
-
-				if(!to_go)
-				{
-					for(; *idx < count; *idx += 1)
-						generate_block(f, list->statements.list[*idx], func,
-								if_false, "if_false", to_go, list, idx);
-					to_go_if = if_false;
-				}
-				else 
-					if_false = to_go;
-				
-			}
-
-			if(body_node->type == type_scope_start)
-			{
-				DEBUG_INFO(
-						emit_location(f, body_node->scope_desc.token);
-						)
-				if_true = generate_blocks_from_list(f, body_node->scope_desc.body, func,
-						NULL, "if_true", to_go_if);
+				generate_blocks_from_list(f, body->scope_desc.body, func,
+						b_true, "if.true", b_aftr);
 			}
 			else
 			{
-				if_true = BasicBlock::Create(*backend.context, "if_true", func);
-				if(if_true->getTerminator() == NULL)
-				{
-					backend.builder->SetInsertPoint(if_true);
-					generate_block(f, body_node, func, if_true, "if_true", to_go_if, list, idx);
-					
-					create_branch(if_true, to_go_if, backend);
-				}
+				backend.builder->SetInsertPoint(b_true);
+				generate_block(f, body, func, b_true, "if.true", b_aftr, list, idx);
+				if(b_true->getTerminator() == NULL)
+					backend.builder->CreateBr(b_aftr);
 			}
-			DEBUG_INFO (
-					emit_location(f, node->condition.token);
-			)
+			*idx += 1;
+			auto else_node = list->statements.list[*idx];
+			if(else_node->type == type_else)
+			{
+				*idx += 1;
+				auto else_body = list->statements.list[*idx];
+				if(else_body->type == type_scope_start)
+					b_else = generate_blocks_from_list(f, else_body->scope_desc.body, func, NULL, "if.else", b_aftr);
+				else
+				{
+					b_else = BasicBlock::Create(*backend.context, "if.else", func);
+					backend.builder->SetInsertPoint(b_else);
+					generate_block(f, else_body, func, NULL, "if.else", b_aftr, list, idx);
+				}
+				if(b_else->getTerminator() == NULL)
+					create_branch(b_else, b_aftr, backend);
+			}
+			if(!to_go)
+			{
+				backend.builder->SetInsertPoint(b_aftr);
+				size_t count = SDCount(list->statements.list);
+				for(; *idx < count; *idx += 1)
+					generate_block(f, list->statements.list[*idx], func, b_aftr, "if.aftr", to_go, list, idx);
+			}
 			backend.builder->SetInsertPoint(passed_block);
-			backend.builder->CreateCondBr(evaluation, if_true, if_false);
-			result = to_go_if;
+			backend.builder->CreateCondBr(evaluation, b_true,
+					b_else ? b_else : b_aftr);
+			result = b_aftr;
 		} break;
 		case type_scope_start: { DEBUG_INFO ( emit_location(f, node->scope_desc.token); ) } break;
 		case type_scope_end: { DEBUG_INFO ( emit_location(f, node->scope_desc.token); ) } break;
@@ -986,7 +1002,7 @@ generate_blocks_from_list(File_Contents *f, Ast_Node *list_node, Function *func,
 		node = list[i];
 		generate_block(f, node, func, body_block, block_name, to_go,
 				list_node, &i);
-		if(node->type == type_return)
+		if(body_block->getTerminator() != NULL)
 			break;
 	}
 
@@ -1056,22 +1072,34 @@ generate_func(File_Contents *f, Ast_Node *node)
 	shfree(backend.named_values);
 
 	{
+		b32 is_apoc = node->function.conv == CALL_APOC;
 		size_t arg_index = 0;
 		for (auto &arg : func->args())
 		{
-			auto apoc_arg = node->function.arguments[arg_index++];
-			u8 *arg_string = (u8 *)AllocateCompileMemory(arg.getName().size() + 1);
-			memcpy(arg_string, arg.getName().str().c_str(), arg.getName().size());
-			auto variable = allocate_variable(func, arg_string, apoc_arg->variable.type, backend);
-			DEBUG_INFO (
-				DILocalVariable *debug_var = debug.builder->createParameterVariable(subprogram, arg.getName().str(),
-					arg_index - 1, debug_unit.file,
-					apoc_arg->variable.identifier.token.line, to_debug_type(apoc_arg->variable.type, &debug));
-				debug.builder->insertDeclare(variable, debug_var, debug.builder->createExpression(),
-					DILocation::get(subprogram->getContext(), apoc_arg->variable.identifier.token.line, 0, subprogram),
-					backend.builder->GetInsertBlock());
-			)
-
+			llvm::AllocaInst *variable = NULL;
+			u8 *arg_string = NULL;
+			if(is_apoc && arg_index == 0)
+			{
+				arg_string = (u8 *)"__apoc_internal_context";
+				auto context_type = get_context_type();
+				variable = allocate_with_llvm_no_zero(func, arg_string, context_type, backend, 16);
+			}
+			else
+			{
+				Ast_Node *apoc_arg = node->function.arguments[arg_index - (is_apoc ? 1 : 0)];
+				arg_string = (u8 *)AllocateCompileMemory(arg.getName().size() + 1);
+				memcpy(arg_string, arg.getName().str().c_str(), arg.getName().size());
+				variable = allocate_variable(func, arg_string, apoc_arg->variable.type, backend);
+				DEBUG_INFO (
+						DILocalVariable *debug_var = debug.builder->createParameterVariable(subprogram, arg.getName().str(),
+							arg_index - 1, debug_unit.file,
+							apoc_arg->variable.identifier.token.line, to_debug_type(apoc_arg->variable.type, &debug));
+						debug.builder->insertDeclare(variable, debug_var, debug.builder->createExpression(),
+							DILocation::get(subprogram->getContext(), apoc_arg->variable.identifier.token.line, 0, subprogram),
+							backend.builder->GetInsertBlock());
+						)
+			}
+			arg_index++;
 			backend.builder->CreateStore(&arg, variable);
 			shput(backend.named_values, arg_string, variable);
 		}

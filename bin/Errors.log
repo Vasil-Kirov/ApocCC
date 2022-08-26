@@ -1,7 +1,0 @@
-[FATAL] W:\Apocalypse\Standard\String.apoc (12, 28):
-	Found unexpected token [ ] ], expected constant integer expression
-
-{
->   	buffer:[STRING_BUFFER_SIZE] u8;
-	len: u6
-	                          ^^^
