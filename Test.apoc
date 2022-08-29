@@ -1,13 +1,12 @@
 
 func $intrinsic var_arg_start(list:** Any);
 
-func _apoc_init() -> i32
+func main() -> i32
 {
-	// if and for are completely broken
-	builder := init_builder("my text");
-	builder += "more text";
-	my_str := builder_to_string(builder);
-	print(my_str);
+	result := init_builder("my big string");
+	result += " more text";
+	str := builder_to_string(@result);
+	print(str);
 	-> 0;
 }
 

@@ -1,8 +1,11 @@
+#include "llvm/ADT/EpochTracker.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Transforms/Instrumentation.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
 #include <LLVM_Helpers.h>
@@ -167,7 +170,7 @@ emit_assignment(File_Contents *f, Ast_Node *node, llvm::Value *location, u8 *ide
 {
 	Assert(node->type == type_assignment);
 
-	DEBUG_INFO (
+	if(f->build_commands.debug_info) {
 		auto scope = stack_peek(debug.scope, DIScope *);
 		auto desc  = shget(debug.file_map, node->assignment.token.file);
 		DILocalVariable *debug_var = debug.builder->createAutoVariable(scope, StringRef((char *)identifier),
@@ -177,7 +180,7 @@ emit_assignment(File_Contents *f, Ast_Node *node, llvm::Value *location, u8 *ide
 		debug.builder->insertDeclare(location, debug_var, debug.builder->createExpression(), 
 			DILocation::get(*backend.context, node->assignment.token.line, node->assignment.token.column, scope),
 			backend.builder->GetInsertBlock());
-	)
+	}
 }
 
 void
@@ -511,6 +514,7 @@ generate_func_signature(File_Contents *f, Ast_Node *node, b32 is_overload)
 		return signature;
 	
 	b32 is_apoc = node->function.conv == CALL_APOC && !is_overload;
+	
 	if(is_apoc && get_type_size(node->function.type) > 8)
 	{
 		Type_Info void_ty = {};
@@ -806,15 +810,15 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		arg_count++;
 	}
 	llvm::Value *arg_exprs[arg_count];
-	llvm::Value *context_ret = NULL;
+	llvm::Value *ret = NULL;
 	if(is_apoc)
 	{
 		auto func_context = create_context(func);
 		if(ret_ptr)
 		{
 			auto context_type = get_context_type();
-			auto ret = allocate_variable(func, (u8 *)"to_return", saved_ret, backend);
-			context_ret = backend.builder->CreateStructGEP(context_type, func_context, 0);
+			ret = allocate_variable(func, (u8 *)"to_return", saved_ret, backend);
+			auto context_ret = backend.builder->CreateStructGEP(context_type, func_context, 0);
 			backend.builder->CreateStore(ret, context_ret);
 		}
 		arg_exprs[0] = func_context;
@@ -851,7 +855,8 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
 		auto ret_type = apoc_type_to_llvm(saved_ret,
 				backend);
-		return backend.builder->CreateLoad(ret_type, context_ret);
+		//return backend.builder->CreateLoad(ret_type, context_ret);
+		return ret;
 	}
 	else
 		return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
@@ -888,14 +893,17 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			{
 				Assert(node->ret.expression);
 				auto context = get_context(func);
+				auto context_type = get_context_type();
+				auto pointer_type = PointerType::get(*backend.context, 0);
 				Assert(context);
-				auto ret_ptr = backend.builder->CreateStructGEP(get_context_type(), context, 0, "ret_ptr");
+				auto context_struct = backend.builder->CreateLoad(pointer_type, context);
+				auto ret_ptr = backend.builder->CreateStructGEP(context_type, context_struct, 0, "ret_ptr"); // address of void *
+				ret_ptr = backend.builder->CreateLoad(pointer_type, ret_ptr);
 				auto to_ret = generate_expression(f, node->ret.expression, func);
-				if(!to_ret->getType()->isPointerTy())
-					to_ret = generate_lhs(f, func, node->ret.expression, NULL, false,
-							(Type_Info){});
-				auto alignment = Align(get_type_alignment(node->ret.func_type));
-				backend.builder->CreateMemCpy(ret_ptr, alignment, to_ret, alignment, get_type_size(node->ret.func_type));
+				backend.builder->CreateStore(to_ret, ret_ptr);
+				// @TODO: memcpy maybe?
+				// auto alignment = Align(get_type_alignment(node->ret.func_type));
+				// backend.builder->CreateMemCpy(ret_ptr, alignment, to_ret, alignment, get_type_size(node->ret.func_type));
 				backend.builder->CreateRetVoid();
 			}
 			else if(node->ret.expression)
@@ -937,10 +945,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			}
 			else
 			{
-				backend.builder->SetInsertPoint(b_true);
-				generate_block(f, body, func, b_true, "if.true", b_aftr, list, idx);
-				if(b_true->getTerminator() == NULL)
-					backend.builder->CreateBr(b_aftr);
+				Assert(false);
 			}
 			*idx += 1;
 			auto else_node = list->statements.list[*idx];
@@ -959,7 +964,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				if(b_else->getTerminator() == NULL)
 					create_branch(b_else, b_aftr, backend);
 			}
-			if(!to_go)
+
 			{
 				backend.builder->SetInsertPoint(b_aftr);
 				size_t count = SDCount(list->statements.list);
@@ -1081,7 +1086,7 @@ generate_func(File_Contents *f, Ast_Node *node)
 			if(is_apoc && arg_index == 0)
 			{
 				arg_string = (u8 *)"__apoc_internal_context";
-				auto context_type = get_context_type();
+				auto context_type = PointerType::get(get_context_type(), 0);
 				variable = allocate_with_llvm_no_zero(func, arg_string, context_type, backend, 16);
 			}
 			else
@@ -1090,14 +1095,15 @@ generate_func(File_Contents *f, Ast_Node *node)
 				arg_string = (u8 *)AllocateCompileMemory(arg.getName().size() + 1);
 				memcpy(arg_string, arg.getName().str().c_str(), arg.getName().size());
 				variable = allocate_variable(func, arg_string, apoc_arg->variable.type, backend);
-				DEBUG_INFO (
+				if(f->build_commands.debug_info)
+				{
 						DILocalVariable *debug_var = debug.builder->createParameterVariable(subprogram, arg.getName().str(),
-							arg_index - 1, debug_unit.file,
+							arg_index, debug_unit.file,
 							apoc_arg->variable.identifier.token.line, to_debug_type(apoc_arg->variable.type, &debug));
 						debug.builder->insertDeclare(variable, debug_var, debug.builder->createExpression(),
 							DILocation::get(subprogram->getContext(), apoc_arg->variable.identifier.token.line, 0, subprogram),
 							backend.builder->GetInsertBlock());
-						)
+				}
 			}
 			arg_index++;
 			backend.builder->CreateStore(&arg, variable);
@@ -1750,11 +1756,11 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 		}
 	}
 	llvm::Value *location = NULL;
-	// @TODO: remove this and place a flag field in generate_expression so we don't have to iterate the expression twice
-	b32 has_list = expression_has_list(node->assignment.rhs);
+
 
 	// @NOTE: structs and arrays are handled in their initialization
-	if(!has_list)
+	if(expression_value->getType()->isPointerTy() == NULL ||
+			node->assignment.decl_type.type == T_POINTER)
 	{
 		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type, &identifier);
 		if (is_untyped(node->assignment.rhs_type))
@@ -1769,13 +1775,15 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 	}
 	else
 	{
-		Assert(node->assignment.is_declaration);
+		expression_value->setName((char *)node->assignment.token.identifier);
+		//Assert(node->assignment.is_declaration);
 		location = expression_value;
 		// @TODO: change to find identifier in case of use with arrays
 		identifier = node->assignment.token.identifier;
 		shput(backend.named_values, node->assignment.token.identifier, (llvm::AllocaInst *)expression_value);
 	}
 	// @TODO: Implement volatile variable	
-	emit_assignment(f, node, location, identifier);
+	if(node->assignment.is_declaration)
+		emit_assignment(f, node, location, identifier);
 }
 

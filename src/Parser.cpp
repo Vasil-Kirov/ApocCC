@@ -569,6 +569,40 @@ parse_statement(File_Contents *f)
 	return result;
 }
 
+void
+parse_and_scope_unscoped(File_Contents *f, Ast_Node **list, Ast_Node *statement)
+{
+	Token_Iden token;
+	if(statement->type == type_if)
+		token = statement->condition.token;
+	else if(statement->type == type_for)
+		token = statement->for_loop.token;
+	else
+		Assert(false);
+	Ast_Node *scope_start = alloc_node();
+	scope_start->type = type_scope_start;
+	scope_start->scope_desc.token = token;
+	scope_start->scope_desc.body = alloc_node();
+	scope_start->scope_desc.body->type = type_statements;
+	Ast_Node *scope_end = alloc_node();
+	scope_end->type = type_scope_end;
+	scope_end->scope_desc.token = token;
+	auto new_list = SDCreate(Ast_Node *);
+	auto body = parse_statement(f);
+
+	if((body->type == type_if || body->type == type_for)
+				&& f->curr_token->type != (Token)'{')
+	{
+		parse_and_scope_unscoped(f, new_list, body);
+	}
+	else
+		SDPush(new_list, body);
+	scope_start->scope_desc.body->statements.list = new_list;
+	SDPush(list, statement);
+	SDPush(list, scope_start);
+	SDPush(list, scope_end);
+}
+
 Ast_Node *
 parse_statement_list(File_Contents *f)
 {
@@ -579,7 +613,13 @@ parse_statement_list(File_Contents *f)
 		if(f->curr_token->type == '}')
 			should_break = true;
 		Ast_Node *statement = parse_statement(f);
-		SDPush(result->statements.list, statement);
+		if((statement->type == type_if || statement->type == type_for)
+				&& f->curr_token->type != (Token)'{')
+		{
+			parse_and_scope_unscoped(f, result->statements.list, statement);
+		}
+		else
+			SDPush(result->statements.list, statement);
 	}
 	return result;
 }
@@ -1324,7 +1364,7 @@ parse_overload(File_Contents *f)
 		func_type.identifier = (u8 *)"void";
 	}
 	this_func.type = func_type;
-	this_func.conv = CALL_APOC;
+	this_func.conv = CALL_C_DECL;
 	this_func.body = parse_body(f, true, invalid_token);
 	Ast_Node *function = alloc_node();
 	function->type = type_func;

@@ -163,9 +163,11 @@ int main(int argc, char *argv[])
 	{
 #if defined(_WIN32)
 	if(f->build_commands.debug_info)
-		vstd_strcat((char *)final_linker_command, (char *)" /DEBUG:FULL ");
+		vstd_strcat((char *)final_linker_command, (char *)" /DEBUG ");
 
-	vstd_strcat((char *)final_linker_command, (char *)" /OUT:");
+	vstd_strcat((char *)final_linker_command, (char *)"/ENTRY:mainCRTStartup ");
+	vstd_strcat((char *)final_linker_command, (char *)"/defaultlib:libcmt ");	
+	vstd_strcat((char *)final_linker_command, (char *)"/OUT:");
 #elif defined (CM_LINUX)
 	vstd_strcat((char *)final_linker_command, (char *)" -o");
 #else
@@ -179,6 +181,7 @@ int main(int argc, char *argv[])
 
 	vstd_strcat((char *)final_linker_command, (char *)f->build_commands.output_file);
 
+	//LG_DEBUG("Linker Command: %s", final_linker_command);
 	if(f->build_commands.call_linker)
 	{
 		TIME_FUNC(timers, platform_call_and_wait((char *)final_linker_command),

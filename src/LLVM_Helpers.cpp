@@ -33,8 +33,34 @@ static const char *type_names[] = {"", "i8", "i16",
 void
 llvm_zero_out_memory(llvm::Value *ptr, u64 size, llvm::Align alignment, IRBuilder<> *builder)
 {
-	auto zero = builder->getInt8(0);
-	builder->CreateMemSet(ptr, zero, size, alignment);
+	switch(size)
+	{
+		case 1:
+		{
+			auto zero = builder->getInt8(0);
+			builder->CreateStore(zero, ptr);
+		} break;
+		case 2:
+		{
+			auto zero = builder->getInt16(0);
+			builder->CreateStore(zero, ptr);
+		} break;
+		case 4:
+		{
+			auto zero = builder->getInt32(0);
+			builder->CreateStore(zero, ptr);
+		} break;
+		case 8:
+		{
+			auto zero = builder->getInt64(0);
+			builder->CreateStore(zero, ptr);
+		} break;
+		default:
+		{
+			auto zero = builder->getInt8(0);
+			builder->CreateMemSet(ptr, zero, size, alignment);
+		} break;
+	}
 }
 
 AllocaInst *

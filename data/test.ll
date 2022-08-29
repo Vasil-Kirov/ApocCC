@@ -3,1285 +3,875 @@ source_filename = "Test.apoc"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-%String_Builder = type { [256 x i8], i64, ptr }
+%__Internal_Context = type { ptr }
 %string = type { ptr, i64 }
+%String_Builder = type { [256 x i8], i64, ptr }
 
-@global_var = local_unnamed_addr constant i8 1
-@global_var.1 = local_unnamed_addr constant i8 0
-@global_var.2 = local_unnamed_addr constant ptr null
-@global_var.3 = local_unnamed_addr constant i64 256
-@0 = private unnamed_addr constant [8 x i8] c"my text\00", align 1
+@global_var = constant i8 1
+@global_var.1 = constant i8 0
+@global_var.2 = constant ptr null
+@global_var.3 = constant i64 256
+@0 = private unnamed_addr constant [14 x i8] c"my big string\00", align 1
+@1 = private unnamed_addr constant [11 x i8] c" more text\00", align 1
+@2 = private unnamed_addr constant [9 x i8] c"len: %d\0A\00", align 1
 
-; Function Attrs: nofree nounwind
-define i32 @_apoc_init(ptr nocapture readnone %__apoc_internal_context) local_unnamed_addr #0 !dbg !23 {
+declare void @var_arg_start(ptr, ptr)
+
+define i32 @main(ptr %__apoc_internal_context) !dbg !23 {
 entry:
-  %String_Builder.i = alloca %String_Builder, align 16
-  %to_return.i = alloca %string, align 16
-  call void @llvm.lifetime.start.p0(i64 272, ptr nonnull %String_Builder.i), !dbg !28
-  call void @llvm.dbg.value(metadata ptr null, metadata !35, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata ptr @0, metadata !35, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.memset.p0.i64(ptr noundef nonnull align 16 dereferenceable(272) %String_Builder.i, i8 0, i64 272, i1 false) #14, !dbg !36
-  call void @llvm.dbg.declare(metadata ptr %String_Builder.i, metadata !37, metadata !DIExpression()) #14, !dbg !36
-  call void @llvm.dbg.value(metadata ptr null, metadata !47, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata ptr null, metadata !48, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata ptr %String_Builder.i, metadata !47, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata ptr %String_Builder.i, metadata !48, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !49, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !50, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !49, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !50, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !51, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !52, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !51, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !52, metadata !DIExpression()) #14, !dbg !28
-  br label %for.body.i
-
-for.body.i:                                       ; preds = %for.incr.i, %entry
-  %indexed_val802.i = phi i8 [ %indexed_val.i, %for.incr.i ], [ 109, %entry ]
-  %current.0801.i = phi ptr [ %current.1.i, %for.incr.i ], [ %String_Builder.i, %entry ]
-  %times.0800.i = phi i64 [ %times.1.i, %for.incr.i ], [ 0, %entry ]
-  %i.0799.i = phi i64 [ %2, %for.incr.i ], [ 0, %entry ]
-  call void @llvm.dbg.value(metadata ptr %current.0801.i, metadata !48, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 %times.0800.i, metadata !50, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 %i.0799.i, metadata !52, metadata !DIExpression()) #14, !dbg !28
-  %elem_ptr6.i = getelementptr [256 x i8], ptr %current.0801.i, i64 0, i64 %i.0799.i, !dbg !53
-  store i8 %indexed_val802.i, ptr %elem_ptr6.i, align 1, !dbg !53
-  call void @llvm.dbg.declare(metadata ptr %elem_ptr6.i, metadata !54, metadata !DIExpression()) #14, !dbg !53
-  %"struct member ptr8.i" = getelementptr inbounds %String_Builder, ptr %current.0801.i, i64 0, i32 1, !dbg !55
-  %selected.i = load i64, ptr %"struct member ptr8.i", align 4, !dbg !55
-  %0 = add i64 %selected.i, 1, !dbg !55
-  store i64 %0, ptr %"struct member ptr8.i", align 4, !dbg !55
-  call void @llvm.dbg.declare(metadata ptr %"struct member ptr8.i", metadata !56, metadata !DIExpression()) #14, !dbg !55
-  %1 = icmp eq i64 %i.0799.i, 256, !dbg !57
-  br i1 %1, label %if.true.i, label %for.incr.i, !dbg !58
-
-for.incr.i:                                       ; preds = %if.true.i, %for.body.i
-  %i.1.i = phi i64 [ 0, %if.true.i ], [ %i.0799.i, %for.body.i ], !dbg !28
-  %times.1.i = phi i64 [ %5, %if.true.i ], [ %times.0800.i, %for.body.i ], !dbg !28
-  %current.1.i = phi ptr [ %calloc.i.i, %if.true.i ], [ %current.0801.i, %for.body.i ], !dbg !28
-  call void @llvm.dbg.value(metadata ptr %current.1.i, metadata !48, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata ptr %current.1.i, metadata !47, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 %times.1.i, metadata !50, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 %times.1.i, metadata !49, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 %i.1.i, metadata !52, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 %i.1.i, metadata !51, metadata !DIExpression()) #14, !dbg !28
-  %2 = add i64 %i.1.i, 1, !dbg !58
-  call void @llvm.dbg.value(metadata i64 %2, metadata !52, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 %2, metadata !51, metadata !DIExpression()) #14, !dbg !28
-  %3 = shl i64 %times.1.i, 8, !dbg !59
-  %4 = add i64 %3, %2, !dbg !59
-  %elem_ptr.i = getelementptr i8, ptr @0, i64 %4, !dbg !59
-  %indexed_val.i = load i8, ptr %elem_ptr.i, align 1, !dbg !59
-  %.not.i = icmp eq i8 %indexed_val.i, 0, !dbg !59
-  br i1 %.not.i, label %builder_to_string.exit, label %for.body.i, !dbg !59
-
-if.true.i:                                        ; preds = %for.body.i
-  call void @llvm.dbg.value(metadata i64 0, metadata !51, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 0, metadata !52, metadata !DIExpression()) #14, !dbg !28
-  %5 = add i64 %times.0800.i, 1, !dbg !60
-  call void @llvm.dbg.value(metadata i64 %5, metadata !49, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 %5, metadata !50, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata i64 272, metadata !61, metadata !DIExpression()) #14, !dbg !66
-  %calloc.i.i = tail call dereferenceable_or_null(272) ptr @calloc(i64 1, i64 272) #14, !dbg !68
-  call void @llvm.dbg.value(metadata ptr %calloc.i.i, metadata !69, metadata !DIExpression()) #14, !dbg !66
-  %"struct member ptr13.i" = getelementptr inbounds %String_Builder, ptr %current.0801.i, i64 0, i32 2, !dbg !70
-  store ptr %calloc.i.i, ptr %"struct member ptr13.i", align 8, !dbg !70
-  call void @llvm.dbg.declare(metadata ptr %"struct member ptr13.i", metadata !71, metadata !DIExpression()) #14, !dbg !70
-  call void @llvm.dbg.value(metadata ptr %calloc.i.i, metadata !47, metadata !DIExpression()) #14, !dbg !28
-  call void @llvm.dbg.value(metadata ptr %calloc.i.i, metadata !48, metadata !DIExpression()) #14, !dbg !28
-  br label %for.incr.i, !dbg !58
-
-builder_to_string.exit:                           ; preds = %for.incr.i
-  call void @llvm.lifetime.end.p0(i64 272, ptr nonnull %String_Builder.i), !dbg !72
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i8 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata i64 undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata ptr undef, metadata !73, metadata !DIExpression()), !dbg !74
-  call void @llvm.dbg.value(metadata ptr undef, metadata !75, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !74
-  call void @llvm.dbg.value(metadata i64 poison, metadata !75, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !74
-  call void @llvm.lifetime.start.p0(i64 16, ptr nonnull %String_Builder.i), !dbg !80
-  call void @llvm.dbg.value(metadata ptr undef, metadata !85, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)) #14, !dbg !80
-  call void @llvm.dbg.value(metadata i64 undef, metadata !85, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)) #14, !dbg !80
-  call void @llvm.memset.p0.i64(ptr noundef nonnull align 16 dereferenceable(16) %String_Builder.i, i8 0, i64 16, i1 false) #14, !dbg !86
-  call void @llvm.dbg.value(metadata ptr undef, metadata !87, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)) #14, !dbg !80
-  call void @llvm.dbg.value(metadata i64 undef, metadata !87, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)) #14, !dbg !80
-  %6 = call i32 (ptr, ...) @printf(ptr nonnull %String_Builder.i) #14, !dbg !88
-  call void @llvm.lifetime.end.p0(i64 16, ptr nonnull %String_Builder.i)
-  ret i32 0, !dbg !89
+  %__apoc_internal_context4 = alloca %__Internal_Context, align 16
+  %str = alloca %string, align 16
+  %__apoc_internal_context3 = alloca %__Internal_Context, align 16
+  %result = alloca %String_Builder, align 16
+  %__apoc_internal_context2 = alloca %__Internal_Context, align 16
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context2, i32 0, i32 0, !dbg !28
+  call void @llvm.memset.p0.i64(ptr align 16 %result, i8 0, i64 272, i1 false), !dbg !28
+  %1 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context2, i32 0, i32 0, !dbg !28
+  store ptr %result, ptr %1, align 8, !dbg !28
+  call void @init_builder(ptr %__apoc_internal_context2, ptr @0), !dbg !28
+  call void @llvm.dbg.declare(metadata ptr %result, metadata !29, metadata !DIExpression()), !dbg !28
+  %2 = load %String_Builder, ptr %result, align 8, !dbg !40
+  call void @"overload[x]="(ptr %result, ptr @1), !dbg !40
+  %3 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0, !dbg !41
+  call void @llvm.memset.p0.i64(ptr align 16 %str, i8 0, i64 16, i1 false), !dbg !41
+  %4 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0, !dbg !41
+  store ptr %str, ptr %4, align 8, !dbg !41
+  %5 = load %String_Builder, ptr %result, align 8, !dbg !41
+  call void @builder_to_string(ptr %__apoc_internal_context3, ptr %result), !dbg !41
+  call void @llvm.dbg.declare(metadata ptr %str, metadata !42, metadata !DIExpression()), !dbg !41
+  %6 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0, !dbg !48
+  %7 = load %string, ptr %str, align 8, !dbg !48
+  call void @print(ptr %__apoc_internal_context4, %string %7), !dbg !48
+  ret i32 0, !dbg !49
 }
 
-; Function Attrs: mustprogress nofree nounwind willreturn
-define noalias ptr @mem_alloc(ptr nocapture readnone %__apoc_internal_context, i64 %size) local_unnamed_addr #1 !dbg !62 {
+define ptr @mem_alloc(ptr %__apoc_internal_context, i64 %size) !dbg !50 {
 entry:
-  call void @llvm.dbg.value(metadata i64 0, metadata !61, metadata !DIExpression()), !dbg !90
-  call void @llvm.dbg.value(metadata i64 %size, metadata !61, metadata !DIExpression()), !dbg !90
-  %calloc = call ptr @calloc(i64 1, i64 %size), !dbg !91
-  call void @llvm.dbg.value(metadata ptr null, metadata !69, metadata !DIExpression()), !dbg !90
-  call void @llvm.dbg.value(metadata ptr %calloc, metadata !69, metadata !DIExpression()), !dbg !90
-  ret ptr %calloc, !dbg !92
+  %result = alloca ptr, align 8
+  %size2 = alloca i64, align 8
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  store i64 0, ptr %size2, align 4
+  call void @llvm.dbg.declare(metadata ptr %size2, metadata !54, metadata !DIExpression()), !dbg !55
+  store i64 %size, ptr %size2, align 4
+  %0 = load i64, ptr %size2, align 4, !dbg !56
+  %1 = call ptr @malloc(i64 %0), !dbg !56
+  store i64 0, ptr %result, align 4, !dbg !56
+  store ptr %1, ptr %result, align 8, !dbg !56
+  call void @llvm.dbg.declare(metadata ptr %result, metadata !57, metadata !DIExpression()), !dbg !56
+  %2 = load ptr, ptr %result, align 8, !dbg !58
+  %3 = load i64, ptr %size2, align 4, !dbg !58
+  %4 = call ptr @memset(ptr %2, i32 0, i64 %3), !dbg !58
+  %5 = load ptr, ptr %result, align 8, !dbg !59
+  ret ptr %5, !dbg !59
 }
 
-; Function Attrs: nofree nounwind
-define void @builder_to_string(ptr nocapture readnone %__apoc_internal_context, %String_Builder %builder) local_unnamed_addr #0 !dbg !93 {
+define void @builder_to_string(ptr %__apoc_internal_context, ptr %builder) !dbg !60 {
 entry:
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i8 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 undef, metadata !96, metadata !DIExpression()), !dbg !97
-  %builder.fca.2.extract = extractvalue %String_Builder %builder, 2
-  call void @llvm.dbg.value(metadata ptr undef, metadata !96, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr null, metadata !98, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !98, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !99, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !100, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !101, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !102, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !99, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !100, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !101, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !102, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr null, metadata !103, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr null, metadata !104, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr null, metadata !105, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr undef, metadata !103, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr undef, metadata !104, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr undef, metadata !105, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !106, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 0, metadata !106, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !102, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !101, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !100, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !99, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !106, metadata !DIExpression()), !dbg !97
-  %.not54 = icmp eq ptr %builder.fca.2.extract, null, !dbg !107
-  br i1 %.not54, label %for.aftr18, label %for.body.preheader, !dbg !107
+  %__apoc_internal_context41 = alloca %__Internal_Context, align 16
+  %__apoc_internal_context23 = alloca %__Internal_Context, align 16
+  %i15 = alloca i64, align 8
+  %times = alloca i64, align 8
+  %__apoc_internal_context12 = alloca %__Internal_Context, align 16
+  %i = alloca i64, align 8
+  %current = alloca ptr, align 8
+  %out_len = alloca i64, align 8
+  %out = alloca %string, align 16
+  %builder2 = alloca ptr, align 8
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  store i64 0, ptr %builder2, align 4
+  call void @llvm.dbg.declare(metadata ptr %builder2, metadata !63, metadata !DIExpression()), !dbg !64
+  store ptr %builder, ptr %builder2, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %out, i8 0, i64 16, i1 false), !dbg !65
+  call void @llvm.dbg.declare(metadata ptr %out, metadata !66, metadata !DIExpression()), !dbg !65
+  store i64 0, ptr %out_len, align 4, !dbg !67
+  store i64 0, ptr %out_len, align 4, !dbg !67
+  call void @llvm.dbg.declare(metadata ptr %out_len, metadata !68, metadata !DIExpression()), !dbg !67
+  %0 = load ptr, ptr %builder2, align 8, !dbg !69
+  store i64 0, ptr %current, align 4, !dbg !69
+  store ptr %0, ptr %current, align 8, !dbg !69
+  call void @llvm.dbg.declare(metadata ptr %current, metadata !70, metadata !DIExpression()), !dbg !69
+  store i64 0, ptr %i, align 4, !dbg !71
+  store i64 0, ptr %i, align 4, !dbg !71
+  call void @llvm.dbg.declare(metadata ptr %i, metadata !72, metadata !DIExpression()), !dbg !73
+  br label %for.cond, !dbg !71
 
-for.body.preheader:                               ; preds = %entry
-  br label %for.body, !dbg !107
+for.cond:                                         ; preds = %for.incr, %entry
+  %"derefrence struct" = load ptr, ptr %current, align 8, !dbg !71
+  %"struct member ptr" = getelementptr inbounds %String_Builder, ptr %"derefrence struct", i32 0, i32 2, !dbg !71
+  %selected = load ptr, ptr %"struct member ptr", align 8, !dbg !71
+  %1 = icmp ne ptr %selected, null, !dbg !71
+  br i1 %1, label %for.body, label %for.aftr, !dbg !71
 
-for.body:                                         ; preds = %for.body.preheader, %for.body
-  %selected8 = phi ptr [ %selected.pr, %for.body ], [ %builder.fca.2.extract, %for.body.preheader ], !dbg !108
-  call void @llvm.dbg.value(metadata ptr undef, metadata !105, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata !DIArgList(i64 poison, i64 undef), metadata !99, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !97
-  call void @llvm.dbg.value(metadata !DIArgList(i64 poison, i64 undef), metadata !100, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !97
-  call void @llvm.dbg.value(metadata !DIArgList(i64 poison, i64 undef), metadata !101, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !97
-  call void @llvm.dbg.value(metadata !DIArgList(i64 poison, i64 undef), metadata !102, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !97
-  %selected8.sroa.gep61 = getelementptr inbounds %String_Builder, ptr %selected8, i64 0, i32 2, !dbg !97
-  call void @llvm.dbg.value(metadata ptr %selected8, metadata !103, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr %selected8, metadata !104, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr %selected8, metadata !105, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !106, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !97
-  %selected.pr = load ptr, ptr %selected8.sroa.gep61, align 8, !dbg !107
-  call void @llvm.dbg.value(metadata i64 poison, metadata !102, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !101, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !100, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !99, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !106, metadata !DIExpression()), !dbg !97
-  %.not = icmp eq ptr %selected.pr, null, !dbg !107
-  br i1 %.not, label %for.aftr18, label %for.body, !dbg !107
-
-for.aftr18:                                       ; preds = %for.body, %entry
-  call void @llvm.dbg.value(metadata ptr undef, metadata !105, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr undef, metadata !104, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata ptr undef, metadata !103, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !109, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !110, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata i64 poison, metadata !111, metadata !DIExpression()), !dbg !97
-  call void @llvm.dbg.value(metadata !DIArgList(i64 poison, i64 undef, i64 undef), metadata !99, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 2, DW_OP_plus, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !97
-  call void @llvm.dbg.value(metadata !DIArgList(i64 poison, i64 undef, i64 undef), metadata !100, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 2, DW_OP_plus, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !97
-  call void @llvm.dbg.value(metadata !DIArgList(i64 poison, i64 undef, i64 undef), metadata !101, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 2, DW_OP_plus, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !97
-  call void @llvm.dbg.value(metadata !DIArgList(i64 poison, i64 undef, i64 undef), metadata !102, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 2, DW_OP_plus, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !97
-  ret void, !dbg !112
-}
-
-; Function Attrs: nofree nounwind
-define void @init_builder(ptr nocapture readnone %__apoc_internal_context, ptr nocapture readonly %text) local_unnamed_addr #0 !dbg !29 {
-entry:
-  %String_Builder = alloca %String_Builder, align 16
-  call void @llvm.dbg.value(metadata ptr null, metadata !35, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata ptr %text, metadata !35, metadata !DIExpression()), !dbg !113
-  call void @llvm.memset.p0.i64(ptr noundef nonnull align 16 dereferenceable(272) %String_Builder, i8 0, i64 272, i1 false), !dbg !114
-  call void @llvm.dbg.declare(metadata ptr %String_Builder, metadata !37, metadata !DIExpression()), !dbg !114
-  call void @llvm.dbg.value(metadata ptr null, metadata !47, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata ptr null, metadata !48, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata ptr %String_Builder, metadata !47, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata ptr %String_Builder, metadata !48, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !49, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !50, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !49, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !50, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !51, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !52, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !51, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !52, metadata !DIExpression()), !dbg !113
-  %indexed_val797 = load i8, ptr %text, align 1, !dbg !115
-  %.not798 = icmp eq i8 %indexed_val797, 0, !dbg !115
-  br i1 %.not798, label %for.aftr, label %for.body.preheader, !dbg !115
-
-for.body.preheader:                               ; preds = %entry
-  br label %for.body, !dbg !116
-
-for.body:                                         ; preds = %for.body.preheader, %for.incr
-  %indexed_val802 = phi i8 [ %indexed_val, %for.incr ], [ %indexed_val797, %for.body.preheader ]
-  %current.0801 = phi ptr [ %current.1, %for.incr ], [ %String_Builder, %for.body.preheader ]
-  %times.0800 = phi i64 [ %times.1, %for.incr ], [ 0, %for.body.preheader ]
-  %i.0799 = phi i64 [ %2, %for.incr ], [ 0, %for.body.preheader ]
-  call void @llvm.dbg.value(metadata ptr %current.0801, metadata !48, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 %times.0800, metadata !50, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 %i.0799, metadata !52, metadata !DIExpression()), !dbg !113
-  %elem_ptr6 = getelementptr [256 x i8], ptr %current.0801, i64 0, i64 %i.0799, !dbg !117
-  store i8 %indexed_val802, ptr %elem_ptr6, align 1, !dbg !117
-  call void @llvm.dbg.declare(metadata ptr %elem_ptr6, metadata !54, metadata !DIExpression()), !dbg !117
-  %"struct member ptr8" = getelementptr inbounds %String_Builder, ptr %current.0801, i64 0, i32 1, !dbg !118
-  %selected = load i64, ptr %"struct member ptr8", align 4, !dbg !118
-  %0 = add i64 %selected, 1, !dbg !118
-  store i64 %0, ptr %"struct member ptr8", align 4, !dbg !118
-  call void @llvm.dbg.declare(metadata ptr %"struct member ptr8", metadata !56, metadata !DIExpression()), !dbg !118
-  %1 = icmp eq i64 %i.0799, 256, !dbg !119
-  br i1 %1, label %if.true, label %for.incr, !dbg !116
-
-for.aftr:                                         ; preds = %for.incr, %entry
-  ret void, !dbg !120
-
-for.incr:                                         ; preds = %for.body, %if.true
-  %i.1 = phi i64 [ 0, %if.true ], [ %i.0799, %for.body ], !dbg !113
-  %times.1 = phi i64 [ %5, %if.true ], [ %times.0800, %for.body ], !dbg !113
-  %current.1 = phi ptr [ %calloc.i, %if.true ], [ %current.0801, %for.body ], !dbg !113
-  call void @llvm.dbg.value(metadata ptr %current.1, metadata !48, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata ptr %current.1, metadata !47, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 %times.1, metadata !50, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 %times.1, metadata !49, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 %i.1, metadata !52, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 %i.1, metadata !51, metadata !DIExpression()), !dbg !113
-  %2 = add i64 %i.1, 1, !dbg !116
-  call void @llvm.dbg.value(metadata i64 %2, metadata !52, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 %2, metadata !51, metadata !DIExpression()), !dbg !113
-  %3 = shl i64 %times.1, 8, !dbg !115
-  %4 = add i64 %3, %2, !dbg !115
-  %elem_ptr = getelementptr i8, ptr %text, i64 %4, !dbg !115
-  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !115
-  %.not = icmp eq i8 %indexed_val, 0, !dbg !115
-  br i1 %.not, label %for.aftr, label %for.body, !dbg !115
-
-if.true:                                          ; preds = %for.body
-  call void @llvm.dbg.value(metadata i64 0, metadata !51, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 0, metadata !52, metadata !DIExpression()), !dbg !113
-  %5 = add i64 %times.0800, 1, !dbg !121
-  call void @llvm.dbg.value(metadata i64 %5, metadata !49, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 %5, metadata !50, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata i64 272, metadata !61, metadata !DIExpression()) #14, !dbg !122
-  %calloc.i = tail call dereferenceable_or_null(272) ptr @calloc(i64 1, i64 272) #14, !dbg !124
-  call void @llvm.dbg.value(metadata ptr %calloc.i, metadata !69, metadata !DIExpression()) #14, !dbg !122
-  %"struct member ptr13" = getelementptr inbounds %String_Builder, ptr %current.0801, i64 0, i32 2, !dbg !125
-  store ptr %calloc.i, ptr %"struct member ptr13", align 8, !dbg !125
-  call void @llvm.dbg.declare(metadata ptr %"struct member ptr13", metadata !71, metadata !DIExpression()), !dbg !125
-  call void @llvm.dbg.value(metadata ptr %calloc.i, metadata !47, metadata !DIExpression()), !dbg !113
-  call void @llvm.dbg.value(metadata ptr %calloc.i, metadata !48, metadata !DIExpression()), !dbg !113
-  br label %for.incr, !dbg !116
-}
-
-; Function Attrs: nofree norecurse nosync nounwind readonly
-define i8 @compare(ptr nocapture readnone %__apoc_internal_context, %string %str1, %string %str2) local_unnamed_addr #2 !dbg !126 {
-entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !129, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !130
-  call void @llvm.dbg.value(metadata i64 0, metadata !129, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !130
-  %str1.fca.0.extract = extractvalue %string %str1, 0
-  call void @llvm.dbg.value(metadata ptr %str1.fca.0.extract, metadata !129, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !130
-  %str1.fca.1.extract = extractvalue %string %str1, 1
-  call void @llvm.dbg.value(metadata i64 %str1.fca.1.extract, metadata !129, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !130
-  call void @llvm.dbg.value(metadata ptr null, metadata !131, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !130
-  call void @llvm.dbg.value(metadata i64 0, metadata !131, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !130
-  %str2.fca.0.extract = extractvalue %string %str2, 0
-  call void @llvm.dbg.value(metadata ptr %str2.fca.0.extract, metadata !131, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !130
-  %str2.fca.1.extract = extractvalue %string %str2, 1
-  call void @llvm.dbg.value(metadata i64 %str2.fca.1.extract, metadata !131, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !130
-  %.not = icmp eq i64 %str1.fca.1.extract, %str2.fca.1.extract, !dbg !132
-  br i1 %.not, label %for.cond.preheader, label %common.ret, !dbg !133
-
-for.cond.preheader:                               ; preds = %entry
-  call void @llvm.dbg.value(metadata i64 0, metadata !134, metadata !DIExpression()), !dbg !130
-  %0 = icmp sgt i64 %str1.fca.1.extract, 0, !dbg !133
-  br i1 %0, label %for.body.preheader, label %common.ret, !dbg !133
-
-for.body.preheader:                               ; preds = %for.cond.preheader
-  br label %for.body, !dbg !135
-
-common.ret:                                       ; preds = %for.cond, %for.body, %for.cond.preheader, %entry
-  %common.ret.op = phi i8 [ 0, %entry ], [ 1, %for.cond.preheader ], [ 1, %for.cond ], [ 0, %for.body ]
-  ret i8 %common.ret.op, !dbg !130
-
-for.cond:                                         ; preds = %for.body
-  %1 = add nuw nsw i64 %i.019, 1, !dbg !135
-  call void @llvm.dbg.value(metadata i64 %i.019, metadata !134, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !130
-  %2 = icmp slt i64 %1, %str1.fca.1.extract, !dbg !133
-  br i1 %2, label %for.body, label %common.ret, !dbg !133
-
-for.body:                                         ; preds = %for.body.preheader, %for.cond
-  %i.019 = phi i64 [ %1, %for.cond ], [ 0, %for.body.preheader ]
-  call void @llvm.dbg.value(metadata i64 %i.019, metadata !134, metadata !DIExpression()), !dbg !130
-  %elem_ptr = getelementptr i8, ptr %str1.fca.0.extract, i64 %i.019, !dbg !136
-  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !136
-  %elem_ptr11 = getelementptr i8, ptr %str2.fca.0.extract, i64 %i.019, !dbg !136
-  %indexed_val12 = load i8, ptr %elem_ptr11, align 1, !dbg !136
-  %.not18 = icmp eq i8 %indexed_val, %indexed_val12, !dbg !136
-  call void @llvm.dbg.value(metadata i64 %i.019, metadata !134, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !130
-  br i1 %.not18, label %for.cond, label %common.ret, !dbg !135
-}
-
-; Function Attrs: nofree nounwind
-define void @to_string(ptr nocapture readnone %__apoc_internal_context, ptr nocapture readonly %text) local_unnamed_addr #0 !dbg !137 {
-entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !138, metadata !DIExpression()), !dbg !139
-  call void @llvm.dbg.value(metadata ptr %text, metadata !138, metadata !DIExpression()), !dbg !139
-  call void @llvm.dbg.value(metadata ptr null, metadata !140, metadata !DIExpression()), !dbg !144
-  call void @llvm.dbg.value(metadata ptr %text, metadata !140, metadata !DIExpression()), !dbg !144
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !144
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !144
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !144
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !144
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !144
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !144
-  br label %for.cond.i, !dbg !148
-
-for.cond.i:                                       ; preds = %for.cond.i, %entry
-  %lsr.iv = phi ptr [ %uglygep, %for.cond.i ], [ %text, %entry ], !dbg !144
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !147, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_stack_value)), !dbg !144
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !146, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_stack_value)), !dbg !144
-  %indexed_val.i = load i8, ptr %lsr.iv, align 1, !dbg !148
-  %.not.i = icmp eq i8 %indexed_val.i, 0, !dbg !148
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !146, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_consts, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !144
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !147, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_consts, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !144
-  %uglygep = getelementptr i8, ptr %lsr.iv, i64 1, !dbg !148
-  br i1 %.not.i, label %copy.exit, label %for.cond.i, !dbg !148
-
-copy.exit:                                        ; preds = %for.cond.i
-  call void @llvm.dbg.value(metadata i64 0, metadata !149, metadata !DIExpression()), !dbg !139
-  call void @llvm.dbg.value(metadata i64 undef, metadata !149, metadata !DIExpression()), !dbg !139
-  call void @llvm.dbg.value(metadata ptr null, metadata !150, metadata !DIExpression()), !dbg !139
-  call void @llvm.dbg.value(metadata ptr undef, metadata !150, metadata !DIExpression()), !dbg !139
-  call void @llvm.dbg.value(metadata ptr null, metadata !151, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata ptr undef, metadata !151, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata ptr null, metadata !157, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata ptr %text, metadata !157, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata i64 0, metadata !158, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata i64 undef, metadata !158, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata ptr null, metadata !159, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata ptr undef, metadata !159, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata ptr null, metadata !160, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata ptr %text, metadata !160, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !155
-  call void @llvm.dbg.declare(metadata ptr poison, metadata !162, metadata !DIExpression()), !dbg !163
-  call void @llvm.dbg.value(metadata ptr undef, metadata !164, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !139
-  call void @llvm.dbg.value(metadata i64 undef, metadata !164, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !139
-  ret void, !dbg !165
-}
-
-; Function Attrs: nofree nounwind
-define void @terminate_string(ptr nocapture readnone %__apoc_internal_context, %string %str) local_unnamed_addr #0 !dbg !166 {
-entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !167, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !168
-  call void @llvm.dbg.value(metadata i64 0, metadata !167, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !168
-  call void @llvm.dbg.value(metadata ptr undef, metadata !167, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !168
-  call void @llvm.dbg.value(metadata i64 undef, metadata !167, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !168
-  call void @llvm.dbg.value(metadata ptr null, metadata !169, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !168
-  call void @llvm.dbg.value(metadata i64 0, metadata !169, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !168
-  call void @llvm.dbg.value(metadata ptr undef, metadata !169, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !168
-  call void @llvm.dbg.value(metadata i64 undef, metadata !169, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value, DW_OP_LLVM_fragment, 64, 64)), !dbg !168
-  call void @llvm.dbg.declare(metadata ptr undef, metadata !170, metadata !DIExpression()), !dbg !171
-  call void @llvm.dbg.value(metadata ptr undef, metadata !169, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !168
-  call void @llvm.dbg.declare(metadata ptr undef, metadata !172, metadata !DIExpression()), !dbg !173
-  call void @llvm.dbg.value(metadata ptr null, metadata !151, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata ptr undef, metadata !151, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata ptr null, metadata !157, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata ptr undef, metadata !157, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata i64 0, metadata !158, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata i64 undef, metadata !158, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata ptr null, metadata !159, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata ptr undef, metadata !159, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata ptr null, metadata !160, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata ptr undef, metadata !160, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !174
-  call void @llvm.dbg.declare(metadata ptr poison, metadata !162, metadata !DIExpression()), !dbg !176
-  call void @llvm.dbg.declare(metadata ptr poison, metadata !177, metadata !DIExpression()), !dbg !178
-  ret void, !dbg !179
-}
-
-; Function Attrs: nofree nounwind
-define void @print(ptr nocapture readnone %__apoc_internal_context, %string %str) local_unnamed_addr #0 !dbg !81 {
-entry:
-  %to_return = alloca %string, align 16
-  call void @llvm.dbg.value(metadata ptr null, metadata !85, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !180
-  call void @llvm.dbg.value(metadata i64 0, metadata !85, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !180
-  call void @llvm.dbg.value(metadata ptr undef, metadata !85, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !180
-  call void @llvm.dbg.value(metadata i64 undef, metadata !85, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !180
-  call void @llvm.memset.p0.i64(ptr noundef nonnull align 16 dereferenceable(16) %to_return, i8 0, i64 16, i1 false), !dbg !181
-  call void @llvm.dbg.value(metadata ptr null, metadata !87, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !180
-  call void @llvm.dbg.value(metadata i64 0, metadata !87, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !180
-  call void @llvm.dbg.value(metadata ptr %to_return, metadata !87, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !180
-  call void @llvm.dbg.value(metadata i64 undef, metadata !87, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !180
-  %0 = call i32 (ptr, ...) @printf(ptr nonnull %to_return), !dbg !182
-  ret void
-}
-
-; Function Attrs: argmemonly nofree norecurse nosync nounwind
-define void @copy(ptr nocapture readnone %__apoc_internal_context, ptr nocapture writeonly %dst, ptr nocapture readonly %src, i64 %size) local_unnamed_addr #3 !dbg !152 {
-entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !151, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata ptr %dst, metadata !151, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata ptr null, metadata !157, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata ptr %src, metadata !157, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata i64 0, metadata !158, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata i64 %size, metadata !158, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata ptr null, metadata !159, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata ptr %dst, metadata !159, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata ptr null, metadata !160, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata ptr %src, metadata !160, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !183
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !183
-  %0 = icmp sgt i64 %size, 0, !dbg !184
-  br i1 %0, label %for.body.preheader, label %for.aftr, !dbg !184
-
-for.body.preheader:                               ; preds = %entry
-  %dst18 = ptrtoint ptr %dst to i64, !dbg !184
-  %src19 = ptrtoint ptr %src to i64, !dbg !184
-  %min.iters.check = icmp ult i64 %size, 4, !dbg !184
-  %1 = sub i64 %dst18, %src19, !dbg !184
-  %diff.check = icmp ult i64 %1, 4, !dbg !184
-  %or.cond = select i1 %min.iters.check, i1 true, i1 %diff.check, !dbg !184
-  br i1 %or.cond, label %for.body.preheader20, label %vector.ph, !dbg !184
-
-vector.ph:                                        ; preds = %for.body.preheader
-  %n.vec = and i64 %size, -4, !dbg !184
-  br label %vector.body, !dbg !184
-
-vector.body:                                      ; preds = %vector.body, %vector.ph
-  %index = phi i64 [ 0, %vector.ph ], [ %index.next, %vector.body ], !dbg !185
-  %2 = getelementptr i8, ptr %src, i64 %index, !dbg !185
-  %wide.load = load <4 x i8>, ptr %2, align 1, !dbg !185
-  %3 = getelementptr i8, ptr %dst, i64 %index, !dbg !185
-  store <4 x i8> %wide.load, ptr %3, align 1, !dbg !185
-  %index.next = add nuw i64 %index, 4, !dbg !185
-  %4 = icmp eq i64 %n.vec, %index.next, !dbg !185
-  br i1 %4, label %middle.block, label %vector.body, !dbg !185, !llvm.loop !186
-
-middle.block:                                     ; preds = %vector.body
-  %cmp.n = icmp eq i64 %n.vec, %size, !dbg !184
-  br i1 %cmp.n, label %for.aftr, label %for.body.preheader20, !dbg !184
-
-for.body.preheader20:                             ; preds = %for.body.preheader, %middle.block
-  %i.017.ph = phi i64 [ 0, %for.body.preheader ], [ %n.vec, %middle.block ]
-  br label %for.body, !dbg !184
-
-for.body:                                         ; preds = %for.body.preheader20, %for.body
-  %i.017 = phi i64 [ %5, %for.body ], [ %i.017.ph, %for.body.preheader20 ]
-  call void @llvm.dbg.value(metadata i64 %i.017, metadata !161, metadata !DIExpression()), !dbg !183
-  %elem_ptr = getelementptr i8, ptr %src, i64 %i.017, !dbg !185
-  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !185
-  %elem_ptr6 = getelementptr i8, ptr %dst, i64 %i.017, !dbg !185
-  store i8 %indexed_val, ptr %elem_ptr6, align 1, !dbg !185
-  call void @llvm.dbg.declare(metadata ptr %elem_ptr6, metadata !162, metadata !DIExpression()), !dbg !185
-  %5 = add nuw nsw i64 %i.017, 1, !dbg !185
-  call void @llvm.dbg.value(metadata i64 %5, metadata !161, metadata !DIExpression()), !dbg !183
-  %6 = icmp slt i64 %5, %size, !dbg !184
-  br i1 %6, label %for.body, label %for.aftr, !dbg !184, !llvm.loop !188
-
-for.aftr:                                         ; preds = %for.body, %middle.block, %entry
-  %i.0.lcssa = phi i64 [ 0, %entry ], [ %size, %middle.block ], [ %size, %for.body ], !dbg !183
-  %elem_ptr8 = getelementptr i8, ptr %src, i64 %i.0.lcssa, !dbg !185
-  %indexed_val9 = load i8, ptr %elem_ptr8, align 1, !dbg !185
-  %elem_ptr11 = getelementptr i8, ptr %dst, i64 %i.0.lcssa, !dbg !185
-  store i8 %indexed_val9, ptr %elem_ptr11, align 1, !dbg !185
-  call void @llvm.dbg.declare(metadata ptr %elem_ptr11, metadata !162, metadata !DIExpression()), !dbg !185
-  ret void
-}
-
-; Function Attrs: argmemonly nofree norecurse nosync nounwind readonly
-define i64 @len(ptr nocapture readnone %__apoc_internal_context, ptr nocapture readonly %text) local_unnamed_addr #4 !dbg !141 {
-entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !140, metadata !DIExpression()), !dbg !189
-  call void @llvm.dbg.value(metadata ptr %text, metadata !140, metadata !DIExpression()), !dbg !189
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !189
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !189
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !189
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !189
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !189
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !189
-  br label %for.cond, !dbg !190
-
-for.cond:                                         ; preds = %for.cond, %entry
-  %lsr.iv = phi i64 [ %lsr.iv.next, %for.cond ], [ -1, %entry ], !dbg !189
-  call void @llvm.dbg.value(metadata i64 %lsr.iv, metadata !147, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !189
-  call void @llvm.dbg.value(metadata i64 %lsr.iv, metadata !146, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !189
-  %uglygep = getelementptr i8, ptr %text, i64 %lsr.iv, !dbg !190
-  %uglygep5 = getelementptr i8, ptr %uglygep, i64 1, !dbg !190
-  %indexed_val = load i8, ptr %uglygep5, align 1, !dbg !190
-  %.not = icmp eq i8 %indexed_val, 0, !dbg !190
-  call void @llvm.dbg.value(metadata i64 %lsr.iv, metadata !146, metadata !DIExpression(DW_OP_plus_uconst, 2, DW_OP_stack_value)), !dbg !189
-  call void @llvm.dbg.value(metadata i64 %lsr.iv, metadata !147, metadata !DIExpression(DW_OP_plus_uconst, 2, DW_OP_stack_value)), !dbg !189
-  %lsr.iv.next = add i64 %lsr.iv, 1, !dbg !190
-  br i1 %.not, label %for.aftr, label %for.cond, !dbg !190
+for.body:                                         ; preds = %for.cond
+  %2 = load i64, ptr %out_len, align 4, !dbg !74
+  %"derefrence struct3" = load ptr, ptr %current, align 8, !dbg !74
+  %"struct member ptr4" = getelementptr inbounds %String_Builder, ptr %"derefrence struct3", i32 0, i32 1, !dbg !74
+  %selected5 = load i64, ptr %"struct member ptr4", align 4, !dbg !74
+  %3 = add i64 %2, %selected5, !dbg !74
+  store i64 %3, ptr %out_len, align 4, !dbg !74
+  %"derefrence struct6" = load ptr, ptr %current, align 8, !dbg !75
+  %"struct member ptr7" = getelementptr inbounds %String_Builder, ptr %"derefrence struct6", i32 0, i32 2, !dbg !75
+  %selected8 = load ptr, ptr %"struct member ptr7", align 8, !dbg !75
+  store ptr %selected8, ptr %current, align 8, !dbg !75
+  br label %for.incr, !dbg !76
 
 for.aftr:                                         ; preds = %for.cond
-  ret i64 %lsr.iv.next, !dbg !191
+  %4 = load i64, ptr %out_len, align 4, !dbg !77
+  %"derefrence struct9" = load ptr, ptr %current, align 8, !dbg !77
+  %"struct member ptr10" = getelementptr inbounds %String_Builder, ptr %"derefrence struct9", i32 0, i32 1, !dbg !77
+  %selected11 = load i64, ptr %"struct member ptr10", align 4, !dbg !77
+  %5 = add i64 %4, %selected11, !dbg !77
+  store i64 %5, ptr %out_len, align 4, !dbg !77
+  %6 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context12, i32 0, i32 0, !dbg !78
+  %7 = load i64, ptr %out_len, align 4, !dbg !78
+  %8 = call ptr @mem_alloc(ptr %__apoc_internal_context12, i64 %7), !dbg !78
+  %"struct member ptr13" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !78
+  store ptr %8, ptr %"struct member ptr13", align 8, !dbg !78
+  %9 = load i64, ptr %out_len, align 4, !dbg !79
+  %"struct member ptr14" = getelementptr inbounds %string, ptr %out, i32 0, i32 1, !dbg !79
+  store i64 %9, ptr %"struct member ptr14", align 4, !dbg !79
+  store i64 0, ptr %times, align 4, !dbg !80
+  store i64 0, ptr %times, align 4, !dbg !80
+  call void @llvm.dbg.declare(metadata ptr %times, metadata !81, metadata !DIExpression()), !dbg !80
+  store i64 0, ptr %i15, align 4, !dbg !82
+  store i64 0, ptr %i15, align 4, !dbg !82
+  call void @llvm.dbg.declare(metadata ptr %i15, metadata !83, metadata !DIExpression()), !dbg !84
+  br label %for.cond16, !dbg !82
+
+for.incr:                                         ; preds = %for.body
+  %10 = load i64, ptr %i, align 4, !dbg !76
+  %11 = add i64 %10, 1, !dbg !76
+  store i64 %11, ptr %i, align 4, !dbg !76
+  br label %for.cond, !dbg !76
+
+for.cond16:                                       ; preds = %for.incr22, %for.aftr
+  %"derefrence struct19" = load ptr, ptr %current, align 8, !dbg !82
+  %"struct member ptr20" = getelementptr inbounds %String_Builder, ptr %"derefrence struct19", i32 0, i32 2, !dbg !82
+  %selected21 = load ptr, ptr %"struct member ptr20", align 8, !dbg !82
+  %12 = icmp ne ptr %selected21, null, !dbg !82
+  br i1 %12, label %for.body17, label %for.aftr18, !dbg !82
+
+for.body17:                                       ; preds = %for.cond16
+  %13 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context23, i32 0, i32 0, !dbg !85
+  %14 = load i64, ptr %times, align 4, !dbg !85
+  %15 = mul i64 %14, 256, !dbg !85
+  %"struct member ptr24" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !85
+  %ptr_load = load ptr, ptr %"struct member ptr24", align 8, !dbg !85
+  %elem_ptr = getelementptr i8, ptr %ptr_load, i64 %15, !dbg !85
+  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !85
+  %16 = load i64, ptr %times, align 4, !dbg !85
+  %17 = mul i64 %16, 256, !dbg !85
+  %"struct member ptr25" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !85
+  %ptr_load26 = load ptr, ptr %"struct member ptr25", align 8, !dbg !85
+  %elem_ptr27 = getelementptr i8, ptr %ptr_load26, i64 %17, !dbg !85
+  %"derefrence struct28" = load ptr, ptr %current, align 8, !dbg !85
+  %"struct member ptr29" = getelementptr inbounds %String_Builder, ptr %"derefrence struct28", i32 0, i32 0, !dbg !85
+  %elem_ptr30 = getelementptr [256 x i8], ptr %"struct member ptr29", i64 0, i64 0, !dbg !85
+  %indexed_val31 = load i8, ptr %elem_ptr30, align 1, !dbg !85
+  %"derefrence struct32" = load ptr, ptr %current, align 8, !dbg !85
+  %"struct member ptr33" = getelementptr inbounds %String_Builder, ptr %"derefrence struct32", i32 0, i32 0, !dbg !85
+  %elem_ptr34 = getelementptr [256 x i8], ptr %"struct member ptr33", i64 0, i64 0, !dbg !85
+  %"derefrence struct35" = load ptr, ptr %current, align 8, !dbg !85
+  %"struct member ptr36" = getelementptr inbounds %String_Builder, ptr %"derefrence struct35", i32 0, i32 1, !dbg !85
+  %selected37 = load i64, ptr %"struct member ptr36", align 4, !dbg !85
+  call void @copy(ptr %__apoc_internal_context23, ptr %elem_ptr27, ptr %elem_ptr34, i64 %selected37), !dbg !85
+  %"derefrence struct38" = load ptr, ptr %current, align 8, !dbg !86
+  %"struct member ptr39" = getelementptr inbounds %String_Builder, ptr %"derefrence struct38", i32 0, i32 2, !dbg !86
+  %selected40 = load ptr, ptr %"struct member ptr39", align 8, !dbg !86
+  store ptr %selected40, ptr %current, align 8, !dbg !86
+  %18 = load i64, ptr %times, align 4, !dbg !87
+  %19 = add i64 %18, 1, !dbg !87
+  store i64 %19, ptr %times, align 4, !dbg !87
+  br label %for.incr22, !dbg !88
+
+for.aftr18:                                       ; preds = %for.cond16
+  %20 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context41, i32 0, i32 0, !dbg !89
+  %21 = load i64, ptr %times, align 4, !dbg !89
+  %22 = mul i64 %21, 256, !dbg !89
+  %"struct member ptr42" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !89
+  %ptr_load43 = load ptr, ptr %"struct member ptr42", align 8, !dbg !89
+  %elem_ptr44 = getelementptr i8, ptr %ptr_load43, i64 %22, !dbg !89
+  %indexed_val45 = load i8, ptr %elem_ptr44, align 1, !dbg !89
+  %23 = load i64, ptr %times, align 4, !dbg !89
+  %24 = mul i64 %23, 256, !dbg !89
+  %"struct member ptr46" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !89
+  %ptr_load47 = load ptr, ptr %"struct member ptr46", align 8, !dbg !89
+  %elem_ptr48 = getelementptr i8, ptr %ptr_load47, i64 %24, !dbg !89
+  %"derefrence struct49" = load ptr, ptr %current, align 8, !dbg !89
+  %"struct member ptr50" = getelementptr inbounds %String_Builder, ptr %"derefrence struct49", i32 0, i32 0, !dbg !89
+  %elem_ptr51 = getelementptr [256 x i8], ptr %"struct member ptr50", i64 0, i64 0, !dbg !89
+  %indexed_val52 = load i8, ptr %elem_ptr51, align 1, !dbg !89
+  %"derefrence struct53" = load ptr, ptr %current, align 8, !dbg !89
+  %"struct member ptr54" = getelementptr inbounds %String_Builder, ptr %"derefrence struct53", i32 0, i32 0, !dbg !89
+  %elem_ptr55 = getelementptr [256 x i8], ptr %"struct member ptr54", i64 0, i64 0, !dbg !89
+  %"derefrence struct56" = load ptr, ptr %current, align 8, !dbg !89
+  %"struct member ptr57" = getelementptr inbounds %String_Builder, ptr %"derefrence struct56", i32 0, i32 1, !dbg !89
+  %selected58 = load i64, ptr %"struct member ptr57", align 4, !dbg !89
+  call void @copy(ptr %__apoc_internal_context41, ptr %elem_ptr48, ptr %elem_ptr55, i64 %selected58), !dbg !89
+  %"derefrence struct59" = load ptr, ptr %current, align 8, !dbg !90
+  %"struct member ptr60" = getelementptr inbounds %String_Builder, ptr %"derefrence struct59", i32 0, i32 1, !dbg !90
+  %selected61 = load i64, ptr %"struct member ptr60", align 4, !dbg !90
+  %25 = call i32 (ptr, ...) @printf(ptr @2, i64 %selected61), !dbg !90
+  %26 = load i64, ptr %out_len, align 4, !dbg !91
+  %"derefrence struct62" = load ptr, ptr %builder2, align 8, !dbg !91
+  %"struct member ptr63" = getelementptr inbounds %String_Builder, ptr %"derefrence struct62", i32 0, i32 1, !dbg !91
+  %selected64 = load i64, ptr %"struct member ptr63", align 4, !dbg !91
+  %27 = add i64 %26, %selected64, !dbg !91
+  store i64 %27, ptr %out_len, align 4, !dbg !91
+  %28 = load ptr, ptr %__apoc_internal_context1, align 8, !dbg !92
+  %ret_ptr = getelementptr inbounds %__Internal_Context, ptr %28, i32 0, i32 0, !dbg !92
+  %29 = load ptr, ptr %ret_ptr, align 8, !dbg !92
+  %30 = load %string, ptr %out, align 8, !dbg !92
+  store %string %30, ptr %29, align 8, !dbg !92
+  ret void, !dbg !92
+
+for.incr22:                                       ; preds = %for.body17
+  %31 = load i64, ptr %i15, align 4, !dbg !88
+  %32 = add i64 %31, 1, !dbg !88
+  store i64 %32, ptr %i15, align 4, !dbg !88
+  br label %for.cond16, !dbg !88
 }
 
-; Function Attrs: nofree nounwind
-declare noundef i32 @printf(ptr nocapture noundef readonly, ...) local_unnamed_addr #0
-
-; Function Attrs: alwaysinline mustprogress nofree norecurse nosync nounwind readonly willreturn
-define i8 @"overload[]"(ptr nocapture readnone %__apoc_internal_context, %string %str, i64 %index) local_unnamed_addr #5 !dbg !192 {
+define void @init_builder(ptr %__apoc_internal_context, ptr %text) !dbg !93 {
 entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !195, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !196
-  call void @llvm.dbg.value(metadata i64 0, metadata !195, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !196
-  %str.fca.0.extract = extractvalue %string %str, 0
-  call void @llvm.dbg.value(metadata ptr %str.fca.0.extract, metadata !195, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !196
-  call void @llvm.dbg.value(metadata i64 undef, metadata !195, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !196
-  call void @llvm.dbg.value(metadata i64 0, metadata !197, metadata !DIExpression()), !dbg !196
-  call void @llvm.dbg.value(metadata i64 %index, metadata !197, metadata !DIExpression()), !dbg !196
-  %elem_ptr = getelementptr i8, ptr %str.fca.0.extract, i64 %index, !dbg !198
-  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !198
-  ret i8 %indexed_val, !dbg !198
+  %__apoc_internal_context14 = alloca %__Internal_Context, align 16
+  %i = alloca i64, align 8
+  %times = alloca i64, align 8
+  %current = alloca ptr, align 8
+  %out = alloca %String_Builder, align 16
+  %text2 = alloca ptr, align 8
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  store i64 0, ptr %text2, align 4
+  call void @llvm.dbg.declare(metadata ptr %text2, metadata !96, metadata !DIExpression()), !dbg !97
+  store ptr %text, ptr %text2, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %out, i8 0, i64 272, i1 false), !dbg !98
+  call void @llvm.dbg.declare(metadata ptr %out, metadata !99, metadata !DIExpression()), !dbg !98
+  %"struct member ptr" = getelementptr inbounds %String_Builder, ptr %out, i32 0, i32 1, !dbg !100
+  %selected = load i64, ptr %"struct member ptr", align 4, !dbg !100
+  %0 = add i64 %selected, 1, !dbg !100
+  %"struct member ptr3" = getelementptr inbounds %String_Builder, ptr %out, i32 0, i32 1, !dbg !100
+  store i64 %0, ptr %"struct member ptr3", align 4, !dbg !100
+  %1 = load %String_Builder, ptr %out, align 8, !dbg !101
+  store i64 0, ptr %current, align 4, !dbg !101
+  store ptr %out, ptr %current, align 8, !dbg !101
+  call void @llvm.dbg.declare(metadata ptr %current, metadata !102, metadata !DIExpression()), !dbg !101
+  store i64 0, ptr %times, align 4, !dbg !103
+  store i64 0, ptr %times, align 4, !dbg !103
+  call void @llvm.dbg.declare(metadata ptr %times, metadata !104, metadata !DIExpression()), !dbg !103
+  store i64 0, ptr %i, align 4, !dbg !105
+  store i64 0, ptr %i, align 4, !dbg !105
+  call void @llvm.dbg.declare(metadata ptr %i, metadata !106, metadata !DIExpression()), !dbg !107
+  br label %for.cond, !dbg !105
+
+for.cond:                                         ; preds = %for.incr, %entry
+  %2 = load i64, ptr %i, align 4, !dbg !105
+  %3 = load i64, ptr %times, align 4, !dbg !105
+  %4 = mul i64 %3, 256, !dbg !105
+  %5 = add i64 %2, %4, !dbg !105
+  %ptr_load = load ptr, ptr %text2, align 8, !dbg !105
+  %elem_ptr = getelementptr i8, ptr %ptr_load, i64 %5, !dbg !105
+  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !105
+  %6 = icmp ne i8 %indexed_val, 0, !dbg !105
+  br i1 %6, label %for.body, label %for.aftr, !dbg !105
+
+for.body:                                         ; preds = %for.cond
+  %7 = load i64, ptr %i, align 4, !dbg !108
+  %8 = load i64, ptr %times, align 4, !dbg !108
+  %9 = mul i64 %8, 256, !dbg !108
+  %10 = add i64 %7, %9, !dbg !108
+  %ptr_load4 = load ptr, ptr %text2, align 8, !dbg !108
+  %elem_ptr5 = getelementptr i8, ptr %ptr_load4, i64 %10, !dbg !108
+  %indexed_val6 = load i8, ptr %elem_ptr5, align 1, !dbg !108
+  %11 = load i64, ptr %i, align 4, !dbg !108
+  %"derefrence struct" = load ptr, ptr %current, align 8, !dbg !108
+  %"struct member ptr7" = getelementptr inbounds %String_Builder, ptr %"derefrence struct", i32 0, i32 0, !dbg !108
+  %elem_ptr8 = getelementptr [256 x i8], ptr %"struct member ptr7", i64 0, i64 %11, !dbg !108
+  store i8 %indexed_val6, ptr %elem_ptr8, align 1, !dbg !108
+  %"derefrence struct9" = load ptr, ptr %current, align 8, !dbg !109
+  %"struct member ptr10" = getelementptr inbounds %String_Builder, ptr %"derefrence struct9", i32 0, i32 1, !dbg !109
+  %selected11 = load i64, ptr %"struct member ptr10", align 4, !dbg !109
+  %12 = add i64 %selected11, 1, !dbg !109
+  %"derefrence struct12" = load ptr, ptr %current, align 8, !dbg !109
+  %"struct member ptr13" = getelementptr inbounds %String_Builder, ptr %"derefrence struct12", i32 0, i32 1, !dbg !109
+  store i64 %12, ptr %"struct member ptr13", align 4, !dbg !109
+  %13 = load i64, ptr %i, align 4, !dbg !110
+  %14 = icmp eq i64 %13, 256, !dbg !110
+  br i1 %14, label %if.true, label %for.incr, !dbg !111
+
+for.aftr:                                         ; preds = %for.cond
+  %15 = load ptr, ptr %__apoc_internal_context1, align 8, !dbg !112
+  %ret_ptr = getelementptr inbounds %__Internal_Context, ptr %15, i32 0, i32 0, !dbg !112
+  %16 = load ptr, ptr %ret_ptr, align 8, !dbg !112
+  %17 = load %String_Builder, ptr %out, align 8, !dbg !112
+  store %String_Builder %17, ptr %16, align 8, !dbg !112
+  ret void, !dbg !112
+
+for.incr:                                         ; preds = %for.body, %if.true
+  %18 = load i64, ptr %i, align 4, !dbg !111
+  %19 = add i64 %18, 1, !dbg !111
+  store i64 %19, ptr %i, align 4, !dbg !111
+  br label %for.cond, !dbg !111
+
+if.true:                                          ; preds = %for.body
+  store i64 0, ptr %i, align 4, !dbg !113
+  %20 = load i64, ptr %times, align 4, !dbg !114
+  %21 = add i64 %20, 1, !dbg !114
+  store i64 %21, ptr %times, align 4, !dbg !114
+  %22 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context14, i32 0, i32 0, !dbg !115
+  %23 = call ptr @mem_alloc(ptr %__apoc_internal_context14, i64 272), !dbg !115
+  %"derefrence struct15" = load ptr, ptr %current, align 8, !dbg !115
+  %"struct member ptr16" = getelementptr inbounds %String_Builder, ptr %"derefrence struct15", i32 0, i32 2, !dbg !115
+  store ptr %23, ptr %"struct member ptr16", align 8, !dbg !115
+  %"derefrence struct17" = load ptr, ptr %current, align 8, !dbg !116
+  %"struct member ptr18" = getelementptr inbounds %String_Builder, ptr %"derefrence struct17", i32 0, i32 2, !dbg !116
+  %selected19 = load ptr, ptr %"struct member ptr18", align 8, !dbg !116
+  store ptr %selected19, ptr %current, align 8, !dbg !116
+  br label %for.incr, !dbg !117
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind willreturn writeonly
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #6
-
-; Function Attrs: mustprogress nocallback nofree nosync nounwind readnone speculatable willreturn
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #7
-
-; Function Attrs: alwaysinline nofree nounwind
-define void @"overload+"(ptr nocapture readnone %__apoc_internal_context, %string %str, ptr nocapture readonly %text) local_unnamed_addr #8 !dbg !199 {
+define i8 @compare(ptr %__apoc_internal_context, %string %str1, %string %str2) !dbg !118 {
 entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !202, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !203
-  call void @llvm.dbg.value(metadata i64 0, metadata !202, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !203
-  call void @llvm.dbg.value(metadata ptr undef, metadata !202, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !203
-  call void @llvm.dbg.value(metadata i64 undef, metadata !202, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !203
-  call void @llvm.dbg.value(metadata ptr null, metadata !204, metadata !DIExpression()), !dbg !203
-  call void @llvm.dbg.value(metadata ptr %text, metadata !204, metadata !DIExpression()), !dbg !203
-  call void @llvm.dbg.value(metadata ptr null, metadata !205, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !203
-  call void @llvm.dbg.value(metadata i64 0, metadata !205, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !203
-  call void @llvm.dbg.value(metadata ptr undef, metadata !205, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !203
-  call void @llvm.dbg.value(metadata ptr null, metadata !140, metadata !DIExpression()), !dbg !206
-  call void @llvm.dbg.value(metadata ptr %text, metadata !140, metadata !DIExpression()), !dbg !206
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !206
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !206
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !206
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !206
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !206
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !206
-  br label %for.cond.i, !dbg !208
+  %i = alloca i64, align 8
+  %str23 = alloca %string, align 16
+  %str12 = alloca %string, align 16
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %str12, i8 0, i64 16, i1 false)
+  call void @llvm.dbg.declare(metadata ptr %str12, metadata !121, metadata !DIExpression()), !dbg !122
+  store %string %str1, ptr %str12, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %str23, i8 0, i64 16, i1 false)
+  call void @llvm.dbg.declare(metadata ptr %str23, metadata !123, metadata !DIExpression()), !dbg !122
+  store %string %str2, ptr %str23, align 8
+  %"struct member ptr" = getelementptr inbounds %string, ptr %str12, i32 0, i32 1, !dbg !124
+  %selected = load i64, ptr %"struct member ptr", align 4, !dbg !124
+  %"struct member ptr4" = getelementptr inbounds %string, ptr %str23, i32 0, i32 1, !dbg !124
+  %selected5 = load i64, ptr %"struct member ptr4", align 4, !dbg !124
+  %0 = icmp ne i64 %selected, %selected5, !dbg !124
+  br i1 %0, label %if.true, label %if.aftr, !dbg !125
 
-for.cond.i:                                       ; preds = %for.cond.i, %entry
-  %lsr.iv = phi ptr [ %uglygep, %for.cond.i ], [ %text, %entry ], !dbg !206
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !147, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_stack_value)), !dbg !206
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !146, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_stack_value)), !dbg !206
-  %indexed_val.i = load i8, ptr %lsr.iv, align 1, !dbg !208
-  %.not.i = icmp eq i8 %indexed_val.i, 0, !dbg !208
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !146, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_consts, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !206
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !147, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_consts, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !206
-  %uglygep = getelementptr i8, ptr %lsr.iv, i64 1, !dbg !208
-  br i1 %.not.i, label %copy.exit43, label %for.cond.i, !dbg !208
+if.true:                                          ; preds = %entry
+  ret i8 0, !dbg !126
 
-copy.exit43:                                      ; preds = %for.cond.i
-  call void @llvm.dbg.value(metadata i64 0, metadata !209, metadata !DIExpression()), !dbg !203
-  call void @llvm.dbg.value(metadata i64 undef, metadata !209, metadata !DIExpression()), !dbg !203
-  call void @llvm.dbg.value(metadata !DIArgList(i64 undef, i64 undef), metadata !205, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_plus, DW_OP_stack_value, DW_OP_LLVM_fragment, 64, 64)), !dbg !203
-  call void @llvm.dbg.declare(metadata ptr undef, metadata !210, metadata !DIExpression()), !dbg !211
-  call void @llvm.dbg.value(metadata ptr undef, metadata !205, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !203
-  call void @llvm.dbg.declare(metadata ptr undef, metadata !212, metadata !DIExpression()), !dbg !213
-  call void @llvm.dbg.value(metadata ptr null, metadata !151, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata ptr undef, metadata !151, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata ptr null, metadata !157, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata ptr undef, metadata !157, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata i64 0, metadata !158, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata i64 undef, metadata !158, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata ptr null, metadata !159, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata ptr undef, metadata !159, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata ptr null, metadata !160, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata ptr undef, metadata !160, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !214
-  call void @llvm.dbg.declare(metadata ptr poison, metadata !162, metadata !DIExpression()), !dbg !216
-  call void @llvm.dbg.value(metadata ptr poison, metadata !151, metadata !DIExpression()), !dbg !217
-  call void @llvm.dbg.value(metadata ptr %text, metadata !157, metadata !DIExpression()), !dbg !217
-  call void @llvm.dbg.value(metadata i64 undef, metadata !158, metadata !DIExpression()), !dbg !217
-  call void @llvm.dbg.value(metadata ptr poison, metadata !159, metadata !DIExpression()), !dbg !217
-  call void @llvm.dbg.value(metadata ptr %text, metadata !160, metadata !DIExpression()), !dbg !217
-  call void @llvm.dbg.value(metadata i64 0, metadata !161, metadata !DIExpression()), !dbg !217
-  call void @llvm.dbg.declare(metadata ptr poison, metadata !162, metadata !DIExpression()), !dbg !219
-  ret void, !dbg !220
+if.aftr:                                          ; preds = %entry
+  store i64 0, ptr %i, align 4, !dbg !125
+  store i64 0, ptr %i, align 4, !dbg !125
+  call void @llvm.dbg.declare(metadata ptr %i, metadata !127, metadata !DIExpression()), !dbg !128
+  br label %for.cond, !dbg !125
+
+for.cond:                                         ; preds = %for.incr, %if.aftr
+  %1 = load i64, ptr %i, align 4, !dbg !125
+  %"struct member ptr6" = getelementptr inbounds %string, ptr %str12, i32 0, i32 1, !dbg !125
+  %selected7 = load i64, ptr %"struct member ptr6", align 4, !dbg !125
+  %2 = icmp slt i64 %1, %selected7, !dbg !125
+  br i1 %2, label %for.body, label %for.aftr, !dbg !125
+
+for.body:                                         ; preds = %for.cond
+  %3 = load i64, ptr %i, align 4, !dbg !129
+  %"struct member ptr8" = getelementptr inbounds %string, ptr %str12, i32 0, i32 0, !dbg !129
+  %ptr_load = load ptr, ptr %"struct member ptr8", align 8, !dbg !129
+  %elem_ptr = getelementptr i8, ptr %ptr_load, i64 %3, !dbg !129
+  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !129
+  %4 = load i64, ptr %i, align 4, !dbg !129
+  %"struct member ptr9" = getelementptr inbounds %string, ptr %str23, i32 0, i32 0, !dbg !129
+  %ptr_load10 = load ptr, ptr %"struct member ptr9", align 8, !dbg !129
+  %elem_ptr11 = getelementptr i8, ptr %ptr_load10, i64 %4, !dbg !129
+  %indexed_val12 = load i8, ptr %elem_ptr11, align 1, !dbg !129
+  %5 = icmp ne i8 %indexed_val, %indexed_val12, !dbg !129
+  br i1 %5, label %if.true13, label %for.incr, !dbg !129
+
+for.aftr:                                         ; preds = %for.cond
+  ret i8 1, !dbg !130
+
+for.incr:                                         ; preds = %for.body
+  %6 = load i64, ptr %i, align 4, !dbg !129
+  %7 = add i64 %6, 1, !dbg !129
+  store i64 %7, ptr %i, align 4, !dbg !129
+  br label %for.cond, !dbg !129
+
+if.true13:                                        ; preds = %for.body
+  ret i8 0, !dbg !131
 }
 
-; Function Attrs: alwaysinline argmemonly nofree norecurse nosync nounwind readonly
-define void @"overload[x]="(ptr nocapture readnone %__apoc_internal_context, ptr nocapture readonly %str, ptr nocapture readonly %text) local_unnamed_addr #9 !dbg !221 {
+define void @to_string(ptr %__apoc_internal_context, ptr %text) !dbg !132 {
 entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !224, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata ptr %str, metadata !224, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata ptr null, metadata !226, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata ptr %text, metadata !226, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata ptr null, metadata !140, metadata !DIExpression()), !dbg !227
-  call void @llvm.dbg.value(metadata ptr %text, metadata !140, metadata !DIExpression()), !dbg !227
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !227
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !227
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !227
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !227
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !227
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !227
-  br label %for.cond.i, !dbg !229
+  %str = alloca %string, align 16
+  %__apoc_internal_context5 = alloca %__Internal_Context, align 16
+  %allocated = alloca ptr, align 8
+  %__apoc_internal_context4 = alloca %__Internal_Context, align 16
+  %text_len = alloca i64, align 8
+  %__apoc_internal_context3 = alloca %__Internal_Context, align 16
+  %text2 = alloca ptr, align 8
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  store i64 0, ptr %text2, align 4
+  call void @llvm.dbg.declare(metadata ptr %text2, metadata !133, metadata !DIExpression()), !dbg !134
+  store ptr %text, ptr %text2, align 8
+  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0, !dbg !135
+  %1 = load ptr, ptr %text2, align 8, !dbg !135
+  %2 = call i64 @len(ptr %__apoc_internal_context3, ptr %1), !dbg !135
+  store i64 0, ptr %text_len, align 4, !dbg !135
+  store i64 %2, ptr %text_len, align 4, !dbg !135
+  call void @llvm.dbg.declare(metadata ptr %text_len, metadata !136, metadata !DIExpression()), !dbg !135
+  %3 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0, !dbg !137
+  %4 = load i64, ptr %text_len, align 4, !dbg !137
+  %5 = call ptr @mem_alloc(ptr %__apoc_internal_context4, i64 %4), !dbg !137
+  store i64 0, ptr %allocated, align 4, !dbg !137
+  store ptr %5, ptr %allocated, align 8, !dbg !137
+  call void @llvm.dbg.declare(metadata ptr %allocated, metadata !138, metadata !DIExpression()), !dbg !137
+  %6 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context5, i32 0, i32 0, !dbg !139
+  %7 = load ptr, ptr %allocated, align 8, !dbg !139
+  %8 = load ptr, ptr %text2, align 8, !dbg !139
+  %9 = load i64, ptr %text_len, align 4, !dbg !139
+  call void @copy(ptr %__apoc_internal_context5, ptr %7, ptr %8, i64 %9), !dbg !139
+  call void @llvm.memset.p0.i64(ptr align 16 %str, i8 0, i64 16, i1 false), !dbg !140
+  %10 = load ptr, ptr %allocated, align 8, !dbg !140
+  %11 = getelementptr inbounds %string, ptr %str, i32 0, i32 0, !dbg !140
+  store ptr %10, ptr %11, align 8, !dbg !140
+  %12 = load i64, ptr %text_len, align 4, !dbg !140
+  %13 = getelementptr inbounds %string, ptr %str, i32 0, i32 1, !dbg !140
+  store i64 %12, ptr %13, align 4, !dbg !140
+  call void @llvm.dbg.declare(metadata ptr %str, metadata !141, metadata !DIExpression()), !dbg !140
+  %14 = load ptr, ptr %__apoc_internal_context1, align 8, !dbg !142
+  %ret_ptr = getelementptr inbounds %__Internal_Context, ptr %14, i32 0, i32 0, !dbg !142
+  %15 = load ptr, ptr %ret_ptr, align 8, !dbg !142
+  %16 = load %string, ptr %str, align 8, !dbg !142
+  store %string %16, ptr %15, align 8, !dbg !142
+  ret void, !dbg !142
+}
 
-for.cond.i:                                       ; preds = %for.cond.i, %entry
-  %lsr.iv = phi ptr [ %uglygep, %for.cond.i ], [ %text, %entry ], !dbg !227
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !147, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_stack_value)), !dbg !227
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !146, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_stack_value)), !dbg !227
-  %indexed_val.i = load i8, ptr %lsr.iv, align 1, !dbg !229
-  %.not.i = icmp eq i8 %indexed_val.i, 0, !dbg !229
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !146, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_consts, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !227
-  call void @llvm.dbg.value(metadata !DIArgList(ptr %lsr.iv, ptr %text), metadata !147, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_minus, DW_OP_consts, 1, DW_OP_plus, DW_OP_stack_value)), !dbg !227
-  %uglygep = getelementptr i8, ptr %lsr.iv, i64 1, !dbg !229
-  br i1 %.not.i, label %len.exit, label %for.cond.i, !dbg !229
+define void @terminate_string(ptr %__apoc_internal_context, %string %str) !dbg !143 {
+entry:
+  %__apoc_internal_context8 = alloca %__Internal_Context, align 16
+  %__apoc_internal_context4 = alloca %__Internal_Context, align 16
+  %out = alloca %string, align 16
+  %str2 = alloca %string, align 16
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %str2, i8 0, i64 16, i1 false)
+  call void @llvm.dbg.declare(metadata ptr %str2, metadata !146, metadata !DIExpression()), !dbg !147
+  store %string %str, ptr %str2, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %out, i8 0, i64 16, i1 false), !dbg !148
+  call void @llvm.dbg.declare(metadata ptr %out, metadata !149, metadata !DIExpression()), !dbg !148
+  %"struct member ptr" = getelementptr inbounds %string, ptr %str2, i32 0, i32 1, !dbg !150
+  %selected = load i64, ptr %"struct member ptr", align 4, !dbg !150
+  %0 = add i64 %selected, 1, !dbg !150
+  %"struct member ptr3" = getelementptr inbounds %string, ptr %out, i32 0, i32 1, !dbg !150
+  store i64 %0, ptr %"struct member ptr3", align 4, !dbg !150
+  %1 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0, !dbg !151
+  %"struct member ptr5" = getelementptr inbounds %string, ptr %out, i32 0, i32 1, !dbg !151
+  %selected6 = load i64, ptr %"struct member ptr5", align 4, !dbg !151
+  %2 = call ptr @mem_alloc(ptr %__apoc_internal_context4, i64 %selected6), !dbg !151
+  %"struct member ptr7" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !151
+  store ptr %2, ptr %"struct member ptr7", align 8, !dbg !151
+  %3 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context8, i32 0, i32 0, !dbg !152
+  %"struct member ptr9" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !152
+  %selected10 = load ptr, ptr %"struct member ptr9", align 8, !dbg !152
+  %"struct member ptr11" = getelementptr inbounds %string, ptr %str2, i32 0, i32 0, !dbg !152
+  %selected12 = load ptr, ptr %"struct member ptr11", align 8, !dbg !152
+  %"struct member ptr13" = getelementptr inbounds %string, ptr %str2, i32 0, i32 1, !dbg !152
+  %selected14 = load i64, ptr %"struct member ptr13", align 4, !dbg !152
+  call void @copy(ptr %__apoc_internal_context8, ptr %selected10, ptr %selected12, i64 %selected14), !dbg !152
+  %"struct member ptr15" = getelementptr inbounds %string, ptr %out, i32 0, i32 1, !dbg !153
+  %selected16 = load i64, ptr %"struct member ptr15", align 4, !dbg !153
+  %"struct member ptr17" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !153
+  %ptr_load = load ptr, ptr %"struct member ptr17", align 8, !dbg !153
+  %elem_ptr = getelementptr i8, ptr %ptr_load, i64 %selected16, !dbg !153
+  store i8 0, ptr %elem_ptr, align 1, !dbg !153
+  %4 = load ptr, ptr %__apoc_internal_context1, align 8, !dbg !154
+  %ret_ptr = getelementptr inbounds %__Internal_Context, ptr %4, i32 0, i32 0, !dbg !154
+  %5 = load ptr, ptr %ret_ptr, align 8, !dbg !154
+  %6 = load %string, ptr %out, align 8, !dbg !154
+  store %string %6, ptr %5, align 8, !dbg !154
+  ret void, !dbg !154
+}
 
-len.exit:                                         ; preds = %for.cond.i
-  call void @llvm.dbg.value(metadata i64 0, metadata !230, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata i64 undef, metadata !230, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata i64 0, metadata !231, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata !DIArgList(i64 undef, i64 undef), metadata !231, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_div, DW_OP_stack_value)), !dbg !225
-  call void @llvm.dbg.value(metadata ptr null, metadata !232, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata ptr %str, metadata !232, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata i64 0, metadata !233, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata i64 0, metadata !233, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata i32 undef, metadata !234, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata i32 undef, metadata !233, metadata !DIExpression()), !dbg !225
-  call void @llvm.dbg.value(metadata i32 undef, metadata !233, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !225
+define void @print(ptr %__apoc_internal_context, %string %str) !dbg !155 {
+entry:
+  %to_print = alloca %string, align 16
+  %__apoc_internal_context3 = alloca %__Internal_Context, align 16
+  %str2 = alloca %string, align 16
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %str2, i8 0, i64 16, i1 false)
+  call void @llvm.dbg.declare(metadata ptr %str2, metadata !156, metadata !DIExpression()), !dbg !157
+  store %string %str, ptr %str2, align 8
+  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0, !dbg !158
+  call void @llvm.memset.p0.i64(ptr align 16 %to_print, i8 0, i64 16, i1 false), !dbg !158
+  %1 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0, !dbg !158
+  store ptr %to_print, ptr %1, align 8, !dbg !158
+  %2 = load %string, ptr %str2, align 8, !dbg !158
+  call void @terminate_string(ptr %__apoc_internal_context3, %string %2), !dbg !158
+  call void @llvm.dbg.declare(metadata ptr %to_print, metadata !159, metadata !DIExpression()), !dbg !158
+  %"struct member ptr" = getelementptr inbounds %string, ptr %to_print, i32 0, i32 0, !dbg !160
+  %selected = load ptr, ptr %"struct member ptr", align 8, !dbg !160
+  %3 = call i32 (ptr, ...) @printf(ptr %selected), !dbg !160
   ret void
 }
 
-; Function Attrs: alwaysinline nofree norecurse nosync nounwind readonly
-define i8 @overload(ptr nocapture readnone %__apoc_internal_context, %string %str, ptr %text) local_unnamed_addr #10 !dbg !235 {
+define void @copy(ptr %__apoc_internal_context, ptr %dst, ptr %src, i64 %size) !dbg !161 {
 entry:
-  call void @llvm.dbg.value(metadata ptr null, metadata !238, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !239
-  call void @llvm.dbg.value(metadata i64 0, metadata !238, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !239
-  call void @llvm.dbg.value(metadata ptr undef, metadata !238, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !239
-  call void @llvm.dbg.value(metadata i64 undef, metadata !238, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !239
-  call void @llvm.dbg.value(metadata ptr null, metadata !240, metadata !DIExpression()), !dbg !239
-  call void @llvm.dbg.value(metadata ptr %text, metadata !240, metadata !DIExpression()), !dbg !239
-  call void @llvm.dbg.value(metadata ptr null, metadata !241, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !239
-  call void @llvm.dbg.value(metadata i64 0, metadata !241, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !239
-  call void @llvm.dbg.value(metadata ptr %text, metadata !241, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !239
-  call void @llvm.dbg.value(metadata ptr null, metadata !140, metadata !DIExpression()), !dbg !242
-  call void @llvm.dbg.value(metadata ptr %text, metadata !140, metadata !DIExpression()), !dbg !242
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !242
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !242
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !242
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !242
-  call void @llvm.dbg.value(metadata i64 0, metadata !146, metadata !DIExpression()), !dbg !242
-  call void @llvm.dbg.value(metadata i64 0, metadata !147, metadata !DIExpression()), !dbg !242
-  br label %for.cond.i, !dbg !244
+  %i = alloca i64, align 8
+  %a1 = alloca ptr, align 8
+  %a0 = alloca ptr, align 8
+  %size4 = alloca i64, align 8
+  %src3 = alloca ptr, align 8
+  %dst2 = alloca ptr, align 8
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  store i64 0, ptr %dst2, align 4
+  call void @llvm.dbg.declare(metadata ptr %dst2, metadata !164, metadata !DIExpression()), !dbg !165
+  store ptr %dst, ptr %dst2, align 8
+  store i64 0, ptr %src3, align 4
+  call void @llvm.dbg.declare(metadata ptr %src3, metadata !166, metadata !DIExpression()), !dbg !165
+  store ptr %src, ptr %src3, align 8
+  store i64 0, ptr %size4, align 4
+  call void @llvm.dbg.declare(metadata ptr %size4, metadata !167, metadata !DIExpression()), !dbg !165
+  store i64 %size, ptr %size4, align 4
+  %0 = load ptr, ptr %dst2, align 8, !dbg !168
+  store i64 0, ptr %a0, align 4, !dbg !168
+  store ptr %0, ptr %a0, align 8, !dbg !168
+  call void @llvm.dbg.declare(metadata ptr %a0, metadata !169, metadata !DIExpression()), !dbg !168
+  %1 = load ptr, ptr %src3, align 8, !dbg !170
+  store i64 0, ptr %a1, align 4, !dbg !170
+  store ptr %1, ptr %a1, align 8, !dbg !170
+  call void @llvm.dbg.declare(metadata ptr %a1, metadata !171, metadata !DIExpression()), !dbg !170
+  store i64 0, ptr %i, align 4, !dbg !172
+  store i64 0, ptr %i, align 4, !dbg !172
+  call void @llvm.dbg.declare(metadata ptr %i, metadata !173, metadata !DIExpression()), !dbg !174
+  br label %for.cond, !dbg !172
 
-for.cond.i:                                       ; preds = %for.cond.i, %entry
-  %lsr.iv = phi i64 [ %lsr.iv.next, %for.cond.i ], [ -1, %entry ], !dbg !242
-  call void @llvm.dbg.value(metadata i64 %lsr.iv, metadata !147, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !242
-  call void @llvm.dbg.value(metadata i64 %lsr.iv, metadata !146, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !242
-  %uglygep = getelementptr i8, ptr %text, i64 %lsr.iv, !dbg !244
-  %uglygep13 = getelementptr i8, ptr %uglygep, i64 1, !dbg !244
-  %indexed_val.i = load i8, ptr %uglygep13, align 1, !dbg !244
-  %.not.i = icmp eq i8 %indexed_val.i, 0, !dbg !244
-  call void @llvm.dbg.value(metadata i64 %lsr.iv, metadata !146, metadata !DIExpression(DW_OP_plus_uconst, 2, DW_OP_stack_value)), !dbg !242
-  call void @llvm.dbg.value(metadata i64 %lsr.iv, metadata !147, metadata !DIExpression(DW_OP_plus_uconst, 2, DW_OP_stack_value)), !dbg !242
-  %lsr.iv.next = add i64 %lsr.iv, 1, !dbg !244
-  br i1 %.not.i, label %len.exit, label %for.cond.i, !dbg !244
+for.cond:                                         ; preds = %for.incr, %entry
+  %2 = load i64, ptr %i, align 4, !dbg !172
+  %3 = load i64, ptr %size4, align 4, !dbg !172
+  %4 = icmp slt i64 %2, %3, !dbg !172
+  br i1 %4, label %for.body, label %for.aftr, !dbg !172
 
-len.exit:                                         ; preds = %for.cond.i
-  call void @llvm.dbg.value(metadata i64 undef, metadata !241, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !239
-  call void @llvm.dbg.value(metadata ptr null, metadata !129, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !245
-  call void @llvm.dbg.value(metadata i64 0, metadata !129, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !245
-  %str1.fca.0.extract.i = extractvalue %string %str, 0
-  call void @llvm.dbg.value(metadata ptr %str1.fca.0.extract.i, metadata !129, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !245
-  %str1.fca.1.extract.i = extractvalue %string %str, 1
-  call void @llvm.dbg.value(metadata i64 %str1.fca.1.extract.i, metadata !129, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !245
-  call void @llvm.dbg.value(metadata ptr null, metadata !131, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !245
-  call void @llvm.dbg.value(metadata i64 0, metadata !131, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !245
-  call void @llvm.dbg.value(metadata ptr %text, metadata !131, metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg !245
-  call void @llvm.dbg.value(metadata i64 undef, metadata !131, metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64)), !dbg !245
-  %.not.i9 = icmp eq i64 %str1.fca.1.extract.i, %lsr.iv.next, !dbg !247
-  br i1 %.not.i9, label %for.cond.preheader.i, label %compare.exit, !dbg !248
+for.body:                                         ; preds = %for.cond
+  %5 = load i64, ptr %i, align 4, !dbg !175
+  %ptr_load = load ptr, ptr %a1, align 8, !dbg !175
+  %elem_ptr = getelementptr i8, ptr %ptr_load, i64 %5, !dbg !175
+  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !175
+  %6 = load i64, ptr %i, align 4, !dbg !175
+  %ptr_load5 = load ptr, ptr %a0, align 8, !dbg !175
+  %elem_ptr6 = getelementptr i8, ptr %ptr_load5, i64 %6, !dbg !175
+  store i8 %indexed_val, ptr %elem_ptr6, align 1, !dbg !175
+  br label %for.incr, !dbg !176
 
-for.cond.preheader.i:                             ; preds = %len.exit
-  call void @llvm.dbg.value(metadata i64 0, metadata !134, metadata !DIExpression()), !dbg !245
-  %0 = icmp sgt i64 %lsr.iv.next, 0, !dbg !248
-  br i1 %0, label %for.body.i.preheader, label %compare.exit, !dbg !248
+for.aftr:                                         ; preds = %for.cond
+  ret void
 
-for.body.i.preheader:                             ; preds = %for.cond.preheader.i
-  br label %for.body.i, !dbg !249
-
-for.cond.i10:                                     ; preds = %for.body.i
-  %1 = add nuw nsw i64 %i.019.i, 1, !dbg !249
-  call void @llvm.dbg.value(metadata i64 %i.019.i, metadata !134, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !245
-  %2 = icmp slt i64 %1, %lsr.iv.next, !dbg !248
-  br i1 %2, label %for.body.i, label %compare.exit, !dbg !248
-
-for.body.i:                                       ; preds = %for.body.i.preheader, %for.cond.i10
-  %i.019.i = phi i64 [ %1, %for.cond.i10 ], [ 0, %for.body.i.preheader ]
-  call void @llvm.dbg.value(metadata i64 %i.019.i, metadata !134, metadata !DIExpression()), !dbg !245
-  %elem_ptr.i11 = getelementptr i8, ptr %str1.fca.0.extract.i, i64 %i.019.i, !dbg !250
-  %indexed_val.i12 = load i8, ptr %elem_ptr.i11, align 1, !dbg !250
-  %elem_ptr11.i = getelementptr i8, ptr %text, i64 %i.019.i, !dbg !250
-  %indexed_val12.i = load i8, ptr %elem_ptr11.i, align 1, !dbg !250
-  %.not18.i = icmp eq i8 %indexed_val.i12, %indexed_val12.i, !dbg !250
-  call void @llvm.dbg.value(metadata i64 %i.019.i, metadata !134, metadata !DIExpression(DW_OP_plus_uconst, 1, DW_OP_stack_value)), !dbg !245
-  br i1 %.not18.i, label %for.cond.i10, label %compare.exit, !dbg !249
-
-compare.exit:                                     ; preds = %for.cond.i10, %for.body.i, %len.exit, %for.cond.preheader.i
-  %common.ret.op.i = phi i8 [ 0, %len.exit ], [ 1, %for.cond.preheader.i ], [ 0, %for.body.i ], [ 1, %for.cond.i10 ]
-  ret i8 %common.ret.op.i, !dbg !251
+for.incr:                                         ; preds = %for.body
+  %7 = load i64, ptr %i, align 4, !dbg !176
+  %8 = add i64 %7, 1, !dbg !176
+  store i64 %8, ptr %i, align 4, !dbg !176
+  br label %for.cond, !dbg !176
 }
 
+define i64 @len(ptr %__apoc_internal_context, ptr %text) !dbg !177 {
+entry:
+  %result = alloca i64, align 8
+  %text2 = alloca ptr, align 8
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  store i64 0, ptr %text2, align 4
+  call void @llvm.dbg.declare(metadata ptr %text2, metadata !180, metadata !DIExpression()), !dbg !181
+  store ptr %text, ptr %text2, align 8
+  store i64 0, ptr %result, align 4, !dbg !182
+  store i64 0, ptr %result, align 4, !dbg !182
+  call void @llvm.dbg.declare(metadata ptr %result, metadata !183, metadata !DIExpression()), !dbg !182
+  store i64 0, ptr %result, align 4, !dbg !184
+  br label %for.cond, !dbg !184
+
+for.cond:                                         ; preds = %for.incr, %entry
+  %0 = load i64, ptr %result, align 4, !dbg !184
+  %ptr_load = load ptr, ptr %text2, align 8, !dbg !184
+  %elem_ptr = getelementptr i8, ptr %ptr_load, i64 %0, !dbg !184
+  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !184
+  %1 = icmp ne i8 %indexed_val, 0, !dbg !184
+  br i1 %1, label %for.body, label %for.aftr, !dbg !184
+
+for.body:                                         ; preds = %for.cond
+  br label %for.incr, !dbg !185
+
+for.aftr:                                         ; preds = %for.cond
+  %2 = load i64, ptr %result, align 4, !dbg !186
+  ret i64 %2, !dbg !186
+
+for.incr:                                         ; preds = %for.body
+  %3 = load i64, ptr %result, align 4, !dbg !185
+  %4 = add i64 %3, 1, !dbg !185
+  store i64 %4, ptr %result, align 4, !dbg !185
+  br label %for.cond, !dbg !185
+}
+
+declare ptr @malloc(i64)
+
+declare ptr @memset(ptr, i32, i64)
+
+declare i32 @scanf(ptr, ...)
+
+declare i32 @printf(ptr, ...)
+
+declare i32 @atoi(ptr)
+
+declare void @srand(i32)
+
+declare i32 @rand()
+
+declare i32 @puts(ptr)
+
+; Function Attrs: alwaysinline
+define i8 @"overload[]"(%string %str, i64 %index) #0 !dbg !187 {
+entry:
+  %index2 = alloca i64, align 8
+  %str1 = alloca %string, align 16
+  call void @llvm.memset.p0.i64(ptr align 16 %str1, i8 0, i64 16, i1 false)
+  call void @llvm.dbg.declare(metadata ptr %str1, metadata !190, metadata !DIExpression()), !dbg !191
+  store %string %str, ptr %str1, align 8
+  store i64 0, ptr %index2, align 4
+  call void @llvm.dbg.declare(metadata ptr %index2, metadata !192, metadata !DIExpression()), !dbg !191
+  store i64 %index, ptr %index2, align 4
+  %0 = load i64, ptr %index2, align 4, !dbg !193
+  %"struct member ptr" = getelementptr inbounds %string, ptr %str1, i32 0, i32 0, !dbg !193
+  %ptr_load = load ptr, ptr %"struct member ptr", align 8, !dbg !193
+  %elem_ptr = getelementptr i8, ptr %ptr_load, i64 %0, !dbg !193
+  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !193
+  ret i8 %indexed_val, !dbg !193
+}
+
+; Function Attrs: argmemonly nofree nounwind willreturn writeonly
+declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+
 ; Function Attrs: nocallback nofree nosync nounwind readnone speculatable willreturn
-declare void @llvm.dbg.value(metadata, metadata, metadata) #11
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #2
 
-; Function Attrs: inaccessiblememonly nofree nounwind willreturn allockind("alloc,zeroed") allocsize(0,1)
-declare noalias noundef ptr @calloc(i64 noundef, i64 noundef) local_unnamed_addr #12
+; Function Attrs: alwaysinline
+define %string @"overload+"(%string %str, ptr %text) #0 !dbg !194 {
+entry:
+  %__apoc_internal_context15 = alloca %__Internal_Context, align 16
+  %__apoc_internal_context8 = alloca %__Internal_Context, align 16
+  %__apoc_internal_context4 = alloca %__Internal_Context, align 16
+  %text_len = alloca i64, align 8
+  %__apoc_internal_context = alloca %__Internal_Context, align 16
+  %out = alloca %string, align 16
+  %text2 = alloca ptr, align 8
+  %str1 = alloca %string, align 16
+  call void @llvm.memset.p0.i64(ptr align 16 %str1, i8 0, i64 16, i1 false)
+  call void @llvm.dbg.declare(metadata ptr %str1, metadata !197, metadata !DIExpression()), !dbg !198
+  store %string %str, ptr %str1, align 8
+  store i64 0, ptr %text2, align 4
+  call void @llvm.dbg.declare(metadata ptr %text2, metadata !199, metadata !DIExpression()), !dbg !198
+  store ptr %text, ptr %text2, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %out, i8 0, i64 16, i1 false), !dbg !200
+  call void @llvm.dbg.declare(metadata ptr %out, metadata !201, metadata !DIExpression()), !dbg !200
+  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context, i32 0, i32 0, !dbg !202
+  %1 = load ptr, ptr %text2, align 8, !dbg !202
+  %2 = call i64 @len(ptr %__apoc_internal_context, ptr %1), !dbg !202
+  store i64 0, ptr %text_len, align 4, !dbg !202
+  store i64 %2, ptr %text_len, align 4, !dbg !202
+  call void @llvm.dbg.declare(metadata ptr %text_len, metadata !203, metadata !DIExpression()), !dbg !202
+  %"struct member ptr" = getelementptr inbounds %string, ptr %str1, i32 0, i32 1, !dbg !204
+  %selected = load i64, ptr %"struct member ptr", align 4, !dbg !204
+  %3 = load i64, ptr %text_len, align 4, !dbg !204
+  %4 = add i64 %selected, %3, !dbg !204
+  %"struct member ptr3" = getelementptr inbounds %string, ptr %out, i32 0, i32 1, !dbg !204
+  store i64 %4, ptr %"struct member ptr3", align 4, !dbg !204
+  %5 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0, !dbg !205
+  %"struct member ptr5" = getelementptr inbounds %string, ptr %out, i32 0, i32 1, !dbg !205
+  %selected6 = load i64, ptr %"struct member ptr5", align 4, !dbg !205
+  %6 = call ptr @mem_alloc(ptr %__apoc_internal_context4, i64 %selected6), !dbg !205
+  %"struct member ptr7" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !205
+  store ptr %6, ptr %"struct member ptr7", align 8, !dbg !205
+  %7 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context8, i32 0, i32 0, !dbg !206
+  %"struct member ptr9" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !206
+  %selected10 = load ptr, ptr %"struct member ptr9", align 8, !dbg !206
+  %"struct member ptr11" = getelementptr inbounds %string, ptr %str1, i32 0, i32 0, !dbg !206
+  %selected12 = load ptr, ptr %"struct member ptr11", align 8, !dbg !206
+  %"struct member ptr13" = getelementptr inbounds %string, ptr %str1, i32 0, i32 1, !dbg !206
+  %selected14 = load i64, ptr %"struct member ptr13", align 4, !dbg !206
+  call void @copy(ptr %__apoc_internal_context8, ptr %selected10, ptr %selected12, i64 %selected14), !dbg !206
+  %8 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context15, i32 0, i32 0, !dbg !207
+  %"struct member ptr16" = getelementptr inbounds %string, ptr %str1, i32 0, i32 1, !dbg !207
+  %selected17 = load i64, ptr %"struct member ptr16", align 4, !dbg !207
+  %"struct member ptr18" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !207
+  %ptr_load = load ptr, ptr %"struct member ptr18", align 8, !dbg !207
+  %elem_ptr = getelementptr i8, ptr %ptr_load, i64 %selected17, !dbg !207
+  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !207
+  %"struct member ptr19" = getelementptr inbounds %string, ptr %str1, i32 0, i32 1, !dbg !207
+  %selected20 = load i64, ptr %"struct member ptr19", align 4, !dbg !207
+  %"struct member ptr21" = getelementptr inbounds %string, ptr %out, i32 0, i32 0, !dbg !207
+  %ptr_load22 = load ptr, ptr %"struct member ptr21", align 8, !dbg !207
+  %elem_ptr23 = getelementptr i8, ptr %ptr_load22, i64 %selected20, !dbg !207
+  %9 = load ptr, ptr %text2, align 8, !dbg !207
+  %10 = load i64, ptr %text_len, align 4, !dbg !207
+  call void @copy(ptr %__apoc_internal_context15, ptr %elem_ptr23, ptr %9, i64 %10), !dbg !207
+  %11 = load %string, ptr %out, align 8, !dbg !208
+  ret %string %11, !dbg !208
+}
 
-; Function Attrs: argmemonly nocallback nofree nosync nounwind willreturn
-declare void @llvm.lifetime.start.p0(i64 immarg, ptr nocapture) #13
+; Function Attrs: alwaysinline
+define void @"overload[x]="(ptr %str, ptr %text) #0 !dbg !209 {
+entry:
+  %__apoc_internal_context3 = alloca %__Internal_Context, align 16
+  %copy_size = alloca i64, align 8
+  %i = alloca i64, align 8
+  %current = alloca ptr, align 8
+  %times = alloca i64, align 8
+  %text_len = alloca i64, align 8
+  %__apoc_internal_context = alloca %__Internal_Context, align 16
+  %text2 = alloca ptr, align 8
+  %str1 = alloca ptr, align 8
+  store i64 0, ptr %str1, align 4
+  call void @llvm.dbg.declare(metadata ptr %str1, metadata !212, metadata !DIExpression()), !dbg !213
+  store ptr %str, ptr %str1, align 8
+  store i64 0, ptr %text2, align 4
+  call void @llvm.dbg.declare(metadata ptr %text2, metadata !214, metadata !DIExpression()), !dbg !213
+  store ptr %text, ptr %text2, align 8
+  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context, i32 0, i32 0, !dbg !215
+  %1 = load ptr, ptr %text2, align 8, !dbg !215
+  %2 = call i64 @len(ptr %__apoc_internal_context, ptr %1), !dbg !215
+  store i64 0, ptr %text_len, align 4, !dbg !215
+  store i64 %2, ptr %text_len, align 4, !dbg !215
+  call void @llvm.dbg.declare(metadata ptr %text_len, metadata !216, metadata !DIExpression()), !dbg !215
+  %3 = load i64, ptr %text_len, align 4, !dbg !217
+  %"derefrence struct" = load ptr, ptr %str1, align 8, !dbg !217
+  %"struct member ptr" = getelementptr inbounds %String_Builder, ptr %"derefrence struct", i32 0, i32 1, !dbg !217
+  %selected = load i64, ptr %"struct member ptr", align 4, !dbg !217
+  %4 = sdiv i64 %3, %selected, !dbg !217
+  store i64 0, ptr %times, align 4, !dbg !217
+  store i64 %4, ptr %times, align 4, !dbg !217
+  call void @llvm.dbg.declare(metadata ptr %times, metadata !218, metadata !DIExpression()), !dbg !217
+  %5 = load ptr, ptr %str1, align 8, !dbg !219
+  store i64 0, ptr %current, align 4, !dbg !219
+  store ptr %5, ptr %current, align 8, !dbg !219
+  call void @llvm.dbg.declare(metadata ptr %current, metadata !220, metadata !DIExpression()), !dbg !219
+  store i64 0, ptr %i, align 4, !dbg !221
+  store i64 0, ptr %i, align 4, !dbg !221
+  call void @llvm.dbg.declare(metadata ptr %i, metadata !222, metadata !DIExpression()), !dbg !223
+  br label %for.cond, !dbg !221
 
-; Function Attrs: argmemonly nocallback nofree nosync nounwind willreturn
-declare void @llvm.lifetime.end.p0(i64 immarg, ptr nocapture) #13
+for.cond:                                         ; preds = %for.incr, %entry
+  %6 = load i64, ptr %i, align 4, !dbg !221
+  %7 = sub i64 %6, 1, !dbg !221
+  %8 = load i64, ptr %times, align 4, !dbg !221
+  %9 = icmp slt i64 %7, %8, !dbg !221
+  br i1 %9, label %for.body, label %for.aftr, !dbg !221
 
-attributes #0 = { nofree nounwind }
-attributes #1 = { mustprogress nofree nounwind willreturn }
-attributes #2 = { nofree norecurse nosync nounwind readonly }
-attributes #3 = { argmemonly nofree norecurse nosync nounwind }
-attributes #4 = { argmemonly nofree norecurse nosync nounwind readonly }
-attributes #5 = { alwaysinline mustprogress nofree norecurse nosync nounwind readonly willreturn }
-attributes #6 = { argmemonly mustprogress nofree nounwind willreturn writeonly }
-attributes #7 = { mustprogress nocallback nofree nosync nounwind readnone speculatable willreturn }
-attributes #8 = { alwaysinline nofree nounwind }
-attributes #9 = { alwaysinline argmemonly nofree norecurse nosync nounwind readonly }
-attributes #10 = { alwaysinline nofree norecurse nosync nounwind readonly }
-attributes #11 = { nocallback nofree nosync nounwind readnone speculatable willreturn }
-attributes #12 = { inaccessiblememonly nofree nounwind willreturn allockind("alloc,zeroed") allocsize(0,1) "alloc-family"="malloc" }
-attributes #13 = { argmemonly nocallback nofree nosync nounwind willreturn }
-attributes #14 = { nounwind }
+for.body:                                         ; preds = %for.cond
+  %10 = load i64, ptr %text_len, align 4, !dbg !224
+  store i64 0, ptr %copy_size, align 4, !dbg !224
+  store i64 %10, ptr %copy_size, align 4, !dbg !224
+  call void @llvm.dbg.declare(metadata ptr %copy_size, metadata !225, metadata !DIExpression()), !dbg !224
+  %11 = load i64, ptr %copy_size, align 4, !dbg !226
+  %12 = icmp sgt i64 %11, 256, !dbg !226
+  br i1 %12, label %if.true, label %for.incr, !dbg !227
+
+for.aftr:                                         ; preds = %for.cond
+  ret void
+
+for.incr:                                         ; preds = %for.body, %if.true
+  %13 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0, !dbg !228
+  %"derefrence struct4" = load ptr, ptr %current, align 8, !dbg !228
+  %"struct member ptr5" = getelementptr inbounds %String_Builder, ptr %"derefrence struct4", i32 0, i32 1, !dbg !228
+  %selected6 = load i64, ptr %"struct member ptr5", align 4, !dbg !228
+  %14 = sub i64 %selected6, 1, !dbg !228
+  %"derefrence struct7" = load ptr, ptr %current, align 8, !dbg !228
+  %"struct member ptr8" = getelementptr inbounds %String_Builder, ptr %"derefrence struct7", i32 0, i32 0, !dbg !228
+  %elem_ptr = getelementptr [256 x i8], ptr %"struct member ptr8", i64 0, i64 %14, !dbg !228
+  %indexed_val = load i8, ptr %elem_ptr, align 1, !dbg !228
+  %"derefrence struct9" = load ptr, ptr %current, align 8, !dbg !228
+  %"struct member ptr10" = getelementptr inbounds %String_Builder, ptr %"derefrence struct9", i32 0, i32 1, !dbg !228
+  %selected11 = load i64, ptr %"struct member ptr10", align 4, !dbg !228
+  %15 = sub i64 %selected11, 1, !dbg !228
+  %"derefrence struct12" = load ptr, ptr %current, align 8, !dbg !228
+  %"struct member ptr13" = getelementptr inbounds %String_Builder, ptr %"derefrence struct12", i32 0, i32 0, !dbg !228
+  %elem_ptr14 = getelementptr [256 x i8], ptr %"struct member ptr13", i64 0, i64 %15, !dbg !228
+  %16 = load i64, ptr %i, align 4, !dbg !228
+  %17 = mul i64 %16, 256, !dbg !228
+  %ptr_load = load ptr, ptr %text2, align 8, !dbg !228
+  %elem_ptr15 = getelementptr i8, ptr %ptr_load, i64 %17, !dbg !228
+  %indexed_val16 = load i8, ptr %elem_ptr15, align 1, !dbg !228
+  %18 = load i64, ptr %i, align 4, !dbg !228
+  %19 = mul i64 %18, 256, !dbg !228
+  %ptr_load17 = load ptr, ptr %text2, align 8, !dbg !228
+  %elem_ptr18 = getelementptr i8, ptr %ptr_load17, i64 %19, !dbg !228
+  %20 = load i64, ptr %copy_size, align 4, !dbg !228
+  call void @copy(ptr %__apoc_internal_context3, ptr %elem_ptr14, ptr %elem_ptr18, i64 %20), !dbg !228
+  %"derefrence struct19" = load ptr, ptr %current, align 8, !dbg !229
+  %"struct member ptr20" = getelementptr inbounds %String_Builder, ptr %"derefrence struct19", i32 0, i32 1, !dbg !229
+  %selected21 = load i64, ptr %"struct member ptr20", align 4, !dbg !229
+  %21 = load i64, ptr %copy_size, align 4, !dbg !229
+  %22 = add i64 %selected21, %21, !dbg !229
+  %"derefrence struct22" = load ptr, ptr %current, align 8, !dbg !229
+  %"struct member ptr23" = getelementptr inbounds %String_Builder, ptr %"derefrence struct22", i32 0, i32 1, !dbg !229
+  store i64 %22, ptr %"struct member ptr23", align 4, !dbg !229
+  %23 = load i64, ptr %text_len, align 4, !dbg !230
+  %24 = sub i64 %23, 256, !dbg !230
+  store i64 %24, ptr %text_len, align 4, !dbg !230
+  %"derefrence struct24" = load ptr, ptr %current, align 8, !dbg !231
+  %"struct member ptr25" = getelementptr inbounds %String_Builder, ptr %"derefrence struct24", i32 0, i32 2, !dbg !231
+  %selected26 = load ptr, ptr %"struct member ptr25", align 8, !dbg !231
+  store ptr %selected26, ptr %current, align 8, !dbg !231
+  %25 = load i64, ptr %i, align 4, !dbg !227
+  %26 = add i64 %25, 1, !dbg !227
+  store i64 %26, ptr %i, align 4, !dbg !227
+  br label %for.cond, !dbg !227
+
+if.true:                                          ; preds = %for.body
+  store i64 256, ptr %copy_size, align 4, !dbg !232
+  br label %for.incr, !dbg !232
+}
+
+; Function Attrs: alwaysinline
+define i8 @overload(%string %str, ptr %text) #0 !dbg !233 {
+entry:
+  %__apoc_internal_context3 = alloca %__Internal_Context, align 16
+  %__apoc_internal_context = alloca %__Internal_Context, align 16
+  %str2 = alloca %string, align 16
+  %text2 = alloca ptr, align 8
+  %str1 = alloca %string, align 16
+  call void @llvm.memset.p0.i64(ptr align 16 %str1, i8 0, i64 16, i1 false)
+  call void @llvm.dbg.declare(metadata ptr %str1, metadata !236, metadata !DIExpression()), !dbg !237
+  store %string %str, ptr %str1, align 8
+  store i64 0, ptr %text2, align 4
+  call void @llvm.dbg.declare(metadata ptr %text2, metadata !238, metadata !DIExpression()), !dbg !237
+  store ptr %text, ptr %text2, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %str2, i8 0, i64 16, i1 false), !dbg !239
+  %0 = load ptr, ptr %text2, align 8, !dbg !239
+  %1 = getelementptr inbounds %string, ptr %str2, i32 0, i32 0, !dbg !239
+  store ptr %0, ptr %1, align 8, !dbg !239
+  %2 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context, i32 0, i32 0, !dbg !239
+  %3 = load ptr, ptr %text2, align 8, !dbg !239
+  %4 = call i64 @len(ptr %__apoc_internal_context, ptr %3), !dbg !239
+  %5 = getelementptr inbounds %string, ptr %str2, i32 0, i32 1, !dbg !239
+  store i64 %4, ptr %5, align 4, !dbg !239
+  call void @llvm.dbg.declare(metadata ptr %str2, metadata !240, metadata !DIExpression()), !dbg !239
+  %6 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0, !dbg !241
+  %7 = load %string, ptr %str1, align 8, !dbg !241
+  %8 = load %string, ptr %str2, align 8, !dbg !241
+  %9 = call i8 @compare(ptr %__apoc_internal_context3, %string %7, %string %8), !dbg !241
+  ret i8 %9, !dbg !241
+}
+
+attributes #0 = { alwaysinline }
+attributes #1 = { argmemonly nofree nounwind willreturn writeonly }
+attributes #2 = { nocallback nofree nosync nounwind readnone speculatable willreturn }
 
 !llvm.dbg.cu = !{!0, !2, !4, !6}
 !llvm.module.flags = !{!21, !22}
 
-!0 = distinct !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "Apoc Compiler", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
+!0 = distinct !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "Apoc Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !1 = !DIFile(filename: "Test.apoc", directory: "W:\\Apocalypse")
-!2 = distinct !DICompileUnit(language: DW_LANG_C99, file: !3, producer: "Apoc Compiler", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = distinct !DICompileUnit(language: DW_LANG_C99, file: !3, producer: "Apoc Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !3 = !DIFile(filename: "Basic.apoc", directory: "W:\\Apocalypse\\Standard")
-!4 = distinct !DICompileUnit(language: DW_LANG_C99, file: !5, producer: "Apoc Compiler", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
+!4 = distinct !DICompileUnit(language: DW_LANG_C99, file: !5, producer: "Apoc Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !5 = !DIFile(filename: "String.apoc", directory: "W:\\Apocalypse\\Standard")
-!6 = distinct !DICompileUnit(language: DW_LANG_C99, file: !7, producer: "Apoc Compiler", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug, globals: !8)
+!6 = distinct !DICompileUnit(language: DW_LANG_C99, file: !7, producer: "Apoc Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, globals: !8)
 !7 = !DIFile(filename: "C_Standard.apoc", directory: "W:\\Apocalypse\\Standard")
 !8 = !{!9, !12, !14, !18}
 !9 = !DIGlobalVariableExpression(var: !10, expr: !DIExpression())
@@ -1298,232 +888,222 @@ attributes #14 = { nounwind }
 !20 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_signed)
 !21 = !{i32 2, !"Debug Info Version", i32 3}
 !22 = !{i32 2, !"CodeView", i32 1}
-!23 = distinct !DISubprogram(name: "_apoc_init", scope: !1, file: !1, line: 4, type: !24, scopeLine: 5, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!23 = distinct !DISubprogram(name: "main", scope: !1, file: !1, line: 4, type: !24, scopeLine: 5, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
 !24 = !DISubroutineType(types: !25)
 !25 = !{!26}
 !26 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_signed)
 !27 = !{}
-!28 = !DILocation(line: 0, scope: !29, inlinedAt: !34)
-!29 = distinct !DISubprogram(name: "init_builder", scope: !5, file: !5, line: 40, type: !30, scopeLine: 41, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!30 = !DISubroutineType(types: !31)
-!31 = !{!17, !32}
-!32 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !33, size: 64)
-!33 = !DIBasicType(name: "u8", size: 8, encoding: DW_ATE_unsigned)
-!34 = distinct !DILocation(line: 7, column: 2, scope: !23)
-!35 = !DILocalVariable(name: "text", scope: !29, file: !5, line: 40, type: !32)
-!36 = !DILocation(line: 42, column: 2, scope: !29, inlinedAt: !34)
-!37 = !DILocalVariable(name: "out", scope: !29, file: !5, line: 42, type: !38, align: 128)
-!38 = !DICompositeType(tag: DW_TAG_structure_type, name: "String_Builder", scope: !5, file: !5, line: 10, size: 2176, align: 2048, elements: !39)
-!39 = !{!40, !44, !45}
-!40 = !DIDerivedType(tag: DW_TAG_member, name: "buffer", scope: !5, file: !5, line: 12, baseType: !41, size: 2048, align: 128)
-!41 = !DICompositeType(tag: DW_TAG_array_type, baseType: !33, size: 2048, align: 8, elements: !42)
-!42 = !{!43}
-!43 = !DISubrange(count: 256, lowerBound: 0)
-!44 = !DIDerivedType(tag: DW_TAG_member, name: "len", scope: !5, file: !5, line: 13, baseType: !20, size: 64, align: 64, offset: 2048)
-!45 = !DIDerivedType(tag: DW_TAG_member, name: "next", scope: !5, file: !5, line: 14, baseType: !46, size: 64, align: 64, offset: 2112)
-!46 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !38, size: 64)
-!47 = !DILocalVariable(name: "current", scope: !29, file: !5, line: 52, type: !46, align: 64)
-!48 = !DILocalVariable(name: "current", scope: !29, file: !5, line: 43, type: !46, align: 64)
-!49 = !DILocalVariable(name: "times", scope: !29, file: !5, line: 50, type: !20, align: 64)
-!50 = !DILocalVariable(name: "times", scope: !29, file: !5, line: 44, type: !20, align: 64)
-!51 = !DILocalVariable(name: "i", scope: !29, file: !5, line: 49, type: !20, align: 64)
-!52 = !DILocalVariable(name: "i", scope: !29, file: !5, line: 45, type: !20, align: 64)
-!53 = !DILocation(line: 46, column: 3, scope: !29, inlinedAt: !34)
-!54 = !DILocalVariable(scope: !29, file: !5, line: 46, type: !33, align: 8)
-!55 = !DILocation(line: 47, column: 3, scope: !29, inlinedAt: !34)
-!56 = !DILocalVariable(scope: !29, file: !5, line: 47, type: !20, align: 64)
-!57 = !DILocation(line: 48, column: 3, scope: !29, inlinedAt: !34)
-!58 = !DILocation(line: 53, column: 3, scope: !29, inlinedAt: !34)
-!59 = !DILocation(line: 45, column: 2, scope: !29, inlinedAt: !34)
-!60 = !DILocation(line: 50, column: 4, scope: !29, inlinedAt: !34)
-!61 = !DILocalVariable(name: "size", scope: !62, file: !3, line: 66, type: !65)
-!62 = distinct !DISubprogram(name: "mem_alloc", scope: !3, file: !3, line: 66, type: !63, scopeLine: 67, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!63 = !DISubroutineType(types: !64)
-!64 = !{!16, !65}
-!65 = !DIBasicType(name: "u64", size: 32, encoding: DW_ATE_unsigned)
-!66 = !DILocation(line: 0, scope: !62, inlinedAt: !67)
-!67 = distinct !DILocation(line: 51, column: 4, scope: !29, inlinedAt: !34)
-!68 = !DILocation(line: 68, column: 2, scope: !62, inlinedAt: !67)
-!69 = !DILocalVariable(name: "result", scope: !62, file: !3, line: 68, type: !16, align: 64)
-!70 = !DILocation(line: 51, column: 4, scope: !29, inlinedAt: !34)
-!71 = !DILocalVariable(scope: !29, file: !5, line: 51, type: !46, align: 64)
-!72 = !DILocation(line: 55, column: 5, scope: !29, inlinedAt: !34)
-!73 = !DILocalVariable(name: "builder", scope: !23, file: !1, line: 7, type: !38, align: 128)
-!74 = !DILocation(line: 0, scope: !23)
-!75 = !DILocalVariable(name: "my_str", scope: !23, file: !1, line: 9, type: !76, align: 128)
-!76 = !DICompositeType(tag: DW_TAG_structure_type, name: "string", scope: !5, file: !5, line: 4, size: 128, align: 64, elements: !77)
-!77 = !{!78, !79}
-!78 = !DIDerivedType(tag: DW_TAG_member, name: "text", scope: !5, file: !5, line: 6, baseType: !32, size: 64, align: 64)
-!79 = !DIDerivedType(tag: DW_TAG_member, name: "len", scope: !5, file: !5, line: 7, baseType: !20, size: 64, align: 64, offset: 64)
-!80 = !DILocation(line: 0, scope: !81, inlinedAt: !84)
-!81 = distinct !DISubprogram(name: "print", scope: !5, file: !5, line: 123, type: !82, scopeLine: 124, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!82 = !DISubroutineType(types: !83)
-!83 = !{!17, !76}
-!84 = distinct !DILocation(line: 10, column: 7, scope: !23)
-!85 = !DILocalVariable(name: "str", scope: !81, file: !5, line: 123, type: !76)
-!86 = !DILocation(line: 125, column: 2, scope: !81, inlinedAt: !84)
-!87 = !DILocalVariable(name: "to_print", scope: !81, file: !5, line: 125, type: !76, align: 128)
-!88 = !DILocation(line: 126, column: 8, scope: !81, inlinedAt: !84)
-!89 = !DILocation(line: 11, column: 5, scope: !23)
-!90 = !DILocation(line: 0, scope: !62)
-!91 = !DILocation(line: 68, column: 2, scope: !62)
-!92 = !DILocation(line: 70, column: 5, scope: !62)
-!93 = distinct !DISubprogram(name: "builder_to_string", scope: !5, file: !5, line: 17, type: !94, scopeLine: 18, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!28 = !DILocation(line: 6, column: 2, scope: !23)
+!29 = !DILocalVariable(name: "result", scope: !23, file: !1, line: 6, type: !30, align: 128)
+!30 = !DICompositeType(tag: DW_TAG_structure_type, name: "String_Builder", scope: !5, file: !5, line: 10, size: 2176, align: 2048, elements: !31)
+!31 = !{!32, !37, !38}
+!32 = !DIDerivedType(tag: DW_TAG_member, name: "buffer", scope: !5, file: !5, line: 12, baseType: !33, size: 2048, align: 128)
+!33 = !DICompositeType(tag: DW_TAG_array_type, baseType: !34, size: 2048, align: 8, elements: !35)
+!34 = !DIBasicType(name: "u8", size: 8, encoding: DW_ATE_unsigned)
+!35 = !{!36}
+!36 = !DISubrange(count: 256, lowerBound: 0)
+!37 = !DIDerivedType(tag: DW_TAG_member, name: "len", scope: !5, file: !5, line: 13, baseType: !20, size: 64, align: 64, offset: 2048)
+!38 = !DIDerivedType(tag: DW_TAG_member, name: "next", scope: !5, file: !5, line: 14, baseType: !39, size: 64, align: 64, offset: 2112)
+!39 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !30, size: 64)
+!40 = !DILocation(line: 7, column: 2, scope: !23)
+!41 = !DILocation(line: 8, column: 2, scope: !23)
+!42 = !DILocalVariable(name: "str", scope: !23, file: !1, line: 8, type: !43, align: 128)
+!43 = !DICompositeType(tag: DW_TAG_structure_type, name: "string", scope: !5, file: !5, line: 4, size: 128, align: 64, elements: !44)
+!44 = !{!45, !47}
+!45 = !DIDerivedType(tag: DW_TAG_member, name: "text", scope: !5, file: !5, line: 6, baseType: !46, size: 64, align: 64)
+!46 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !34, size: 64)
+!47 = !DIDerivedType(tag: DW_TAG_member, name: "len", scope: !5, file: !5, line: 7, baseType: !20, size: 64, align: 64, offset: 64)
+!48 = !DILocation(line: 9, column: 7, scope: !23)
+!49 = !DILocation(line: 10, column: 5, scope: !23)
+!50 = distinct !DISubprogram(name: "mem_alloc", scope: !3, file: !3, line: 66, type: !51, scopeLine: 67, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!51 = !DISubroutineType(types: !52)
+!52 = !{!16, !53}
+!53 = !DIBasicType(name: "u64", size: 32, encoding: DW_ATE_unsigned)
+!54 = !DILocalVariable(name: "size", arg: 1, scope: !50, file: !3, line: 66, type: !53)
+!55 = !DILocation(line: 66, scope: !50)
+!56 = !DILocation(line: 68, column: 2, scope: !50)
+!57 = !DILocalVariable(name: "result", scope: !50, file: !3, line: 68, type: !16, align: 64)
+!58 = !DILocation(line: 69, column: 8, scope: !50)
+!59 = !DILocation(line: 70, column: 5, scope: !50)
+!60 = distinct !DISubprogram(name: "builder_to_string", scope: !5, file: !5, line: 17, type: !61, scopeLine: 18, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!61 = !DISubroutineType(types: !62)
+!62 = !{!17, !39}
+!63 = !DILocalVariable(name: "builder", arg: 1, scope: !60, file: !5, line: 17, type: !39)
+!64 = !DILocation(line: 17, scope: !60)
+!65 = !DILocation(line: 19, column: 2, scope: !60)
+!66 = !DILocalVariable(name: "out", scope: !60, file: !5, line: 19, type: !43, align: 128)
+!67 = !DILocation(line: 20, column: 2, scope: !60)
+!68 = !DILocalVariable(name: "out_len", scope: !60, file: !5, line: 20, type: !20, align: 64)
+!69 = !DILocation(line: 21, column: 2, scope: !60)
+!70 = !DILocalVariable(name: "current", scope: !60, file: !5, line: 21, type: !39, align: 64)
+!71 = !DILocation(line: 22, column: 2, scope: !60)
+!72 = !DILocalVariable(name: "i", scope: !60, file: !5, line: 22, type: !20, align: 64)
+!73 = !DILocation(line: 22, column: 6, scope: !60)
+!74 = !DILocation(line: 23, column: 3, scope: !60)
+!75 = !DILocation(line: 24, column: 3, scope: !60)
+!76 = !DILocation(line: 25, column: 2, scope: !60)
+!77 = !DILocation(line: 26, column: 2, scope: !60)
+!78 = !DILocation(line: 27, column: 2, scope: !60)
+!79 = !DILocation(line: 28, column: 2, scope: !60)
+!80 = !DILocation(line: 30, column: 2, scope: !60)
+!81 = !DILocalVariable(name: "times", scope: !60, file: !5, line: 30, type: !20, align: 64)
+!82 = !DILocation(line: 31, column: 2, scope: !60)
+!83 = !DILocalVariable(name: "i", scope: !60, file: !5, line: 31, type: !20, align: 64)
+!84 = !DILocation(line: 31, column: 6, scope: !60)
+!85 = !DILocation(line: 32, column: 7, scope: !60)
+!86 = !DILocation(line: 33, column: 3, scope: !60)
+!87 = !DILocation(line: 34, column: 3, scope: !60)
+!88 = !DILocation(line: 35, column: 2, scope: !60)
+!89 = !DILocation(line: 36, column: 6, scope: !60)
+!90 = !DILocation(line: 37, column: 8, scope: !60)
+!91 = !DILocation(line: 38, column: 2, scope: !60)
+!92 = !DILocation(line: 39, column: 5, scope: !60)
+!93 = distinct !DISubprogram(name: "init_builder", scope: !5, file: !5, line: 42, type: !94, scopeLine: 43, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
 !94 = !DISubroutineType(types: !95)
-!95 = !{!17, !38}
-!96 = !DILocalVariable(name: "builder", scope: !93, file: !5, line: 17, type: !38)
-!97 = !DILocation(line: 0, scope: !93)
-!98 = !DILocalVariable(name: "out", scope: !93, file: !5, line: 19, type: !76, align: 128)
-!99 = !DILocalVariable(name: "out_len", scope: !93, file: !5, line: 36, type: !20, align: 64)
-!100 = !DILocalVariable(name: "out_len", scope: !93, file: !5, line: 26, type: !20, align: 64)
-!101 = !DILocalVariable(name: "out_len", scope: !93, file: !5, line: 23, type: !20, align: 64)
-!102 = !DILocalVariable(name: "out_len", scope: !93, file: !5, line: 20, type: !20, align: 64)
-!103 = !DILocalVariable(name: "current", scope: !93, file: !5, line: 33, type: !46, align: 64)
-!104 = !DILocalVariable(name: "current", scope: !93, file: !5, line: 24, type: !46, align: 64)
-!105 = !DILocalVariable(name: "current", scope: !93, file: !5, line: 21, type: !46, align: 64)
-!106 = !DILocalVariable(name: "i", scope: !93, file: !5, line: 22, type: !20, align: 64)
-!107 = !DILocation(line: 22, column: 2, scope: !93)
-!108 = !DILocation(line: 24, column: 3, scope: !93)
-!109 = !DILocalVariable(name: "times", scope: !93, file: !5, line: 30, type: !20, align: 64)
-!110 = !DILocalVariable(name: "times", scope: !93, file: !5, line: 34, type: !20, align: 64)
-!111 = !DILocalVariable(name: "i", scope: !93, file: !5, line: 31, type: !20, align: 64)
-!112 = !DILocation(line: 37, column: 5, scope: !93)
-!113 = !DILocation(line: 0, scope: !29)
-!114 = !DILocation(line: 42, column: 2, scope: !29)
-!115 = !DILocation(line: 45, column: 2, scope: !29)
-!116 = !DILocation(line: 53, column: 3, scope: !29)
-!117 = !DILocation(line: 46, column: 3, scope: !29)
-!118 = !DILocation(line: 47, column: 3, scope: !29)
-!119 = !DILocation(line: 48, column: 3, scope: !29)
-!120 = !DILocation(line: 55, column: 5, scope: !29)
-!121 = !DILocation(line: 50, column: 4, scope: !29)
-!122 = !DILocation(line: 0, scope: !62, inlinedAt: !123)
-!123 = distinct !DILocation(line: 51, column: 4, scope: !29)
-!124 = !DILocation(line: 68, column: 2, scope: !62, inlinedAt: !123)
-!125 = !DILocation(line: 51, column: 4, scope: !29)
-!126 = distinct !DISubprogram(name: "compare", scope: !5, file: !5, line: 94, type: !127, scopeLine: 95, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!127 = !DISubroutineType(types: !128)
-!128 = !{!11, !76, !76}
-!129 = !DILocalVariable(name: "str1", scope: !126, file: !5, line: 94, type: !76)
-!130 = !DILocation(line: 0, scope: !126)
-!131 = !DILocalVariable(name: "str2", arg: 1, scope: !126, file: !5, line: 94, type: !76)
-!132 = !DILocation(line: 96, column: 2, scope: !126)
-!133 = !DILocation(line: 99, column: 2, scope: !126)
-!134 = !DILocalVariable(name: "i", scope: !126, file: !5, line: 99, type: !20, align: 64)
-!135 = !DILocation(line: 100, column: 38, scope: !126)
-!136 = !DILocation(line: 100, column: 3, scope: !126)
-!137 = distinct !DISubprogram(name: "to_string", scope: !5, file: !5, line: 104, type: !30, scopeLine: 105, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!138 = !DILocalVariable(name: "text", scope: !137, file: !5, line: 104, type: !32)
-!139 = !DILocation(line: 0, scope: !137)
-!140 = !DILocalVariable(name: "text", scope: !141, file: !5, line: 137, type: !32)
-!141 = distinct !DISubprogram(name: "len", scope: !5, file: !5, line: 137, type: !142, scopeLine: 138, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!142 = !DISubroutineType(types: !143)
-!143 = !{!20, !32}
-!144 = !DILocation(line: 0, scope: !141, inlinedAt: !145)
-!145 = distinct !DILocation(line: 106, column: 2, scope: !137)
-!146 = !DILocalVariable(name: "result", scope: !141, file: !5, line: 140, type: !20, align: 64)
-!147 = !DILocalVariable(name: "result", scope: !141, file: !5, line: 139, type: !20, align: 64)
-!148 = !DILocation(line: 140, column: 2, scope: !141, inlinedAt: !145)
-!149 = !DILocalVariable(name: "text_len", scope: !137, file: !5, line: 106, type: !20, align: 64)
-!150 = !DILocalVariable(name: "allocated", scope: !137, file: !5, line: 107, type: !16, align: 64)
-!151 = !DILocalVariable(name: "dst", scope: !152, file: !5, line: 129, type: !16)
-!152 = distinct !DISubprogram(name: "copy", scope: !5, file: !5, line: 129, type: !153, scopeLine: 130, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!153 = !DISubroutineType(types: !154)
-!154 = !{!17, !16, !16, !65}
-!155 = !DILocation(line: 0, scope: !152, inlinedAt: !156)
-!156 = distinct !DILocation(line: 108, column: 6, scope: !137)
-!157 = !DILocalVariable(name: "src", arg: 1, scope: !152, file: !5, line: 129, type: !16)
-!158 = !DILocalVariable(name: "size", arg: 2, scope: !152, file: !5, line: 129, type: !65)
-!159 = !DILocalVariable(name: "a0", scope: !152, file: !5, line: 131, type: !32, align: 64)
-!160 = !DILocalVariable(name: "a1", scope: !152, file: !5, line: 132, type: !32, align: 64)
-!161 = !DILocalVariable(name: "i", scope: !152, file: !5, line: 133, type: !20, align: 64)
-!162 = !DILocalVariable(scope: !152, file: !5, line: 134, type: !33, align: 8)
-!163 = !DILocation(line: 134, column: 3, scope: !152, inlinedAt: !156)
-!164 = !DILocalVariable(name: "str", scope: !137, file: !5, line: 109, type: !76, align: 128)
-!165 = !DILocation(line: 110, column: 5, scope: !137)
-!166 = distinct !DISubprogram(name: "terminate_string", scope: !5, file: !5, line: 113, type: !82, scopeLine: 114, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!167 = !DILocalVariable(name: "str", scope: !166, file: !5, line: 113, type: !76)
-!168 = !DILocation(line: 0, scope: !166)
-!169 = !DILocalVariable(name: "out", scope: !166, file: !5, line: 115, type: !76, align: 128)
-!170 = !DILocalVariable(scope: !166, file: !5, line: 116, type: !20, align: 64)
-!171 = !DILocation(line: 116, column: 2, scope: !166)
-!172 = !DILocalVariable(scope: !166, file: !5, line: 117, type: !32, align: 64)
-!173 = !DILocation(line: 117, column: 2, scope: !166)
-!174 = !DILocation(line: 0, scope: !152, inlinedAt: !175)
-!175 = distinct !DILocation(line: 118, column: 6, scope: !166)
-!176 = !DILocation(line: 134, column: 3, scope: !152, inlinedAt: !175)
-!177 = !DILocalVariable(scope: !166, file: !5, line: 119, type: !33, align: 8)
-!178 = !DILocation(line: 119, column: 2, scope: !166)
-!179 = !DILocation(line: 120, column: 5, scope: !166)
-!180 = !DILocation(line: 0, scope: !81)
-!181 = !DILocation(line: 125, column: 2, scope: !81)
-!182 = !DILocation(line: 126, column: 8, scope: !81)
-!183 = !DILocation(line: 0, scope: !152)
-!184 = !DILocation(line: 133, column: 2, scope: !152)
-!185 = !DILocation(line: 134, column: 3, scope: !152)
-!186 = distinct !{!186, !187}
-!187 = !{!"llvm.loop.isvectorized", i32 1}
-!188 = distinct !{!188, !187}
-!189 = !DILocation(line: 0, scope: !141)
-!190 = !DILocation(line: 140, column: 2, scope: !141)
-!191 = !DILocation(line: 141, column: 5, scope: !141)
-!192 = distinct !DISubprogram(name: "overload[]", scope: !5, file: !5, line: 58, type: !193, scopeLine: 59, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!193 = !DISubroutineType(types: !194)
-!194 = !{!33, !76, !65}
-!195 = !DILocalVariable(name: "str", scope: !192, file: !5, line: 58, type: !76)
-!196 = !DILocation(line: 0, scope: !192)
-!197 = !DILocalVariable(name: "index", arg: 1, scope: !192, file: !5, line: 58, type: !65)
-!198 = !DILocation(line: 60, column: 5, scope: !192)
-!199 = distinct !DISubprogram(name: "overload+", scope: !5, file: !5, line: 63, type: !200, scopeLine: 64, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!200 = !DISubroutineType(types: !201)
-!201 = !{!17, !76, !32}
-!202 = !DILocalVariable(name: "str", scope: !199, file: !5, line: 63, type: !76)
-!203 = !DILocation(line: 0, scope: !199)
-!204 = !DILocalVariable(name: "text", arg: 1, scope: !199, file: !5, line: 63, type: !32)
-!205 = !DILocalVariable(name: "out", scope: !199, file: !5, line: 65, type: !76, align: 128)
-!206 = !DILocation(line: 0, scope: !141, inlinedAt: !207)
-!207 = distinct !DILocation(line: 66, column: 2, scope: !199)
-!208 = !DILocation(line: 140, column: 2, scope: !141, inlinedAt: !207)
-!209 = !DILocalVariable(name: "text_len", scope: !199, file: !5, line: 66, type: !20, align: 64)
-!210 = !DILocalVariable(scope: !199, file: !5, line: 67, type: !20, align: 64)
-!211 = !DILocation(line: 67, column: 2, scope: !199)
-!212 = !DILocalVariable(scope: !199, file: !5, line: 68, type: !32, align: 64)
-!213 = !DILocation(line: 68, column: 2, scope: !199)
-!214 = !DILocation(line: 0, scope: !152, inlinedAt: !215)
-!215 = distinct !DILocation(line: 69, column: 6, scope: !199)
-!216 = !DILocation(line: 134, column: 3, scope: !152, inlinedAt: !215)
-!217 = !DILocation(line: 0, scope: !152, inlinedAt: !218)
-!218 = distinct !DILocation(line: 70, column: 6, scope: !199)
-!219 = !DILocation(line: 134, column: 3, scope: !152, inlinedAt: !218)
-!220 = !DILocation(line: 71, column: 5, scope: !199)
-!221 = distinct !DISubprogram(name: "overload[x]=", scope: !5, file: !5, line: 74, type: !222, scopeLine: 75, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!222 = !DISubroutineType(types: !223)
-!223 = !{!17, !46, !32}
-!224 = !DILocalVariable(name: "str", scope: !221, file: !5, line: 74, type: !46)
-!225 = !DILocation(line: 0, scope: !221)
-!226 = !DILocalVariable(name: "text", arg: 1, scope: !221, file: !5, line: 74, type: !32)
-!227 = !DILocation(line: 0, scope: !141, inlinedAt: !228)
-!228 = distinct !DILocation(line: 76, column: 2, scope: !221)
-!229 = !DILocation(line: 140, column: 2, scope: !141, inlinedAt: !228)
-!230 = !DILocalVariable(name: "text_len", scope: !221, file: !5, line: 76, type: !20, align: 64)
-!231 = !DILocalVariable(name: "times", scope: !221, file: !5, line: 77, type: !20, align: 64)
-!232 = !DILocalVariable(name: "current", scope: !221, file: !5, line: 78, type: !46, align: 64)
-!233 = !DILocalVariable(name: "i", scope: !221, file: !5, line: 79, type: !20, align: 64)
-!234 = !DILocalVariable(name: "copy_size", scope: !221, file: !5, line: 80, type: !20, align: 64)
-!235 = distinct !DISubprogram(name: "overload", scope: !5, file: !5, line: 88, type: !236, scopeLine: 89, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
-!236 = !DISubroutineType(types: !237)
-!237 = !{!11, !76, !32}
-!238 = !DILocalVariable(name: "str", scope: !235, file: !5, line: 88, type: !76)
-!239 = !DILocation(line: 0, scope: !235)
-!240 = !DILocalVariable(name: "text", arg: 1, scope: !235, file: !5, line: 88, type: !32)
-!241 = !DILocalVariable(name: "str2", scope: !235, file: !5, line: 90, type: !76, align: 128)
-!242 = !DILocation(line: 0, scope: !141, inlinedAt: !243)
-!243 = distinct !DILocation(line: 90, column: 2, scope: !235)
-!244 = !DILocation(line: 140, column: 2, scope: !141, inlinedAt: !243)
-!245 = !DILocation(line: 0, scope: !126, inlinedAt: !246)
-!246 = distinct !DILocation(line: 91, column: 5, scope: !235)
-!247 = !DILocation(line: 96, column: 2, scope: !126, inlinedAt: !246)
-!248 = !DILocation(line: 99, column: 2, scope: !126, inlinedAt: !246)
-!249 = !DILocation(line: 100, column: 38, scope: !126, inlinedAt: !246)
-!250 = !DILocation(line: 100, column: 3, scope: !126, inlinedAt: !246)
-!251 = !DILocation(line: 91, column: 5, scope: !235)
+!95 = !{!17, !46}
+!96 = !DILocalVariable(name: "text", arg: 1, scope: !93, file: !5, line: 42, type: !46)
+!97 = !DILocation(line: 42, scope: !93)
+!98 = !DILocation(line: 44, column: 2, scope: !93)
+!99 = !DILocalVariable(name: "out", scope: !93, file: !5, line: 44, type: !30, align: 128)
+!100 = !DILocation(line: 45, column: 2, scope: !93)
+!101 = !DILocation(line: 46, column: 2, scope: !93)
+!102 = !DILocalVariable(name: "current", scope: !93, file: !5, line: 46, type: !39, align: 64)
+!103 = !DILocation(line: 47, column: 2, scope: !93)
+!104 = !DILocalVariable(name: "times", scope: !93, file: !5, line: 47, type: !20, align: 64)
+!105 = !DILocation(line: 48, column: 2, scope: !93)
+!106 = !DILocalVariable(name: "i", scope: !93, file: !5, line: 48, type: !20, align: 64)
+!107 = !DILocation(line: 48, column: 6, scope: !93)
+!108 = !DILocation(line: 49, column: 3, scope: !93)
+!109 = !DILocation(line: 50, column: 3, scope: !93)
+!110 = !DILocation(line: 51, column: 3, scope: !93)
+!111 = !DILocation(line: 57, column: 2, scope: !93)
+!112 = !DILocation(line: 58, column: 5, scope: !93)
+!113 = !DILocation(line: 52, column: 4, scope: !93)
+!114 = !DILocation(line: 53, column: 4, scope: !93)
+!115 = !DILocation(line: 54, column: 4, scope: !93)
+!116 = !DILocation(line: 55, column: 4, scope: !93)
+!117 = !DILocation(line: 56, column: 3, scope: !93)
+!118 = distinct !DISubprogram(name: "compare", scope: !5, file: !5, line: 99, type: !119, scopeLine: 100, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!119 = !DISubroutineType(types: !120)
+!120 = !{!11, !43, !43}
+!121 = !DILocalVariable(name: "str1", arg: 1, scope: !118, file: !5, line: 99, type: !43)
+!122 = !DILocation(line: 99, scope: !118)
+!123 = !DILocalVariable(name: "str2", arg: 2, scope: !118, file: !5, line: 99, type: !43)
+!124 = !DILocation(line: 101, column: 2, scope: !118)
+!125 = !DILocation(line: 104, column: 2, scope: !118)
+!126 = !DILocation(line: 102, column: 6, scope: !118)
+!127 = !DILocalVariable(name: "i", scope: !118, file: !5, line: 104, type: !20, align: 64)
+!128 = !DILocation(line: 104, column: 6, scope: !118)
+!129 = !DILocation(line: 105, column: 3, scope: !118)
+!130 = !DILocation(line: 106, column: 5, scope: !118)
+!131 = !DILocation(line: 105, column: 38, scope: !118)
+!132 = distinct !DISubprogram(name: "to_string", scope: !5, file: !5, line: 109, type: !94, scopeLine: 110, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!133 = !DILocalVariable(name: "text", arg: 1, scope: !132, file: !5, line: 109, type: !46)
+!134 = !DILocation(line: 109, scope: !132)
+!135 = !DILocation(line: 111, column: 2, scope: !132)
+!136 = !DILocalVariable(name: "text_len", scope: !132, file: !5, line: 111, type: !20, align: 64)
+!137 = !DILocation(line: 112, column: 2, scope: !132)
+!138 = !DILocalVariable(name: "allocated", scope: !132, file: !5, line: 112, type: !16, align: 64)
+!139 = !DILocation(line: 113, column: 6, scope: !132)
+!140 = !DILocation(line: 114, column: 2, scope: !132)
+!141 = !DILocalVariable(name: "str", scope: !132, file: !5, line: 114, type: !43, align: 128)
+!142 = !DILocation(line: 115, column: 5, scope: !132)
+!143 = distinct !DISubprogram(name: "terminate_string", scope: !5, file: !5, line: 118, type: !144, scopeLine: 119, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!144 = !DISubroutineType(types: !145)
+!145 = !{!17, !43}
+!146 = !DILocalVariable(name: "str", arg: 1, scope: !143, file: !5, line: 118, type: !43)
+!147 = !DILocation(line: 118, scope: !143)
+!148 = !DILocation(line: 120, column: 2, scope: !143)
+!149 = !DILocalVariable(name: "out", scope: !143, file: !5, line: 120, type: !43, align: 128)
+!150 = !DILocation(line: 121, column: 2, scope: !143)
+!151 = !DILocation(line: 122, column: 2, scope: !143)
+!152 = !DILocation(line: 123, column: 6, scope: !143)
+!153 = !DILocation(line: 124, column: 2, scope: !143)
+!154 = !DILocation(line: 125, column: 5, scope: !143)
+!155 = distinct !DISubprogram(name: "print", scope: !5, file: !5, line: 128, type: !144, scopeLine: 129, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!156 = !DILocalVariable(name: "str", arg: 1, scope: !155, file: !5, line: 128, type: !43)
+!157 = !DILocation(line: 128, scope: !155)
+!158 = !DILocation(line: 130, column: 2, scope: !155)
+!159 = !DILocalVariable(name: "to_print", scope: !155, file: !5, line: 130, type: !43, align: 128)
+!160 = !DILocation(line: 131, column: 8, scope: !155)
+!161 = distinct !DISubprogram(name: "copy", scope: !5, file: !5, line: 134, type: !162, scopeLine: 135, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!162 = !DISubroutineType(types: !163)
+!163 = !{!17, !16, !16, !53}
+!164 = !DILocalVariable(name: "dst", arg: 1, scope: !161, file: !5, line: 134, type: !16)
+!165 = !DILocation(line: 134, scope: !161)
+!166 = !DILocalVariable(name: "src", arg: 2, scope: !161, file: !5, line: 134, type: !16)
+!167 = !DILocalVariable(name: "size", arg: 3, scope: !161, file: !5, line: 134, type: !53)
+!168 = !DILocation(line: 136, column: 2, scope: !161)
+!169 = !DILocalVariable(name: "a0", scope: !161, file: !5, line: 136, type: !46, align: 64)
+!170 = !DILocation(line: 137, column: 2, scope: !161)
+!171 = !DILocalVariable(name: "a1", scope: !161, file: !5, line: 137, type: !46, align: 64)
+!172 = !DILocation(line: 138, column: 2, scope: !161)
+!173 = !DILocalVariable(name: "i", scope: !161, file: !5, line: 138, type: !20, align: 64)
+!174 = !DILocation(line: 138, column: 6, scope: !161)
+!175 = !DILocation(line: 140, column: 3, scope: !161)
+!176 = !DILocation(line: 141, column: 2, scope: !161)
+!177 = distinct !DISubprogram(name: "len", scope: !5, file: !5, line: 144, type: !178, scopeLine: 145, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!178 = !DISubroutineType(types: !179)
+!179 = !{!20, !46}
+!180 = !DILocalVariable(name: "text", arg: 1, scope: !177, file: !5, line: 144, type: !46)
+!181 = !DILocation(line: 144, scope: !177)
+!182 = !DILocation(line: 146, column: 2, scope: !177)
+!183 = !DILocalVariable(name: "result", scope: !177, file: !5, line: 146, type: !20, align: 64)
+!184 = !DILocation(line: 147, column: 2, scope: !177)
+!185 = !DILocation(line: 147, column: 47, scope: !177)
+!186 = !DILocation(line: 148, column: 5, scope: !177)
+!187 = distinct !DISubprogram(name: "overload[]", scope: !5, file: !5, line: 61, type: !188, scopeLine: 62, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!188 = !DISubroutineType(types: !189)
+!189 = !{!34, !43, !53}
+!190 = !DILocalVariable(name: "str", scope: !187, file: !5, line: 61, type: !43)
+!191 = !DILocation(line: 61, scope: !187)
+!192 = !DILocalVariable(name: "index", arg: 1, scope: !187, file: !5, line: 61, type: !53)
+!193 = !DILocation(line: 63, column: 5, scope: !187)
+!194 = distinct !DISubprogram(name: "overload+", scope: !5, file: !5, line: 66, type: !195, scopeLine: 67, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!195 = !DISubroutineType(types: !196)
+!196 = !{!43, !43, !46}
+!197 = !DILocalVariable(name: "str", scope: !194, file: !5, line: 66, type: !43)
+!198 = !DILocation(line: 66, scope: !194)
+!199 = !DILocalVariable(name: "text", arg: 1, scope: !194, file: !5, line: 66, type: !46)
+!200 = !DILocation(line: 68, column: 2, scope: !194)
+!201 = !DILocalVariable(name: "out", scope: !194, file: !5, line: 68, type: !43, align: 128)
+!202 = !DILocation(line: 69, column: 2, scope: !194)
+!203 = !DILocalVariable(name: "text_len", scope: !194, file: !5, line: 69, type: !20, align: 64)
+!204 = !DILocation(line: 70, column: 2, scope: !194)
+!205 = !DILocation(line: 71, column: 2, scope: !194)
+!206 = !DILocation(line: 72, column: 6, scope: !194)
+!207 = !DILocation(line: 73, column: 6, scope: !194)
+!208 = !DILocation(line: 74, column: 5, scope: !194)
+!209 = distinct !DISubprogram(name: "overload[x]=", scope: !5, file: !5, line: 77, type: !210, scopeLine: 78, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!210 = !DISubroutineType(types: !211)
+!211 = !{!17, !39, !46}
+!212 = !DILocalVariable(name: "str", scope: !209, file: !5, line: 77, type: !39)
+!213 = !DILocation(line: 77, scope: !209)
+!214 = !DILocalVariable(name: "text", arg: 1, scope: !209, file: !5, line: 77, type: !46)
+!215 = !DILocation(line: 79, column: 2, scope: !209)
+!216 = !DILocalVariable(name: "text_len", scope: !209, file: !5, line: 79, type: !20, align: 64)
+!217 = !DILocation(line: 80, column: 2, scope: !209)
+!218 = !DILocalVariable(name: "times", scope: !209, file: !5, line: 80, type: !20, align: 64)
+!219 = !DILocation(line: 81, column: 2, scope: !209)
+!220 = !DILocalVariable(name: "current", scope: !209, file: !5, line: 81, type: !39, align: 64)
+!221 = !DILocation(line: 82, column: 2, scope: !209)
+!222 = !DILocalVariable(name: "i", scope: !209, file: !5, line: 82, type: !20, align: 64)
+!223 = !DILocation(line: 82, column: 6, scope: !209)
+!224 = !DILocation(line: 83, column: 3, scope: !209)
+!225 = !DILocalVariable(name: "copy_size", scope: !209, file: !5, line: 83, type: !20, align: 64)
+!226 = !DILocation(line: 84, column: 3, scope: !209)
+!227 = !DILocation(line: 89, column: 2, scope: !209)
+!228 = !DILocation(line: 85, column: 7, scope: !209)
+!229 = !DILocation(line: 86, column: 3, scope: !209)
+!230 = !DILocation(line: 87, column: 3, scope: !209)
+!231 = !DILocation(line: 88, column: 3, scope: !209)
+!232 = !DILocation(line: 84, column: 37, scope: !209)
+!233 = distinct !DISubprogram(name: "overload", scope: !5, file: !5, line: 93, type: !234, scopeLine: 94, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !6, retainedNodes: !27)
+!234 = !DISubroutineType(types: !235)
+!235 = !{!11, !43, !46}
+!236 = !DILocalVariable(name: "str", scope: !233, file: !5, line: 93, type: !43)
+!237 = !DILocation(line: 93, scope: !233)
+!238 = !DILocalVariable(name: "text", arg: 1, scope: !233, file: !5, line: 93, type: !46)
+!239 = !DILocation(line: 95, column: 2, scope: !233)
+!240 = !DILocalVariable(name: "str2", scope: !233, file: !5, line: 95, type: !43, align: 128)
+!241 = !DILocation(line: 96, column: 5, scope: !233)

@@ -1,23 +1,22 @@
-#include <stdarg.h>
-#include <stdio.h>
 typedef unsigned char u8;
 
 typedef struct 
 {
-	u8 text[1024];
-	long long len;
-} My_Builder;
+	void *c;
+} My_Struct;
 
-My_Builder get_struct(const char *text)
+void test(My_Struct *a)
 {
-	My_Builder out = {};
-	for(size_t i = 0; text[i] != 0; ++i)
-		out.text[i] = text[i];
-	return out;
+	*(int *)a->c = 10;
 }
 
 int main()
 {
-	My_Builder str = get_struct("A lot  of fucking text");
-	printf("%s", str.text);
+	//My_Struct b = test();
+	int a = 10;
+	My_Struct d = {};
+	d.c = &a;
+	My_Struct *b = &d;
+	test(b);
+	return *(int *)b->c;
 }

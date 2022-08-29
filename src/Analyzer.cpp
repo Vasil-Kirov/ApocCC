@@ -897,12 +897,13 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 
 	if(node->assignment.assign_type != '=')
 	{
-		Type_Info left = fix_type(f, get_symbol_spot(f, node->assignment.token)->type);
+		Type_Info left = fix_type(f, get_expression_type(f, node->assignment.lhs, node->assignment.token, NULL));
 		Type_Info right = fix_type(f, get_expression_type(f, node->assignment.rhs, node->assignment.token, NULL));
 		i32 index = 0;
 		auto overload = get_overload(f, &left, &right, node, &index);
 		if(overload)
 		{
+			overload->overload.index = index;
 			Token_Iden at_tok = node->assignment.token;
 			at_tok.type = (Token)'@';
 			auto left_expr = alloc_node();
