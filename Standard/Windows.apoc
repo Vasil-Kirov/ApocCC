@@ -1,0 +1,69 @@
+
+$is_defined Windows
+
+func CreateFileA(
+  lpFileName:* u8,
+  dwDesiredAccess: u32,
+  dwShareMode: u32,
+  lpSecurityAttributes:* SECURITY_ATTRIBUTES,
+  dwCreationDisposition: u32,
+  dwFlagsAndAttributes: u32,
+  hTemplateFile:* void,
+) ->* void;
+
+func open_file(f_name:* u8) ->* void
+{
+	//CreateFileA(f_name, 
+	-> null;
+}
+
+struct SECURITY_ATTRIBUTES {
+  len: u32;
+  lpSecurityDescriptor:* void;
+  bInheritHandle: bool;
+}
+
+
+DELETE                        :: (0x00010000);
+READ_CONTROL                  :: (0x00020000);
+WRITE_DAC                     :: (0x00040000);
+WRITE_OWNER                   :: (0x00080000);
+SYNCHRONIZE                   :: (0x00100000);
+
+enum Generic_Rights
+{
+	READ    = 0x80000000;
+	WRITE   = 0x40000000;
+	EXECUTE = 0x20000000;
+	ALL     = 0x10000000;
+}
+
+enum File_Permission
+{
+	READ_DATA        = 0x0001;
+	WRITE_DATA       = 0x0002;
+	APPEND_DATA      = 0x0004;
+	READ_EA          = 0x0008;
+	WRITE_EA         = 0x0010;
+	EXECUTE          = 0x0020;
+	READ_ATTRIBUTES  = 0x0080;
+	WRITE_ATTRIBUTES = 0x0100;
+	GENERIC_READ     = READ_CONTROL     |
+					   READ_DATA        |
+					   READ_ATTRIBUTES  |
+					   READ_EA          |
+					   SYNCHRONIZE;
+	GENERIC_WRITE    = READ_CONTROL     |
+					   WRITE_DATA       |
+					   WRITE_ATTRIBUTES |
+					   WRITE_EA         |
+					   APPEND_DATA      |
+					   SYNCHRONIZE;
+	GENERIC_EXECUTE  = READ_CONTROL     |
+					   READ_ATTRIBUTES  |
+					   EXECUTE          |
+					   SYNCHRONIZE;
+}
+
+$end_is
+

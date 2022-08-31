@@ -423,6 +423,7 @@ generate_statement(File_Contents *f, Ast_Node *node)
 		} break;
 		case type_assignment:
 		{
+			// @NOTE: recomputing the expression is probably faster than looking it up
 			b32 failed = false;
 			auto interp_val = interpret_expression(node->assignment.rhs, &failed);
 			if(failed)

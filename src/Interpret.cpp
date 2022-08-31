@@ -664,16 +664,15 @@ interpret_binary(Ast_Node *node, b32 *failed)
 {
 	if(node->type == type_binary_expr)
 	{
-		Interp_Val result = {};
-		if(*failed)
-			return result;
-
 		Interp_Val left = interpret_binary(node->left, failed);
 		Interp_Val right = interpret_binary(node->right, failed);
 		// @NOTE: not sure if we need those
 		// auto left_type = node->binary_expr.left;
 		// auto right_type = node->binary_expr.right;
 
+		Interp_Val result = {};
+		if(*failed)
+			return result;
 
 		switch ((int)node->binary_expr.op)
 		{

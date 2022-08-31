@@ -6,6 +6,52 @@
 	.globl	@feat.00
 .set @feat.00, 0
 	.file	"Test.apoc"
+	.def	main;
+	.scl	2;
+	.type	32;
+	.endef
+	.globl	main
+	.p2align	4, 0x90
+main:
+.seh_proc main
+	subq	$376, %rsp
+	.seh_stackalloc 376
+	.seh_endprologue
+	movq	%rcx, 32(%rsp)
+	leaq	64(%rsp), %rcx
+	xorl	%edx, %edx
+	movl	$272, %r8d
+	callq	memset
+	leaq	64(%rsp), %rax
+	movq	%rax, 48(%rsp)
+	leaq	48(%rsp), %rcx
+	leaq	.L__unnamed_1(%rip), %rdx
+	callq	init_builder
+	leaq	.L__unnamed_2(%rip), %rcx
+	callq	puts
+	leaq	64(%rsp), %rcx
+	leaq	.L__unnamed_3(%rip), %rdx
+	callq	"overload[x]="
+	leaq	352(%rsp), %rcx
+	xorl	%edx, %edx
+	movl	$16, %r8d
+	callq	memset
+	leaq	352(%rsp), %rax
+	movq	%rax, 336(%rsp)
+	leaq	336(%rsp), %rcx
+	leaq	64(%rsp), %rdx
+	callq	builder_to_string
+	leaq	.L__unnamed_4(%rip), %rcx
+	callq	puts
+	leaq	.L__unnamed_5(%rip), %rcx
+	callq	puts
+	leaq	.L__unnamed_6(%rip), %rcx
+	callq	puts
+	xorl	%eax, %eax
+	addq	$376, %rsp
+	retq
+	.seh_endproc
+
 	.def	mem_alloc;
 	.scl	2;
 	.type	32;
@@ -58,10 +104,10 @@ builder_to_string:
 	movq	%rax, 80(%rsp)
 	movq	$0, 88(%rsp)
 	movq	$0, 88(%rsp)
-.LBB1_1:
+.LBB2_1:
 	movq	80(%rsp), %rax
 	cmpq	$0, 264(%rax)
-	je	.LBB1_3
+	je	.LBB2_3
 	movq	72(%rsp), %rax
 	movq	80(%rsp), %rcx
 	addq	256(%rcx), %rax
@@ -69,8 +115,8 @@ builder_to_string:
 	movq	80(%rsp), %rax
 	movq	264(%rax), %rax
 	movq	%rax, 80(%rsp)
-	jmp	.LBB1_4
-.LBB1_3:
+	jmp	.LBB2_4
+.LBB2_3:
 	movq	72(%rsp), %rax
 	movq	80(%rsp), %rcx
 	addq	256(%rcx), %rax
@@ -85,16 +131,16 @@ builder_to_string:
 	movq	$0, 112(%rsp)
 	movq	$0, 120(%rsp)
 	movq	$0, 120(%rsp)
-	jmp	.LBB1_5
-.LBB1_4:
+	jmp	.LBB2_5
+.LBB2_4:
 	movq	88(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 88(%rsp)
-	jmp	.LBB1_1
-.LBB1_5:
+	jmp	.LBB2_1
+.LBB2_5:
 	movq	80(%rsp), %rax
 	cmpq	$0, 264(%rax)
-	je	.LBB1_7
+	je	.LBB2_7
 	movq	112(%rsp), %rdx
 	shlq	$8, %rdx
 	addq	48(%rsp), %rdx
@@ -109,8 +155,8 @@ builder_to_string:
 	movq	112(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 112(%rsp)
-	jmp	.LBB1_8
-.LBB1_7:
+	jmp	.LBB2_8
+.LBB2_7:
 	movq	112(%rsp), %rax
 	shlq	$8, %rax
 	movq	48(%rsp), %rdx
@@ -132,11 +178,11 @@ builder_to_string:
 	movq	%rcx, (%rax)
 	addq	$152, %rsp
 	retq
-.LBB1_8:
+.LBB2_8:
 	movq	120(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 120(%rsp)
-	jmp	.LBB1_5
+	jmp	.LBB2_5
 	.seh_endproc
 
 	.def	init_builder;
@@ -183,14 +229,14 @@ init_builder:
 	movq	$0, 592(%rsp)
 	movq	$0, 600(%rsp)
 	movq	$0, 600(%rsp)
-.LBB2_1:
+.LBB3_1:
 	movq	600(%rsp), %rcx
 	movq	592(%rsp), %rax
 	shlq	$8, %rax
 	addq	%rax, %rcx
 	movq	296(%rsp), %rax
 	cmpb	$0, (%rax,%rcx)
-	je	.LBB2_3
+	je	.LBB3_3
 	movq	600(%rsp), %rcx
 	movq	592(%rsp), %rax
 	shlq	$8, %rax
@@ -206,9 +252,9 @@ init_builder:
 	movq	584(%rsp), %rax
 	movq	%rcx, 256(%rax)
 	cmpq	$256, 600(%rsp)
-	je	.LBB2_5
-	jmp	.LBB2_4
-.LBB2_3:
+	je	.LBB3_5
+	jmp	.LBB3_4
+.LBB3_3:
 	movq	288(%rsp), %rax
 	movq	(%rax), %rax
 	movb	304(%rsp), %cl
@@ -1225,12 +1271,12 @@ init_builder:
 	popq	%r14
 	popq	%r15
 	retq
-.LBB2_4:
+.LBB3_4:
 	movq	600(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 600(%rsp)
-	jmp	.LBB2_1
-.LBB2_5:
+	jmp	.LBB3_1
+.LBB3_5:
 	movq	$0, 600(%rsp)
 	movq	592(%rsp), %rax
 	addq	$1, %rax
@@ -1244,7 +1290,7 @@ init_builder:
 	movq	584(%rsp), %rax
 	movq	264(%rax), %rax
 	movq	%rax, 584(%rsp)
-	jmp	.LBB2_4
+	jmp	.LBB3_4
 	.seh_endproc
 
 	.def	compare;
@@ -1269,35 +1315,35 @@ compare:
 	movq	%r9, 32(%rsp)
 	movq	24(%rsp), %rax
 	cmpq	40(%rsp), %rax
-	je	.LBB3_2
+	je	.LBB4_2
 	xorl	%eax, %eax
 	addq	$56, %rsp
 	retq
-.LBB3_2:
+.LBB4_2:
 	movq	$0, 48(%rsp)
 	movq	$0, 48(%rsp)
-.LBB3_3:
+.LBB4_3:
 	movq	48(%rsp), %rax
 	cmpq	24(%rsp), %rax
-	jge	.LBB3_5
+	jge	.LBB4_5
 	movq	48(%rsp), %rcx
 	movq	16(%rsp), %rax
 	movb	(%rax,%rcx), %al
 	movq	48(%rsp), %rdx
 	movq	32(%rsp), %rcx
 	cmpb	(%rcx,%rdx), %al
-	jne	.LBB3_7
-	jmp	.LBB3_6
-.LBB3_5:
+	jne	.LBB4_7
+	jmp	.LBB4_6
+.LBB4_5:
 	movb	$1, %al
 	addq	$56, %rsp
 	retq
-.LBB3_6:
+.LBB4_6:
 	movq	48(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 48(%rsp)
-	jmp	.LBB3_3
-.LBB3_7:
+	jmp	.LBB4_3
+.LBB4_7:
 	xorl	%eax, %eax
 	addq	$56, %rsp
 	retq
@@ -1521,25 +1567,25 @@ copy:
 	movq	%rax, 40(%rsp)
 	movq	$0, 48(%rsp)
 	movq	$0, 48(%rsp)
-.LBB9_1:
+.LBB10_1:
 	movq	48(%rsp), %rax
 	cmpq	24(%rsp), %rax
-	jge	.LBB9_3
+	jge	.LBB10_3
 	movq	48(%rsp), %rcx
 	movq	40(%rsp), %rax
 	movb	(%rax,%rcx), %dl
 	movq	48(%rsp), %rcx
 	movq	32(%rsp), %rax
 	movb	%dl, (%rax,%rcx)
-	jmp	.LBB9_4
-.LBB9_3:
+	jmp	.LBB10_4
+.LBB10_3:
 	addq	$56, %rsp
 	retq
-.LBB9_4:
+.LBB10_4:
 	movq	48(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 48(%rsp)
-	jmp	.LBB9_1
+	jmp	.LBB10_1
 	.seh_endproc
 
 	.def	len;
@@ -1559,21 +1605,40 @@ len:
 	movq	$0, 16(%rsp)
 	movq	$0, 16(%rsp)
 	movq	$0, 16(%rsp)
-.LBB10_1:
+.LBB11_1:
 	movq	16(%rsp), %rcx
 	movq	8(%rsp), %rax
 	cmpb	$0, (%rax,%rcx)
-	je	.LBB10_3
-	jmp	.LBB10_4
-.LBB10_3:
+	je	.LBB11_3
+	jmp	.LBB11_4
+.LBB11_3:
 	movq	16(%rsp), %rax
 	addq	$24, %rsp
 	retq
-.LBB10_4:
+.LBB11_4:
 	movq	16(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 16(%rsp)
-	jmp	.LBB10_1
+	jmp	.LBB11_1
+	.seh_endproc
+
+	.def	open_file;
+	.scl	2;
+	.type	32;
+	.endef
+	.globl	open_file
+	.p2align	4, 0x90
+open_file:
+.seh_proc open_file
+	subq	$24, %rsp
+	.seh_stackalloc 24
+	.seh_endprologue
+	movq	%rcx, (%rsp)
+	movq	$0, 16(%rsp)
+	movq	%rdx, 16(%rsp)
+	xorl	%eax, %eax
+	addq	$24, %rsp
+	retq
 	.seh_endproc
 
 	.def	"overload[]";
@@ -1680,21 +1745,21 @@ len:
 	movq	%rax, 72(%rsp)
 	movq	$0, 80(%rsp)
 	movq	$0, 80(%rsp)
-.LBB13_1:
+.LBB15_1:
 	movq	80(%rsp), %rax
 	subq	$1, %rax
 	cmpq	64(%rsp), %rax
-	jge	.LBB13_3
+	jge	.LBB15_3
 	movq	56(%rsp), %rax
 	movq	$0, 88(%rsp)
 	movq	%rax, 88(%rsp)
 	cmpq	$256, 88(%rsp)
-	jg	.LBB13_5
-	jmp	.LBB13_4
-.LBB13_3:
+	jg	.LBB15_5
+	jmp	.LBB15_4
+.LBB15_3:
 	addq	$104, %rsp
 	retq
-.LBB13_4:
+.LBB15_4:
 	movq	72(%rsp), %rax
 	movq	256(%rax), %rax
 	subq	$1, %rax
@@ -1720,10 +1785,10 @@ len:
 	movq	80(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 80(%rsp)
-	jmp	.LBB13_1
-.LBB13_5:
+	jmp	.LBB15_1
+.LBB15_5:
 	movq	$256, 88(%rsp)
-	jmp	.LBB13_4
+	jmp	.LBB15_4
 	.seh_endproc
 
 	.def	overload;
@@ -1781,4 +1846,47 @@ global_var.2:
 	.p2align	3
 global_var.3:
 	.quad	256
+
+	.globl	global_var.4
+	.p2align	3
+global_var.4:
+	.quad	65536
+
+	.globl	global_var.5
+	.p2align	3
+global_var.5:
+	.quad	131072
+
+	.globl	global_var.6
+	.p2align	3
+global_var.6:
+	.quad	262144
+
+	.globl	global_var.7
+	.p2align	3
+global_var.7:
+	.quad	524288
+
+	.globl	global_var.8
+	.p2align	3
+global_var.8:
+	.quad	1048576
+
+.L__unnamed_1:
+	.asciz	"my big string"
+
+.L__unnamed_2:
+	.asciz	"1"
+
+.L__unnamed_3:
+	.asciz	" more text"
+
+.L__unnamed_4:
+	.asciz	"2"
+
+.L__unnamed_5:
+	.asciz	"3"
+
+.L__unnamed_6:
+	.asciz	"4"
 

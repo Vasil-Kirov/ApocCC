@@ -374,7 +374,18 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 		} break;
 		case type_assignment:
 		{
+			// @NOTE: should this be here?
+			Assert(node->assignment.lhs);
+			if(!node->assignment.is_declaration)
+				raise_semantic_error(f, "Global assignment is not a declaration",
+						node->assignment.token);
 			verify_assignment(f, node, true);
+			b32 failed = false;
+			auto expr = interpret_expression(node->assignment.rhs, &failed);
+			if(failed)
+				raise_semantic_error(f, "Expression for global declaration is not constant",
+						node->assignment.token);
+			interp_add_symbol(node->assignment.lhs->identifier.name, expr);
 			return node;
 		} break;
 		case type_run: 
@@ -400,11 +411,38 @@ verify_enum(File_Contents *f, Ast_Node *node)
 	Token_Iden first_token = {};
 	Token_Iden last_token = {};
 	size_t n = 0;
+	interp_push_scope();
+	Scope_Info scope_info = {};
+	scope_info.start_line = node->enumerator.token.line;
+	scope_info.file = node->enumerator.token.file;
+	push_scope(f, scope_info);
+
+	size_t type_id_len = vstd_strlen((char *)enumerator->type.identifier);
+	u8 *type_id = (u8 *)AllocatePermanentMemory(type_id_len);
+	memcpy(type_id, enumerator->type.identifier, type_id_len);
+	enumerator->type.identifier = NULL;
+	enumerator->type.identifier = var_type_to_name(enumerator->type, false);
+
 	for(size_t i = 0; i < member_count; ++i)
 	{
 		Ast_Assignment member = enumerator->members[i]->assignment;
 		if(member.rhs)
 		{
+			b32 failed = false;
+			get_expression_type(f, member.rhs, member.token, NULL);
+			auto mem_val = interpret_expression(member.rhs, &failed);
+			if(failed)
+				raise_semantic_error(f, "Expression in enum is not constant", member.token);
+			interp_add_symbol(member.lhs->identifier.name, mem_val);
+
+			Symbol symbol;
+			symbol.identifier = member.lhs->identifier.name;
+			symbol.token = member.lhs->identifier.token;
+			symbol.type  = enumerator->type;
+			symbol.tag   = S_GLOBAL_VAR;
+			symbol.node  = enumerator->members[i];
+			add_symbol(f, symbol);
+			
 			if(!first_rhs)
 			{
 				first_rhs = member.rhs;
@@ -415,7 +453,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 			n = i + 1;
 		}
 	}
-	
+
 	Interp_Val d = {};
 	d.type.type = T_INTEGER;
 	d.type.primitive.size = byte8;
@@ -473,7 +511,6 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		DO_OP(d, /, top, bot);
 	}
 
-	interp_push_scope();
 	for(size_t i = 0; i < member_count; ++i)
 	{
 		Ast_Assignment member = enumerator->members[i]->assignment;
@@ -504,8 +541,8 @@ verify_enum(File_Contents *f, Ast_Node *node)
 				enumerator->type = mem_type;
 			else if(!check_type_compatibility(enumerator->type, mem_type))
 				raise_formated_semantic_error(f, member.token, 
-						"Member %s in enum is of type %s which is incompatible with the rest of the enum "
-						"is of type %s",
+						"Member %s in enum is of type %s which is incompatible "
+						"with the rest of the enum is of type %s",
 						member.lhs->identifier.name, var_type_to_name(mem_type),
 						var_type_to_name(enumerator->type));
 			b32 failed = false;
@@ -515,8 +552,11 @@ verify_enum(File_Contents *f, Ast_Node *node)
 						"contains an incorrect constant expression",
 						i + 1, node->enumerator.id.name);
 		}
-		interp_add_symbol(member.lhs->identifier.name, enumerator->members[i]->interp_val.val);
 	}
+	enumerator->type.identifier = type_id;
+	// @TODO: make it so it doesn't error out if you have a
+	// global with the same name as enum member
+	pop_scope(f, enumerator->members[member_count - 1]->interp_val.id.token);
 	destroy_scope();
 	
 	Type_Info *enum_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));

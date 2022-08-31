@@ -2,7 +2,6 @@
 func $intrinsic var_arg_start(list:** Any);
 func $intrinsic var_arg_stop(list:** Any);
 
-$is_defined Windows
 func main() -> i32
 {
 	result := init_builder("my big string");
@@ -19,5 +18,4 @@ func main() -> i32
 	//print(str);
 	-> 0;
 }
-$end_is
 
