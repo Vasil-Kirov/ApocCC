@@ -418,7 +418,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 	push_scope(f, scope_info);
 
 	size_t type_id_len = vstd_strlen((char *)enumerator->type.identifier);
-	u8 *type_id = (u8 *)AllocatePermanentMemory(type_id_len);
+	u8 *type_id = (u8 *)AllocatePermanentMemory(type_id_len + 1);
 	memcpy(type_id, enumerator->type.identifier, type_id_len);
 	enumerator->type.identifier = NULL;
 	enumerator->type.identifier = var_type_to_name(enumerator->type, false);
@@ -1351,7 +1351,9 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 					return *overload->overload.function->function.type.func.return_type;
 				}
 				else
-					raise_semantic_error(f, "Indexing of non-indexable type", expression->index.token);
+					raise_formated_semantic_error(f, expression->index.token,
+							"Indexing of non-indexable type %s",
+							var_type_to_name(operand_type));
 			}
 			if(!is_integer(index_type))
 			{

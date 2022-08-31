@@ -1630,14 +1630,94 @@ len:
 	.p2align	4, 0x90
 open_file:
 .seh_proc open_file
-	subq	$24, %rsp
-	.seh_stackalloc 24
+	subq	$120, %rsp
+	.seh_stackalloc 120
 	.seh_endprologue
-	movq	%rcx, (%rsp)
-	movq	$0, 16(%rsp)
-	movq	%rdx, 16(%rsp)
+	movq	%rcx, 64(%rsp)
+	movq	$0, 72(%rsp)
+	movq	%rdx, 72(%rsp)
+	movq	$0, 80(%rsp)
+	movq	%r8, 80(%rsp)
+	movq	$0, 88(%rsp)
+	movq	$0, 88(%rsp)
+	movq	80(%rsp), %rax
+	andq	$1, %rax
+	testb	$1, %al
+	je	.LBB12_2
+	movq	88(%rsp), %rax
+	orq	$1179785, %rax
+	movq	%rax, 88(%rsp)
+.LBB12_2:
+	movq	80(%rsp), %rax
+	andq	$1, %rax
+	testb	$1, %al
+	je	.LBB12_4
+	movq	88(%rsp), %rax
+	orq	$1179926, %rax
+	movq	%rax, 88(%rsp)
+.LBB12_4:
+	movq	80(%rsp), %rax
+	andq	$2, %rax
+	testb	$1, %al
+	je	.LBB12_6
+	movq	88(%rsp), %rax
+	orq	$1179808, %rax
+	movq	%rax, 88(%rsp)
+.LBB12_6:
+	movq	72(%rsp), %rdx
+	movq	88(%rsp), %r8
+	leaq	96(%rsp), %rcx
+	xorl	%r9d, %r9d
 	xorl	%eax, %eax
-	addq	$24, %rsp
+	movq	$0, 32(%rsp)
+	movq	$4, 40(%rsp)
+	movq	$32, 48(%rsp)
+	movq	$0, 56(%rsp)
+	callq	CreateFileA
+	movq	$0, 112(%rsp)
+	movq	%rax, 112(%rsp)
+	movq	112(%rsp), %rax
+	addq	$120, %rsp
+	retq
+	.seh_endproc
+
+	.def	write_file;
+	.scl	2;
+	.type	32;
+	.endef
+	.globl	write_file
+	.p2align	4, 0x90
+write_file:
+.seh_proc write_file
+	subq	$104, %rsp
+	.seh_stackalloc 104
+	.seh_endprologue
+	movq	%rcx, 48(%rsp)
+	movq	$0, 56(%rsp)
+	movq	%rdx, 56(%rsp)
+	movq	$0, 64(%rsp)
+	movq	%r8, 64(%rsp)
+	movl	$0, 72(%rsp)
+	movl	%r9d, 72(%rsp)
+	movl	$0, 76(%rsp)
+	movq	$0, 76(%rsp)
+	movq	56(%rsp), %rdx
+	movq	64(%rsp), %r8
+	movl	72(%rsp), %r9d
+	leaq	80(%rsp), %rcx
+	leaq	76(%rsp), %rax
+	xorl	%r10d, %r10d
+	movq	%rax, 32(%rsp)
+	movq	$0, 40(%rsp)
+	callq	WriteFile
+	movl	76(%rsp), %eax
+	cmpl	72(%rsp), %eax
+	sete	%al
+	movb	$0, 103(%rsp)
+	andb	$1, %al
+	movb	%al, 103(%rsp)
+	movb	103(%rsp), %al
+	addq	$104, %rsp
 	retq
 	.seh_endproc
 
@@ -1745,21 +1825,21 @@ open_file:
 	movq	%rax, 72(%rsp)
 	movq	$0, 80(%rsp)
 	movq	$0, 80(%rsp)
-.LBB15_1:
+.LBB16_1:
 	movq	80(%rsp), %rax
 	subq	$1, %rax
 	cmpq	64(%rsp), %rax
-	jge	.LBB15_3
+	jge	.LBB16_3
 	movq	56(%rsp), %rax
 	movq	$0, 88(%rsp)
 	movq	%rax, 88(%rsp)
 	cmpq	$256, 88(%rsp)
-	jg	.LBB15_5
-	jmp	.LBB15_4
-.LBB15_3:
+	jg	.LBB16_5
+	jmp	.LBB16_4
+.LBB16_3:
 	addq	$104, %rsp
 	retq
-.LBB15_4:
+.LBB16_4:
 	movq	72(%rsp), %rax
 	movq	256(%rax), %rax
 	subq	$1, %rax
@@ -1785,10 +1865,10 @@ open_file:
 	movq	80(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, 80(%rsp)
-	jmp	.LBB15_1
-.LBB15_5:
+	jmp	.LBB16_1
+.LBB16_5:
 	movq	$256, 88(%rsp)
-	jmp	.LBB15_4
+	jmp	.LBB16_4
 	.seh_endproc
 
 	.def	overload;

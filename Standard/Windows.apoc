@@ -2,19 +2,48 @@
 $is_defined Windows
 
 func CreateFileA(
-  lpFileName:* u8,
-  dwDesiredAccess: u32,
+  lpFileName: *u8,
+  dwDesiredAccess: File_Permission,
   dwShareMode: u32,
-  lpSecurityAttributes:* SECURITY_ATTRIBUTES,
-  dwCreationDisposition: u32,
-  dwFlagsAndAttributes: u32,
-  hTemplateFile:* void,
+  lpSecurityAttributes: *SECURITY_ATTRIBUTES,
+  dwCreationDisposition: Create_Disposition,
+  dwFlagsAndAttributes: File_Attribute,
+  hTemplateFile: *void
 ) ->* void;
 
-func open_file(f_name:* u8) ->* void
+func WriteFile(
+	hFile: *void,
+	lpBuffer: *void,
+	nNumberOfBytesToWrite: u32,
+	lpNumberOfBytesWritten: *u32,
+	lpOverlapped: *void // @Incomplete
+) -> bool;
+
+func GetStdHandle(nStdHandle: STD_Handle) -> *void;
+
+func open_file(f_name:* u8, access: File_Access) -> *void
 {
-	//CreateFileA(f_name, 
-	-> null;
+	win_access: File_Permission;
+	if #bool(access & File_Access.READ)    win_access |= File_Permission.GENERIC_READ;
+	if #bool(access & File_Access.WRITE)   win_access |= File_Permission.GENERIC_WRITE;
+	if #bool(access & File_Access.EXECUTE) win_access |= File_Permission.GENERIC_EXECUTE;
+	file := CreateFileA(f_name, win_access, 0, null, Create_Disposition.OPEN_ALWAYS,
+			File_Attribute.NORMAL,
+			null);
+	-> file;
+}
+
+func write_file(file: *void, data: *void, size: u32) -> bool
+{
+	written: u32;
+	WriteFile(file, data, size, @written, null);
+	result := written == size;
+	-> result;
+}
+
+func get_stdout() -> *void
+{
+	-> GetStdHandle(STD_Handle.OUTPUT);
 }
 
 struct SECURITY_ATTRIBUTES {
@@ -29,6 +58,28 @@ READ_CONTROL                  :: (0x00020000);
 WRITE_DAC                     :: (0x00040000);
 WRITE_OWNER                   :: (0x00080000);
 SYNCHRONIZE                   :: (0x00100000);
+
+enum STD_Handle: u32
+{
+	INPUT  = -10;
+	OUTPUT = -11;
+	ERRRO  = -12;
+}
+
+// @Incomplete
+enum File_Attribute
+{
+	NORMAL = 0x20;
+}
+
+enum Create_Disposition
+{
+	CREATE_NEW     = 1;
+	CREATE_ALWAYS  = 2;
+	OPEN_EXISTING  = 3;
+	OPEN_ALWAYS    = 4;
+	TRUNC_EXISTING = 5;
+}
 
 enum Generic_Rights
 {

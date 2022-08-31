@@ -1,0 +1,8 @@
+
+enum File_Access
+{
+	READ = 1;
+	WRITE;
+	EXECUTE;
+}
+

@@ -6,6 +6,7 @@ target triple = "x86_64-pc-windows-msvc"
 %string = type { ptr, i64 }
 %__Internal_Context = type { ptr }
 %String_Builder = type { [256 x i8], i64, ptr }
+%Any = type { ptr, ptr }
 
 @global_var = constant i8 1
 @global_var.1 = constant i8 0
@@ -22,6 +23,7 @@ target triple = "x86_64-pc-windows-msvc"
 @3 = private unnamed_addr constant [2 x i8] c"2\00", align 1
 @4 = private unnamed_addr constant [2 x i8] c"3\00", align 1
 @5 = private unnamed_addr constant [2 x i8] c"4\00", align 1
+@6 = private unnamed_addr constant [1 x i8] zeroinitializer, align 1
 
 declare void @var_arg_start(ptr, ptr)
 
@@ -307,7 +309,7 @@ for.body:                                         ; preds = %for.cond
   store i64 %12, ptr %"struct member ptr13", align 4
   %13 = load i64, ptr %i, align 4
   %14 = icmp eq i64 %13, 256
-  br i1 %14, label %if.true, label %for.incr
+  br i1 %14, label %if.true, label %if.aftr
 
 for.aftr:                                         ; preds = %for.cond
   %15 = load ptr, ptr %__apoc_internal_context1, align 8
@@ -317,7 +319,7 @@ for.aftr:                                         ; preds = %for.cond
   store %String_Builder %17, ptr %16, align 8
   ret void
 
-for.incr:                                         ; preds = %for.body, %if.true
+for.incr:                                         ; preds = %if.aftr
   %18 = load i64, ptr %i, align 4
   %19 = add i64 %18, 1
   store i64 %19, ptr %i, align 4
@@ -337,6 +339,9 @@ if.true:                                          ; preds = %for.body
   %"struct member ptr18" = getelementptr inbounds %String_Builder, ptr %"derefrence struct17", i32 0, i32 2
   %selected19 = load ptr, ptr %"struct member ptr18", align 8
   store ptr %selected19, ptr %current, align 8
+  br label %if.aftr
+
+if.aftr:                                          ; preds = %for.body, %if.true
   br label %for.incr
 }
 
@@ -385,12 +390,12 @@ for.body:                                         ; preds = %for.cond
   %elem_ptr11 = getelementptr i8, ptr %ptr_load10, i64 %4
   %indexed_val12 = load i8, ptr %elem_ptr11, align 1
   %5 = icmp ne i8 %indexed_val, %indexed_val12
-  br i1 %5, label %if.true13, label %for.incr
+  br i1 %5, label %if.true13, label %if.aftr14
 
 for.aftr:                                         ; preds = %for.cond
   ret i8 1
 
-for.incr:                                         ; preds = %for.body
+for.incr:                                         ; preds = %if.aftr14
   %6 = load i64, ptr %i, align 4
   %7 = add i64 %6, 1
   store i64 %7, ptr %i, align 4
@@ -398,6 +403,9 @@ for.incr:                                         ; preds = %for.body
 
 if.true13:                                        ; preds = %for.body
   ret i8 0
+
+if.aftr14:                                        ; preds = %for.body
+  br label %for.incr
 }
 
 define void @to_string(ptr %__apoc_internal_context, ptr %text) {
@@ -487,8 +495,15 @@ entry:
   ret void
 }
 
-define ptr @parse_format(ptr %__apoc_internal_context, %string %format, ptr %list) {
+define void @parse_format(ptr %__apoc_internal_context, %string %format, ptr %list) {
 entry:
+  %to_return = alloca %string, align 16
+  %__apoc_internal_context5 = alloca %__Internal_Context, align 16
+  %item = alloca %Any, align 16
+  %i = alloca i64, align 8
+  %list_index = alloca i64, align 8
+  %builder = alloca %String_Builder, align 16
+  %__apoc_internal_context4 = alloca %__Internal_Context, align 16
   %list3 = alloca ptr, align 8
   %format2 = alloca %string, align 16
   %__apoc_internal_context1 = alloca ptr, align 16
@@ -497,15 +512,84 @@ entry:
   store %string %format, ptr %format2, align 8
   store i64 0, ptr %list3, align 4
   store ptr %list, ptr %list3, align 8
-  ret ptr null
+  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0
+  call void @llvm.memset.p0.i64(ptr align 16 %builder, i8 0, i64 272, i1 false)
+  %1 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0
+  store ptr %builder, ptr %1, align 8
+  call void @init_builder(ptr %__apoc_internal_context4, ptr @6)
+  store i64 0, ptr %list_index, align 4
+  store i64 0, ptr %list_index, align 4
+  store i64 0, ptr %i, align 4
+  store i64 0, ptr %i, align 4
+  br label %for.cond
+
+for.cond:                                         ; preds = %for.incr, %entry
+  %2 = load i64, ptr %i, align 4
+  %"struct member ptr" = getelementptr inbounds %string, ptr %format2, i32 0, i32 1
+  %selected = load i64, ptr %"struct member ptr", align 4
+  %3 = icmp slt i64 %2, %selected
+  br i1 %3, label %for.body, label %for.aftr
+
+for.body:                                         ; preds = %for.cond
+  %4 = load %string, ptr %format2, align 8
+  %5 = load i64, ptr %i, align 4
+  %6 = call i8 @"overload[]"(%string %4, i64 %5)
+  %7 = icmp eq i8 %6, 37
+  br i1 %7, label %if.true, label %if.else
+
+for.aftr:                                         ; preds = %for.cond
+  %8 = load ptr, ptr %__apoc_internal_context1, align 8
+  %ret_ptr = getelementptr inbounds %__Internal_Context, ptr %8, i32 0, i32 0
+  %9 = load ptr, ptr %ret_ptr, align 8
+  %10 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context5, i32 0, i32 0
+  call void @llvm.memset.p0.i64(ptr align 16 %to_return, i8 0, i64 16, i1 false)
+  %11 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context5, i32 0, i32 0
+  store ptr %to_return, ptr %11, align 8
+  %12 = load %String_Builder, ptr %builder, align 8
+  call void @builder_to_string(ptr %__apoc_internal_context5, ptr %builder)
+  store ptr %to_return, ptr %9, align 8
+  ret void
+
+for.incr:                                         ; preds = %if.aftr
+  %13 = load i64, ptr %i, align 4
+  %14 = add i64 %13, 1
+  store i64 %14, ptr %i, align 4
+  br label %for.cond
+
+if.true:                                          ; preds = %for.body
+  %15 = load i64, ptr %list_index, align 4
+  %ptr_load = load ptr, ptr %list3, align 8
+  %elem_ptr = getelementptr %Any, ptr %ptr_load, i64 %15
+  %indexed_val = load %Any, ptr %elem_ptr, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %item, i8 0, i64 16, i1 false)
+  store %Any %indexed_val, ptr %item, align 8
+  %16 = load i64, ptr %list_index, align 4
+  %17 = add i64 %16, 1
+  store i64 %17, ptr %list_index, align 4
+  br label %if.aftr
+
+if.aftr:                                          ; preds = %if.else, %if.true
+  %18 = load %String_Builder, ptr %builder, align 8
+  %19 = load %string, ptr %format2, align 8
+  %20 = load i64, ptr %i, align 4
+  %21 = call i8 @"overload[]"(%string %19, i64 %20)
+  call void @"overload[x]=.9"(ptr %builder, i8 %21)
+  br label %for.incr
+
+if.else:                                          ; preds = %for.body
+  %22 = load %String_Builder, ptr %builder, align 8
+  %23 = load %string, ptr %format2, align 8
+  %24 = load i64, ptr %i, align 4
+  %25 = call i8 @"overload[]"(%string %23, i64 %24)
+  call void @"overload[x]=.9"(ptr %builder, i8 %25)
+  br label %if.aftr
 }
 
 define void @"print!@* u8"(ptr %__apoc_internal_context, ptr %format) {
 entry:
-  %__apoc_internal_context6 = alloca %__Internal_Context, align 16
-  %list = alloca ptr, align 8
-  %str5 = alloca %string, align 16
+  %to_return = alloca %string, align 16
   %__apoc_internal_context4 = alloca %__Internal_Context, align 16
+  %list = alloca ptr, align 8
   %str = alloca %string, align 16
   %__apoc_internal_context3 = alloca %__Internal_Context, align 16
   %format2 = alloca ptr, align 8
@@ -519,51 +603,44 @@ entry:
   store ptr %str, ptr %1, align 8
   %2 = load ptr, ptr %format2, align 8
   call void @to_string(ptr %__apoc_internal_context3, ptr %2)
-  %3 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0
-  call void @llvm.memset.p0.i64(ptr align 16 %str5, i8 0, i64 16, i1 false)
-  %4 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0
-  store ptr %str5, ptr %4, align 8
-  %5 = load %string, ptr %str, align 8
-  call void @terminate_string(ptr %__apoc_internal_context4, %string %5)
   store i64 0, ptr %list, align 4
   store i64 0, ptr %list, align 4
-  %6 = load ptr, ptr %list, align 8
+  %3 = load ptr, ptr %list, align 8
   call void @llvm.va_start(ptr %list)
-  %7 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context6, i32 0, i32 0
-  %8 = load %string, ptr %str5, align 8
-  %9 = load ptr, ptr %list, align 8
-  %10 = call ptr @parse_format(ptr %__apoc_internal_context6, %string %8, ptr %9)
-  %11 = load ptr, ptr %list, align 8
+  %4 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0
+  call void @llvm.memset.p0.i64(ptr align 16 %to_return, i8 0, i64 16, i1 false)
+  %5 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context4, i32 0, i32 0
+  store ptr %to_return, ptr %5, align 8
+  %6 = load %string, ptr %str, align 8
+  %7 = load ptr, ptr %list, align 8
+  call void @parse_format(ptr %__apoc_internal_context4, %string %6, ptr %7)
+  %8 = load ptr, ptr %list, align 8
   call void @llvm.va_end(ptr %list)
   ret void
 }
 
 define void @"print!@string!@ 'unkown' "(ptr %__apoc_internal_context, %string %format, ...) {
 entry:
-  %__apoc_internal_context5 = alloca %__Internal_Context, align 16
-  %list = alloca ptr, align 8
-  %format4 = alloca %string, align 16
+  %to_return = alloca %string, align 16
   %__apoc_internal_context3 = alloca %__Internal_Context, align 16
+  %list = alloca ptr, align 8
   %format2 = alloca %string, align 16
   %__apoc_internal_context1 = alloca ptr, align 16
   store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
   call void @llvm.memset.p0.i64(ptr align 16 %format2, i8 0, i64 16, i1 false)
   store %string %format, ptr %format2, align 8
-  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
-  call void @llvm.memset.p0.i64(ptr align 16 %format4, i8 0, i64 16, i1 false)
-  %1 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
-  store ptr %format4, ptr %1, align 8
-  %2 = load %string, ptr %format2, align 8
-  call void @terminate_string(ptr %__apoc_internal_context3, %string %2)
   store i64 0, ptr %list, align 4
   store i64 0, ptr %list, align 4
-  %3 = load ptr, ptr %list, align 8
+  %0 = load ptr, ptr %list, align 8
   call void @llvm.va_start(ptr %list)
-  %4 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context5, i32 0, i32 0
-  %5 = load %string, ptr %format4, align 8
-  %6 = load ptr, ptr %list, align 8
-  %7 = call ptr @parse_format(ptr %__apoc_internal_context5, %string %5, ptr %6)
-  %8 = load ptr, ptr %list, align 8
+  %1 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
+  call void @llvm.memset.p0.i64(ptr align 16 %to_return, i8 0, i64 16, i1 false)
+  %2 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
+  store ptr %to_return, ptr %2, align 8
+  %3 = load %string, ptr %format2, align 8
+  %4 = load ptr, ptr %list, align 8
+  call void @parse_format(ptr %__apoc_internal_context3, %string %3, ptr %4)
+  %5 = load ptr, ptr %list, align 8
   call void @llvm.va_end(ptr %list)
   ret void
 }
@@ -656,16 +733,117 @@ for.incr:                                         ; preds = %for.body
   br label %for.cond
 }
 
-declare ptr @CreateFileA(ptr, ptr, i32, i32, ptr, i32, i32, ptr)
+declare ptr @CreateFileA(ptr, ptr, i64, i32, ptr, i64, i64, ptr)
 
-define ptr @open_file(ptr %__apoc_internal_context, ptr %f_name) {
+declare i8 @WriteFile(ptr, ptr, ptr, i32, ptr, ptr)
+
+declare ptr @GetStdHandle(ptr, i32)
+
+define ptr @open_file(ptr %__apoc_internal_context, ptr %f_name, i64 %access) {
 entry:
+  %file = alloca ptr, align 8
+  %__apoc_internal_context12 = alloca %__Internal_Context, align 16
+  %win_access = alloca i64, align 8
+  %access3 = alloca i64, align 8
   %f_name2 = alloca ptr, align 8
   %__apoc_internal_context1 = alloca ptr, align 16
   store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
   store i64 0, ptr %f_name2, align 4
   store ptr %f_name, ptr %f_name2, align 8
-  ret ptr null
+  store i64 0, ptr %access3, align 4
+  store i64 %access, ptr %access3, align 4
+  store i64 0, ptr %win_access, align 4
+  store i64 0, ptr %win_access, align 4
+  %0 = load i64, ptr %access3, align 4
+  %1 = and i64 %0, 1
+  %cast = trunc i64 %1 to i8
+  %boolean_expr = trunc i8 %cast to i1
+  br i1 %boolean_expr, label %if.true, label %if.aftr11
+
+if.true:                                          ; preds = %entry
+  %2 = load i64, ptr %win_access, align 4
+  %3 = or i64 %2, 1179785
+  store i64 %3, ptr %win_access, align 4
+  br label %if.aftr
+
+if.aftr:                                          ; preds = %if.true
+  %4 = load i64, ptr %access3, align 4
+  %5 = and i64 %4, 1
+  %cast4 = trunc i64 %5 to i8
+  %boolean_expr5 = trunc i8 %cast4 to i1
+  br i1 %boolean_expr5, label %if.true6, label %if.aftr11
+
+if.true6:                                         ; preds = %if.aftr
+  %6 = load i64, ptr %win_access, align 4
+  %7 = or i64 %6, 1179926
+  store i64 %7, ptr %win_access, align 4
+  br label %if.aftr7
+
+if.aftr7:                                         ; preds = %if.true6
+  %8 = load i64, ptr %access3, align 4
+  %9 = and i64 %8, 2
+  %cast8 = trunc i64 %9 to i8
+  %boolean_expr9 = trunc i8 %cast8 to i1
+  br i1 %boolean_expr9, label %if.true10, label %if.aftr11
+
+if.true10:                                        ; preds = %if.aftr7
+  %10 = load i64, ptr %win_access, align 4
+  %11 = or i64 %10, 1179808
+  store i64 %11, ptr %win_access, align 4
+  br label %if.aftr11
+
+if.aftr11:                                        ; preds = %entry, %if.aftr, %if.aftr7, %if.true10
+  %12 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context12, i32 0, i32 0
+  %13 = load ptr, ptr %f_name2, align 8
+  %14 = load i64, ptr %win_access, align 4
+  %15 = call ptr @CreateFileA(ptr %__apoc_internal_context12, ptr %13, i64 %14, i32 0, ptr null, i64 4, i64 32, ptr null)
+  store i64 0, ptr %file, align 4
+  store ptr %15, ptr %file, align 8
+  %16 = load ptr, ptr %file, align 8
+  ret ptr %16
+}
+
+define i8 @write_file(ptr %__apoc_internal_context, ptr %file, ptr %data, i32 %size) {
+entry:
+  %result = alloca i8, align 1
+  %__apoc_internal_context5 = alloca %__Internal_Context, align 16
+  %written = alloca i32, align 4
+  %size4 = alloca i32, align 4
+  %data3 = alloca ptr, align 8
+  %file2 = alloca ptr, align 8
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  store i64 0, ptr %file2, align 4
+  store ptr %file, ptr %file2, align 8
+  store i64 0, ptr %data3, align 4
+  store ptr %data, ptr %data3, align 8
+  store i32 0, ptr %size4, align 4
+  store i32 %size, ptr %size4, align 4
+  store i32 0, ptr %written, align 4
+  store i64 0, ptr %written, align 4
+  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context5, i32 0, i32 0
+  %1 = load ptr, ptr %file2, align 8
+  %2 = load ptr, ptr %data3, align 8
+  %3 = load i32, ptr %size4, align 4
+  %4 = load i32, ptr %written, align 4
+  %5 = call i8 @WriteFile(ptr %__apoc_internal_context5, ptr %1, ptr %2, i32 %3, ptr %written, ptr null)
+  %6 = load i32, ptr %written, align 4
+  %7 = load i32, ptr %size4, align 4
+  %8 = icmp eq i32 %6, %7
+  store i8 0, ptr %result, align 1
+  store i1 %8, ptr %result, align 1
+  %9 = load i8, ptr %result, align 1
+  ret i8 %9
+}
+
+define ptr @get_stdout(ptr %__apoc_internal_context) {
+entry:
+  %__apoc_internal_context2 = alloca %__Internal_Context, align 16
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context2, i32 0, i32 0
+  %1 = call ptr @GetStdHandle(ptr %__apoc_internal_context2, i32 -11)
+  ret ptr %1
 }
 
 ; Function Attrs: alwaysinline
@@ -796,61 +974,137 @@ for.body:                                         ; preds = %for.cond
   store i64 %10, ptr %copy_size, align 4
   %11 = load i64, ptr %copy_size, align 4
   %12 = icmp sgt i64 %11, 256
-  br i1 %12, label %if.true, label %for.incr
+  br i1 %12, label %if.true, label %if.aftr
 
 for.aftr:                                         ; preds = %for.cond
   ret void
 
-for.incr:                                         ; preds = %for.body, %if.true
-  %13 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
-  %"derefrence struct4" = load ptr, ptr %current, align 8
-  %"struct member ptr5" = getelementptr inbounds %String_Builder, ptr %"derefrence struct4", i32 0, i32 1
-  %selected6 = load i64, ptr %"struct member ptr5", align 4
-  %14 = sub i64 %selected6, 1
-  %"derefrence struct7" = load ptr, ptr %current, align 8
-  %"struct member ptr8" = getelementptr inbounds %String_Builder, ptr %"derefrence struct7", i32 0, i32 0
-  %elem_ptr = getelementptr [256 x i8], ptr %"struct member ptr8", i64 0, i64 %14
-  %indexed_val = load i8, ptr %elem_ptr, align 1
-  %"derefrence struct9" = load ptr, ptr %current, align 8
-  %"struct member ptr10" = getelementptr inbounds %String_Builder, ptr %"derefrence struct9", i32 0, i32 1
-  %selected11 = load i64, ptr %"struct member ptr10", align 4
-  %15 = sub i64 %selected11, 1
-  %"derefrence struct12" = load ptr, ptr %current, align 8
-  %"struct member ptr13" = getelementptr inbounds %String_Builder, ptr %"derefrence struct12", i32 0, i32 0
-  %elem_ptr14 = getelementptr [256 x i8], ptr %"struct member ptr13", i64 0, i64 %15
-  %16 = load i64, ptr %i, align 4
-  %17 = mul i64 %16, 256
-  %ptr_load = load ptr, ptr %text2, align 8
-  %elem_ptr15 = getelementptr i8, ptr %ptr_load, i64 %17
-  %indexed_val16 = load i8, ptr %elem_ptr15, align 1
-  %18 = load i64, ptr %i, align 4
-  %19 = mul i64 %18, 256
-  %ptr_load17 = load ptr, ptr %text2, align 8
-  %elem_ptr18 = getelementptr i8, ptr %ptr_load17, i64 %19
-  %20 = load i64, ptr %copy_size, align 4
-  call void @copy(ptr %__apoc_internal_context3, ptr %elem_ptr14, ptr %elem_ptr18, i64 %20)
-  %"derefrence struct19" = load ptr, ptr %current, align 8
-  %"struct member ptr20" = getelementptr inbounds %String_Builder, ptr %"derefrence struct19", i32 0, i32 1
-  %selected21 = load i64, ptr %"struct member ptr20", align 4
-  %21 = load i64, ptr %copy_size, align 4
-  %22 = add i64 %selected21, %21
-  %"derefrence struct22" = load ptr, ptr %current, align 8
-  %"struct member ptr23" = getelementptr inbounds %String_Builder, ptr %"derefrence struct22", i32 0, i32 1
-  store i64 %22, ptr %"struct member ptr23", align 4
-  %23 = load i64, ptr %text_len, align 4
-  %24 = sub i64 %23, 256
-  store i64 %24, ptr %text_len, align 4
-  %"derefrence struct24" = load ptr, ptr %current, align 8
-  %"struct member ptr25" = getelementptr inbounds %String_Builder, ptr %"derefrence struct24", i32 0, i32 2
-  %selected26 = load ptr, ptr %"struct member ptr25", align 8
-  store ptr %selected26, ptr %current, align 8
-  %25 = load i64, ptr %i, align 4
-  %26 = add i64 %25, 1
-  store i64 %26, ptr %i, align 4
+for.incr:                                         ; preds = %if.aftr
+  %13 = load i64, ptr %i, align 4
+  %14 = add i64 %13, 1
+  store i64 %14, ptr %i, align 4
   br label %for.cond
 
 if.true:                                          ; preds = %for.body
   store i64 256, ptr %copy_size, align 4
+  br label %if.aftr
+
+if.aftr:                                          ; preds = %for.body, %if.true
+  %15 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
+  %"derefrence struct4" = load ptr, ptr %current, align 8
+  %"struct member ptr5" = getelementptr inbounds %String_Builder, ptr %"derefrence struct4", i32 0, i32 1
+  %selected6 = load i64, ptr %"struct member ptr5", align 4
+  %16 = sub i64 %selected6, 1
+  %"derefrence struct7" = load ptr, ptr %current, align 8
+  %"struct member ptr8" = getelementptr inbounds %String_Builder, ptr %"derefrence struct7", i32 0, i32 0
+  %elem_ptr = getelementptr [256 x i8], ptr %"struct member ptr8", i64 0, i64 %16
+  %indexed_val = load i8, ptr %elem_ptr, align 1
+  %"derefrence struct9" = load ptr, ptr %current, align 8
+  %"struct member ptr10" = getelementptr inbounds %String_Builder, ptr %"derefrence struct9", i32 0, i32 1
+  %selected11 = load i64, ptr %"struct member ptr10", align 4
+  %17 = sub i64 %selected11, 1
+  %"derefrence struct12" = load ptr, ptr %current, align 8
+  %"struct member ptr13" = getelementptr inbounds %String_Builder, ptr %"derefrence struct12", i32 0, i32 0
+  %elem_ptr14 = getelementptr [256 x i8], ptr %"struct member ptr13", i64 0, i64 %17
+  %18 = load i64, ptr %i, align 4
+  %19 = mul i64 %18, 256
+  %ptr_load = load ptr, ptr %text2, align 8
+  %elem_ptr15 = getelementptr i8, ptr %ptr_load, i64 %19
+  %indexed_val16 = load i8, ptr %elem_ptr15, align 1
+  %20 = load i64, ptr %i, align 4
+  %21 = mul i64 %20, 256
+  %ptr_load17 = load ptr, ptr %text2, align 8
+  %elem_ptr18 = getelementptr i8, ptr %ptr_load17, i64 %21
+  %22 = load i64, ptr %copy_size, align 4
+  call void @copy(ptr %__apoc_internal_context3, ptr %elem_ptr14, ptr %elem_ptr18, i64 %22)
+  %"derefrence struct19" = load ptr, ptr %current, align 8
+  %"struct member ptr20" = getelementptr inbounds %String_Builder, ptr %"derefrence struct19", i32 0, i32 1
+  %selected21 = load i64, ptr %"struct member ptr20", align 4
+  %23 = load i64, ptr %copy_size, align 4
+  %24 = add i64 %selected21, %23
+  %"derefrence struct22" = load ptr, ptr %current, align 8
+  %"struct member ptr23" = getelementptr inbounds %String_Builder, ptr %"derefrence struct22", i32 0, i32 1
+  store i64 %24, ptr %"struct member ptr23", align 4
+  %25 = load i64, ptr %text_len, align 4
+  %26 = sub i64 %25, 256
+  store i64 %26, ptr %text_len, align 4
+  %"derefrence struct24" = load ptr, ptr %current, align 8
+  %"struct member ptr25" = getelementptr inbounds %String_Builder, ptr %"derefrence struct24", i32 0, i32 2
+  %selected26 = load ptr, ptr %"struct member ptr25", align 8
+  store ptr %selected26, ptr %current, align 8
+  br label %for.incr
+}
+
+; Function Attrs: alwaysinline
+define void @"overload[x]=.9"(ptr %str, i8 %c) #0 {
+entry:
+  %__apoc_internal_context = alloca %__Internal_Context, align 16
+  %to_put = alloca ptr, align 8
+  %c2 = alloca i8, align 1
+  %str1 = alloca ptr, align 8
+  store i64 0, ptr %str1, align 4
+  store ptr %str, ptr %str1, align 8
+  store i8 0, ptr %c2, align 1
+  store i8 %c, ptr %c2, align 1
+  %0 = load ptr, ptr %str1, align 8
+  store i64 0, ptr %to_put, align 4
+  store ptr %0, ptr %to_put, align 8
+  br label %for.cond
+
+for.cond:                                         ; preds = %for.incr, %entry
+  %1 = load ptr, ptr %to_put, align 8
+  %2 = icmp ne ptr %1, null
+  %"derefrence struct" = load ptr, ptr %to_put, align 8
+  %"struct member ptr" = getelementptr inbounds %String_Builder, ptr %"derefrence struct", i32 0, i32 1
+  %selected = load i64, ptr %"struct member ptr", align 4
+  %3 = icmp eq i64 %selected, 256
+  %"&&" = and i1 %2, %3
+  br i1 %"&&", label %for.body, label %for.aftr
+
+for.body:                                         ; preds = %for.cond
+  %"derefrence struct3" = load ptr, ptr %to_put, align 8
+  %"struct member ptr4" = getelementptr inbounds %String_Builder, ptr %"derefrence struct3", i32 0, i32 2
+  %selected5 = load ptr, ptr %"struct member ptr4", align 8
+  %4 = icmp eq ptr %selected5, null
+  br i1 %4, label %if.true, label %if.aftr12
+
+for.aftr:                                         ; preds = %for.cond
+  %5 = load i8, ptr %c2, align 1
+  %"derefrence struct16" = load ptr, ptr %to_put, align 8
+  %"struct member ptr17" = getelementptr inbounds %String_Builder, ptr %"derefrence struct16", i32 0, i32 1
+  %selected18 = load i64, ptr %"struct member ptr17", align 4
+  %"derefrence struct19" = load ptr, ptr %to_put, align 8
+  %"struct member ptr20" = getelementptr inbounds %String_Builder, ptr %"derefrence struct19", i32 0, i32 0
+  %elem_ptr = getelementptr [256 x i8], ptr %"struct member ptr20", i64 0, i64 %selected18
+  store i8 %5, ptr %elem_ptr, align 1
+  ret void
+
+for.incr:                                         ; preds = %if.aftr12
+  br label %for.cond
+
+if.true:                                          ; preds = %for.body
+  %6 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context, i32 0, i32 0
+  %7 = call ptr @mem_alloc(ptr %__apoc_internal_context, i64 272)
+  %"derefrence struct6" = load ptr, ptr %to_put, align 8
+  %"struct member ptr7" = getelementptr inbounds %String_Builder, ptr %"derefrence struct6", i32 0, i32 2
+  store ptr %7, ptr %"struct member ptr7", align 8
+  br label %if.aftr
+
+if.aftr:                                          ; preds = %if.true
+  %"derefrence struct8" = load ptr, ptr %to_put, align 8
+  %"struct member ptr9" = getelementptr inbounds %String_Builder, ptr %"derefrence struct8", i32 0, i32 1
+  %selected10 = load i64, ptr %"struct member ptr9", align 4
+  %8 = icmp eq i64 %selected10, 256
+  br i1 %8, label %if.true11, label %if.aftr12
+
+if.true11:                                        ; preds = %if.aftr
+  %"derefrence struct13" = load ptr, ptr %to_put, align 8
+  %"struct member ptr14" = getelementptr inbounds %String_Builder, ptr %"derefrence struct13", i32 0, i32 2
+  %selected15 = load ptr, ptr %"struct member ptr14", align 8
+  store ptr %selected15, ptr %to_put, align 8
+  br label %if.aftr12
+
+if.aftr12:                                        ; preds = %for.body, %if.aftr, %if.true11
   br label %for.incr
 }
 

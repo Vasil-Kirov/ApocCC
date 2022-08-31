@@ -26,7 +26,7 @@
 static Backend_State backend;
 static Debug_Info debug;
 
-//#define ONLY_IR
+#define ONLY_IR
 void
 do_passes()
 {
@@ -1018,7 +1018,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				generate_boolean_expression(f, node->condition.expr, func);
 
 			llvm::BasicBlock *b_true = BasicBlock::Create(*backend.context, "if.true", func);
-			llvm::BasicBlock *b_aftr = to_go ? to_go : BasicBlock::Create(*backend.context, "if.aftr", func);
+			llvm::BasicBlock *b_aftr = BasicBlock::Create(*backend.context, "if.aftr", func);
 			llvm::BasicBlock *b_else = NULL;
 			*idx += 1;
 			auto body = list->statements.list[*idx];
@@ -1053,7 +1053,15 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				backend.builder->SetInsertPoint(b_aftr);
 				size_t count = SDCount(list->statements.list);
 				for(; *idx < count; *idx += 1)
-					generate_block(f, list->statements.list[*idx], func, b_aftr, "if.aftr", to_go, list, idx);
+				{
+					auto got = generate_block(f, list->statements.list[*idx], func, b_aftr, "if.aftr", to_go, list, idx);
+					if(b_aftr->getTerminator() != NULL)
+					{
+						if(got)
+							b_aftr = got;
+					}
+				}
+				create_branch(b_aftr, to_go, backend);
 			}
 			backend.builder->SetInsertPoint(passed_block);
 			backend.builder->CreateCondBr(evaluation, b_true,

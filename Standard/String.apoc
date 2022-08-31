@@ -57,7 +57,7 @@ func init_builder(text: *u8) -> String_Builder
 	-> out;
 }
 
-overload [](str: string, index: u64) -> u8
+overload [](str: string, index: i64) -> u8
 {
 	-> str.text[index];
 }
@@ -87,6 +87,19 @@ overload +=(str: *String_Builder, text:* u8)
 		current = current.next;
 	}
 	
+}
+
+overload +=(str: *String_Builder, c: u8)
+{
+	to_put := str;
+	for ; to_put != null && to_put.len == STRING_BUFFER_SIZE; null {
+		if to_put.next == null  {
+			to_put.next = #*String_Builder mem_alloc($size String_Builder);
+		}
+		if to_put.len == STRING_BUFFER_SIZE
+			to_put = to_put.next;
+	}
+	to_put.buffer[to_put.len] = c;
 }
 
 overload ==(str: string, text:* u8) -> bool
@@ -125,15 +138,24 @@ func terminate_string(str: string) -> string
 }
 
 
-func parse_format(format: string, list:* Any) ->* u8
+func parse_format(format: string, list:* Any) -> string
 {
-	-> null;
+	builder := init_builder("");
+	list_index := 0;
+	for i := 0; i < format.len; ++i {
+		if format[i] == '%' {
+			item := list[list_index];
+			list_index += 1;
+		} else {
+			builder += format[i];
+		}
+	}
+	-> builder_to_string(@builder);
 }
 
 func print(format:* u8)
 {
 	str := to_string(format);
-	str = terminate_string(str);
 	list:* Any;
 	var_arg_start(@list);
 	parse_format(str, list);
@@ -142,7 +164,6 @@ func print(format:* u8)
 
 func print(format: string, ...)
 {
-	format = terminate_string(format);
 	list:* Any;
 	var_arg_start(@list);
 	parse_format(format, list);
