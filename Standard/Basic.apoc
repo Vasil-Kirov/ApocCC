@@ -63,13 +63,6 @@ struct $union Type_Info {
 	function:   Type_Func;
 }
 
-func mem_alloc(size: u64) ->* void
-{
-	result := malloc(size);
-	memset(result, 0, size);
-	-> result;
-}
-
 struct Type_Primitive {
 	kind: Type_Type;
 	size: Var_Size

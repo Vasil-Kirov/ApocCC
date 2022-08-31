@@ -83,6 +83,7 @@ typedef struct _File_Contents
 	Token_Iden *token_buffer;
 	Type_Table *type_table;
 	Ast_Node  **overloads;
+	Ast_Node  **defered;
 	llvm::Function  **overload_gens;
 	Stack		scope_stack;
 	Scope_Info *scopes;
@@ -142,7 +143,7 @@ u8 *
 var_type_to_name(Type_Info type, b32 bracket = true);
 
 Symbol *
-get_symbol_spot(File_Contents *f, Token_Iden token);
+get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out = true);
 
 void
 verify_enum(File_Contents *f, Ast_Node *node);

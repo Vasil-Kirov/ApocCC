@@ -34,7 +34,6 @@ func builder_to_string(builder: *String_Builder) -> string
 		times += 1;
 	}
 	copy(@out.text[times * STRING_BUFFER_SIZE], @current.buffer[0], #u64 current.len);
-	printf("len: %d\n", current.len);
 	out_len += builder.len;
 	-> out;
 }
@@ -125,11 +124,31 @@ func terminate_string(str: string) -> string
 	-> out;
 }
 
-func print(str: string)
+
+func parse_format(format: string, list:* Any) ->* u8
 {
-	to_print := terminate_string(str);
-	printf(to_print.text);
+	-> null;
 }
+
+func print(format:* u8)
+{
+	str := to_string(format);
+	str = terminate_string(str);
+	list:* Any;
+	var_arg_start(@list);
+	parse_format(str, list);
+	var_arg_stop(@list);
+}
+
+func print(format: string, ...)
+{
+	format = terminate_string(format);
+	list:* Any;
+	var_arg_start(@list);
+	parse_format(format, list);
+	var_arg_stop(@list);
+}
+
 
 func copy(dst:* void, src:* void, size: u64)
 {

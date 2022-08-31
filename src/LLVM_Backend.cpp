@@ -4,6 +4,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include <LLVM_Backend.h>
@@ -345,6 +346,23 @@ generate_union_type(File_Contents *f, Type_Info passed_type)
 }
 
 void
+put_not_overloaded(u8 *overloaded_name, llvm::Function *func)
+{
+	size_t i = 0;
+	for(; overloaded_name[i] != '!'; ++i)
+		if(overloaded_name[i] == '\0') return;
+	size_t before_name = vstd_strlen((char *)overloaded_name);
+	overloaded_name[i] = 0;
+	size_t after_name  = vstd_strlen((char *)overloaded_name);
+	if(before_name == after_name)
+		return;
+	auto non_overloaded = (u8 *)AllocateCompileMemory(after_name + 1);
+	memcpy(non_overloaded, overloaded_name, after_name);
+	shput(backend.func_table, non_overloaded, func);
+	overloaded_name[i] = '!';
+}
+
+void
 generate_signatures(File_Contents *f)
 {
 	Type_Table *type_table = f->type_table;
@@ -370,8 +388,24 @@ generate_signatures(File_Contents *f)
 			if(symbol.tag == S_FUNCTION)
 			{
 				Assert(symbol.node->type == type_func);
-				llvm::Function *func = generate_func_signature(f, symbol.node);
-				shput(backend.func_table, symbol.node->function.identifier.name, func);
+				if(symbol.node->function.overloads)
+				{
+					auto overloads = symbol.node->function.overloads;
+					size_t overload_count = SDCount(overloads);
+					llvm::Function *func = NULL;
+					for(size_t k = 0; k < overload_count; ++k)
+					{
+						func = generate_func_signature(f, overloads[k]);
+						shput(backend.func_table, overloads[k]->function.identifier.name, func);
+					}
+					//put_not_overloaded(symbol.node->function.identifier.name, func);
+					shput(backend.func_table, symbol.node->function.identifier.name, func);
+				}
+				else
+				{
+					llvm::Function *func = generate_func_signature(f, symbol.node);
+					shput(backend.func_table, symbol.node->function.identifier.name, func);
+				}
 			}
 		}
 	}
@@ -463,10 +497,17 @@ generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count)
 
 	// @NOTE: delay function generation so all global symbols can be declared
 	size_t func_count = SDCount(functions);
-	auto func_results = (Function **)AllocateCompileMemory(sizeof(Function *) * func_count);
+	auto func_results = SDCreate(Function *);
 	*out_func_count = func_count;
 	for(size_t i = 0; i < func_count; ++i)
-		func_results[i] = generate_func(f, functions[i]);
+	{
+		auto func = functions[i];
+		if(func->function.overloads)
+			func = func->function.overloads[0];
+
+		auto result = generate_func(f, func);
+		SDPush(func_results, result);
+	}
 
 	return func_results;
 }
@@ -657,15 +698,11 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 
 	auto after_body = node->for_loop.expr3 ? incr : cond;
 	backend.builder->SetInsertPoint(body);
-	if(list[*idx]->type == type_scope_start)
-	{
-		generate_blocks_from_list(f, list[*idx]->scope_desc.body, func, body, "for.body",
-				after_body);
-	}
-	else
-	{
-		generate_block(f, list[*idx], func, body, "for.body", after_body, statements, idx);
-	}
+	Assert(list[*idx]->type == type_scope_start);
+
+	generate_blocks_from_list(f, list[*idx]->scope_desc.body, func, body, "for.body",
+			after_body);
+	*idx += 1;
 	if(body->getTerminator() == NULL)
 		backend.builder->CreateBr(after_body);
 
@@ -678,11 +715,12 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 
 
 	backend.builder->SetInsertPoint(aftr);
-	if(aftr->getTerminator() == NULL)
+	Assert(aftr->getTerminator() == NULL);
+
 	{
 		size_t count = SDCount(list);
 		for(; *idx < count; *idx += 1)
-			generate_block(f, list[*idx], func, body, "for.body", aftr, statements, idx);
+			generate_block(f, list[*idx], func, body, "for.aftr", aftr, statements, idx);
 	}
 
 
@@ -719,10 +757,11 @@ generate_intrinsic(File_Contents *f, Symbol *intrinsic_sym, Ast_Node *call_node,
 		auto list = generate_expression(f, call_node->func_call.arguments[0], func);
 		return backend.builder->CreateVAArg(list, get_type_info_kind("Any", backend));
 	}
-	else if(vstd_strcmp(name, (char *)"get_type"))
+	else if(vstd_strcmp(name, (char *)"var_arg_stop"))
 	{
-		auto type = generate_type_info(call_node->func_call.expr_types[0], func);
-		return type;
+		return backend.builder->CreateCall(Intrinsic::getDeclaration(backend.module,
+					llvm::Intrinsic::vaend, None),
+				generate_expression(f, call_node->func_call.arguments[0], func));
 	}
 	else
 		raise_semantic_error(f, "Function marked as intrinsic is not an intrinsic", intrinsic_sym->token);
@@ -756,6 +795,50 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
 }
 #else
+
+llvm::FunctionCallee
+get_callee_maybe_overloaded(llvm::Value *operand, Ast_Node *call_node)
+{
+	size_t arg_count = SDCount(call_node->func_call.arg_types);
+	if(arg_count == 0)
+	{
+RETURN_NOT_OVERLOADED:
+		auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
+		auto callee = FunctionCallee(func_pointer_type, operand);
+		return callee;
+	}
+
+	auto str = operand->getName().str();
+	size_t to_allocate = str.size();
+	to_allocate += 128 * arg_count;
+	auto overloaded_name = (char *)AllocateCompileMemory(to_allocate);
+	vstd_strcat(overloaded_name, str.c_str());
+	vstd_strcat(overloaded_name, "!@");
+
+	for(size_t i = 0; i < arg_count; ++i)
+	{
+		vstd_strcat(overloaded_name,
+				(char *)var_type_to_name(call_node->func_call.expr_types[i], false));
+		if(i + 1 != arg_count)
+		{
+			vstd_strcat(overloaded_name, "!@");
+		}
+	}
+	//@TODO: check for invalid overloads
+	//@TODO: check for invalid overloads
+	//@TODO: check for invalid overloads
+	//@TODO: check for invalid overloads
+	//@TODO: check for invalid overloads
+	Variable_Types id_type = {};
+	auto func_val = get_identifier((u8 *)overloaded_name, &id_type);
+	if(func_val == NULL)
+		goto RETURN_NOT_OVERLOADED;
+
+	auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
+	auto callee = FunctionCallee(func_pointer_type, func_val);
+	return callee;
+}
+
 llvm::Value *
 generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 {
@@ -799,8 +882,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	if(call_node->func_call.operand_type.func.calling_convention == CALL_APOC)
 		is_apoc = true;
 
-	auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
-	auto callee = FunctionCallee(func_pointer_type, operand);
+	auto callee = get_callee_maybe_overloaded(operand, call_node);
 	size_t arg_count = SDCount(call_node->func_call.arguments);
 	size_t i = 0;
 	size_t j = 0;
@@ -852,10 +934,11 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	}
 	if(ret_ptr)
 	{
+		*call_node->func_call.operand_type.func.return_type = saved_ret;
 		backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
 		auto ret_type = apoc_type_to_llvm(saved_ret,
 				backend);
-		//return backend.builder->CreateLoad(ret_type, context_ret);
+		//return backend.builder->CreateLoad(ret_type, ret);
 		return ret;
 	}
 	else
@@ -976,7 +1059,21 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 					b_else ? b_else : b_aftr);
 			result = b_aftr;
 		} break;
-		case type_scope_start: { DEBUG_INFO ( emit_location(f, node->scope_desc.token); ) } break;
+		case type_scope_start:
+		{
+			DEBUG_INFO ( emit_location(f, node->scope_desc.token); )
+			auto body = node->scope_desc.body;
+			size_t count = SDCount(body->statements.list);
+			Ast_Node *node;
+			for(size_t i = 0; i < count; ++i)
+			{
+				node = body->statements.list[i];
+				generate_block(f, node, func, passed_block, block_name, to_go,
+						body, &i);
+				if(passed_block->getTerminator() != NULL)
+					break;
+			}
+		} break;
 		case type_scope_end: { DEBUG_INFO ( emit_location(f, node->scope_desc.token); ) } break;
 		default:
 		{
@@ -1135,7 +1232,11 @@ get_identifier(u8 *name, Variable_Types *returned_type)
 		if(global_var == NULL)
 		{
 			auto function = shget(backend.func_table, name);
-			Assert(function);
+			if(function == NULL)
+			{
+				*returned_type = ID_INVALID;
+				return NULL;
+			}
 			*returned_type = ID_FUNCTION;
 			return function;
 		}
@@ -1214,6 +1315,7 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		{
 			Variable_Types type;
 			llvm::Value *value = get_identifier(node->identifier.name, &type);
+			Assert(type != ID_INVALID);
 			
 			if(type == ID_CONST_GLOBAL)
 				return ((GlobalVariable *)value)->getInitializer();
@@ -1676,6 +1778,7 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, 
 			{
 				Variable_Types id_type;
 				result = get_identifier(lhs->identifier.name, &id_type);
+				Assert(id_type != ID_INVALID);
 
 				// @TODO: compiler error for this
 				Assert(id_type != ID_FUNCTION);
@@ -1689,6 +1792,11 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, 
 		case type_selector:
 		{
 			return generate_selector(f, lhs, func);
+		} break;
+		case type_func_call:
+		{
+			// @NOTE: should probably remove this, like idk
+			return generate_func_call(f, lhs, func);
 		} break;
 	}
 	Assert(false);

@@ -91,6 +91,7 @@ typedef enum : signed short
 	tok_call_conv = -51,
 
 	tok_overload  = -52,
+	tok_defer     = -53,
 } Token;
 
 typedef struct _str_hash_table

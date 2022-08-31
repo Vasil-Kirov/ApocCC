@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
 	if(f->build_commands.debug_info)
 		vstd_strcat((char *)final_linker_command, (char *)" /DEBUG ");
 
-	vstd_strcat((char *)final_linker_command, (char *)"/ENTRY:mainCRTStartup ");
+	vstd_strcat((char *)final_linker_command, (char *)" /ENTRY:mainCRTStartup ");
 	vstd_strcat((char *)final_linker_command, (char *)"/defaultlib:libcmt ");	
 	vstd_strcat((char *)final_linker_command, (char *)"/OUT:");
 #elif defined (CM_LINUX)

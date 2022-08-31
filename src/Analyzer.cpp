@@ -546,6 +546,41 @@ func_fix_types(File_Contents *f, Ast_Node *node)
 	if(type_is_invalid(node->function.type))
 		raise_formated_semantic_error(f, node->function.identifier.token,
 				"Return type %s of function %s is not defined", node->function.type.identifier, node->function.identifier.name);
+	if(func_sym->node->function.overloads)
+	{
+		auto overloads = func_sym->node->function.overloads;
+		size_t overload_count = SDCount(overloads);
+		for(size_t i = 0; i < overload_count; ++i)
+		{
+			Type_Info ret_type;
+			Type_Info *func_type = &overloads[i]->function.type;
+			if(func_type->type == T_FUNC)
+				ret_type = *func_type->func.return_type;
+			else
+				ret_type = *func_type;
+			if(!vstd_strcmp((char *)node->function.type.identifier, (char *)ret_type.identifier))
+				raise_formated_semantic_error(f, overloads[i]->function.identifier.token, "Function return type cannot be overloaded."
+						"\n\tOriginal function is of type %s, overloads is of type %s",
+						var_type_to_name(node->function.type), var_type_to_name(ret_type));
+		}
+		auto copy = alloc_node();
+		memcpy(copy, node, sizeof(Ast_Node));
+		u8 *overload_name = NULL;
+		auto id_len = vstd_strlen((char *)copy->function.identifier.name);
+		for(size_t i = 0; i < id_len; ++i)
+		{
+			if(copy->function.identifier.name[i] == '!')
+			{
+				overload_name = copy->function.identifier.name;
+				break;
+			}
+		}
+		if(!overload_name)
+			overload_name = get_func_name(copy);
+		auto fake_token = node->function.identifier.token;
+		fake_token.identifier = overload_name;
+		func_sym = get_symbol_spot(f, fake_token);
+	}
 
 	Type_Info *return_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 	memcpy(return_type, &node->function.type, sizeof(Type_Info));
@@ -753,6 +788,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 						for(; to_replace->statements.list[i]->type != type_scope_end;
 								++i) {}
 
+						ret_node->ret.token = to_replace->statements.list[i]->scope_desc.token;
 						to_replace->statements.list[i] = ret_node;
 						SDPush(to_replace->statements.list, node);
 					}
@@ -932,7 +968,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 		if(!node->assignment.is_declaration)
 		{
 			// node->assignment.decl_type = get_symbol_spot(f, node->assignment.token)->type;
-			node->assignment.decl_type = get_expression_type(f, node->assignment.lhs, node->assignment.token, NULL);
+			node->assignment.decl_type = get_expression_type(f, node->assignment.lhs, node->assignment.token, node);
 			node->assignment.is_const = node->assignment.decl_type.is_const;
 		}
 		if(type_is_invalid(expression_type))
@@ -1638,6 +1674,10 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_toke
 Type_Info
 verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, Ast_Node *previous)
 {
+	if(previous && previous->type == type_assignment)
+	{
+		raise_semantic_error(f, "You're trying to assign to a function call...", expr_token);
+	}
 	func_call->func_call.operand_type = get_expression_type(f, func_call->func_call.operand, func_call->func_call.token, previous);
 	Type_Info operand_type = func_call->func_call.operand_type;
 	if(operand_type.type != T_FUNC)
@@ -1660,11 +1700,64 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, A
 		}
 	}
 
-	Type_Info *param_types = operand_type.func.param_types;
+	func_call->func_call.expr_types = SDCreate(Type_Info);
 	Ast_Node **passed_expr = func_call->func_call.arguments;
 	size_t expr_count = SDCount(passed_expr);
+
+	for (size_t i = 0; i < expr_count; ++i)
+	{
+		Type_Info expr_type = fix_type(f, get_expression_type(f, passed_expr[i], expr_token, NULL));
+		SDPush(func_call->func_call.expr_types, expr_type);
+	}
+	if(func_call->func_call.operand->type == type_identifier)
+	{
+		auto func_sym = get_symbol_spot(f, func_call->func_call.operand->identifier.token, false);
+		if(func_sym && func_sym->tag == S_FUNCTION && func_sym->node->function.overloads)
+		{
+			size_t to_allocate = vstd_strlen((char *)func_sym->node->function.identifier.name);
+			to_allocate += 128 * SDCount(func_sym->node->function.arguments);
+			u8 *out = (u8 *)AllocatePermanentMemory(to_allocate * 1.5f);
+			vstd_strcat((char *)out, (char *)func_sym->node->function.identifier.name);
+			vstd_strcat((char *)out, "!@");
+			for(size_t i = 0; i < expr_count; ++i)
+			{
+				vstd_strcat((char *)out,
+						(char *)var_type_to_name(func_call->func_call.expr_types[i], false));
+				if(i + 1 != expr_count)
+				{
+					vstd_strcat((char *)out, "!@");
+				}
+			}
+			auto overload_count = SDCount(func_sym->node->function.overloads);
+			Ast_Node *found_overload = NULL;
+			for(size_t i = 0; i < overload_count; ++i)
+			{
+				if(vstd_strcmp((char *)out, (char *)func_sym->node->function.overloads[i]->function.identifier.name))
+				{
+					found_overload = func_sym->node->function.overloads[i];
+				}
+			}
+			if(!found_overload)
+			{
+				char *error = (char *)AllocatePermanentMemory(512 * overload_count);			
+				Ast_Node **overloads = func_sym->node->function.overloads;
+				for(size_t i = 0; i < overload_count; ++i)
+				{
+					vstd_strcat(error, (char *)overloads[i]->function.identifier.name);
+					vstd_strcat(error, "\n\t");
+				}
+				raise_formated_semantic_error(f, func_call->func_call.token, "No overload found for function call: \n\t%s", error);
+			}
+			Token_Iden custom_token = func_call->func_call.token;
+			custom_token.identifier = out;
+			auto overload_sym = get_symbol_spot(f, custom_token);
+			operand_type = overload_sym->type;
+			func_call->func_call.operand_type = operand_type;
+		}
+	}
+
+	Type_Info *param_types = operand_type.func.param_types;
 	size_t param_count = SDCount(param_types);
-	func_call->func_call.expr_types = SDCreate(Type_Info);
 	b32 has_var_args = false;
 	for(size_t i = 0; i < param_count; ++i)
 	{
@@ -1688,10 +1781,9 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, A
 	size_t j = 0;
 	for(size_t i = 0; i < expr_count; ++i)
 	{
-		Type_Info expr_type = fix_type(f, get_expression_type(f, passed_expr[i], expr_token, NULL));
 		Type_Info arg_type = fix_type(f, param_types[j]);
+		Type_Info expr_type = func_call->func_call.expr_types[i];
 		
-		SDPush(func_call->func_call.expr_types, expr_type);
 		SDPush(func_call->func_call.arg_types, arg_type);
 		if(arg_type.type == T_DETECT)
 		{
@@ -1806,7 +1898,7 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 }
 
 Symbol *
-get_symbol_spot(File_Contents *f, Token_Iden token)
+get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out)
 {
 	Symbol *result = NULL;
 	u8 *identifier = token.identifier;
@@ -1861,7 +1953,7 @@ get_symbol_spot(File_Contents *f, Token_Iden token)
 	}
 	EXIT_FUNC_SEARCH:
 
-	if(result == NULL)
+	if(result == NULL && error_out)
 	{
 		char *error = (char *)AllocateCompileMemory(1024 * 1024);
 		memset(error, 0, 1024 * 1024);

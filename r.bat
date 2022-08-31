@@ -10,7 +10,7 @@ call lib FileTwo.o %LIBS% /nologo /OUT:Basic.lib > NUL
 
 echo --- Program ---
 REM ..\Basic.apoc 
-call apoc ..\Test.apoc ..\Standard\Basic.apoc ..\Standard\String.apoc ..\Standard\C_Standard.apoc --debug --optimize none --linker /subsystem:console
+call apoc ..\Test.apoc ..\Standard\Basic.apoc ..\Standard\String.apoc ..\Standard\C_Standard.apoc --optimize none --linker /subsystem:console
 call a.exe
 echo:
 echo %errorlevel%

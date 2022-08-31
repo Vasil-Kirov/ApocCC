@@ -97,6 +97,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "$intrinsic", tok_intrinsic);
 		shput(keyword_table, "$call",      tok_call_conv);
 		shput(keyword_table, "overload",   tok_overload);
+		shput(keyword_table, "defer",      tok_defer);
 	}
 	
 	// NOTE(Vasko): Add basic types to string hash table

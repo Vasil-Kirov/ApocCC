@@ -221,6 +221,7 @@ parse(File_Contents *f)
 	root->type = type_root;
 	// NOTE(Vasko): nothing special about root, it doesn't contain data
 	f->overloads = SDCreate(Ast_Node *);
+	f->defered = SDCreate(Ast_Node *);
 
 	Token_Iden *info_tok = f->curr_token;
 
@@ -372,7 +373,7 @@ parse_body(File_Contents *f, b32 is_func, Token_Iden opt_tok)
 	}
 	Scope_Info new_scope = {false, (unsigned int)f->curr_token->line, 0, (char *)f->path, NULL};
 	push_scope(f, new_scope);
-	result->scope_desc.body = parse_statement_list(f);
+	result->scope_desc.body = parse_statement_list(f, is_func);
 	return result;
 }
 
@@ -534,6 +535,12 @@ parse_statement(File_Contents *f)
 		{
 			result = parse_for_statement(f);
 		} break;
+		case tok_defer:
+		{
+			advance_token(f);
+			result = alloc_node();
+			result->type = type_defer;
+		} break;
 		case tok_star:
 		case tok_identifier:
 		{
@@ -604,7 +611,7 @@ parse_and_scope_unscoped(File_Contents *f, Ast_Node **list, Ast_Node *statement)
 }
 
 Ast_Node *
-parse_statement_list(File_Contents *f)
+parse_statement_list(File_Contents *f, b32 is_func)
 {
 	Ast_Node *result = ast_statements();
 	b32 should_break = false;
@@ -613,13 +620,51 @@ parse_statement_list(File_Contents *f)
 		if(f->curr_token->type == '}')
 			should_break = true;
 		Ast_Node *statement = parse_statement(f);
-		if((statement->type == type_if || statement->type == type_for)
-				&& f->curr_token->type != (Token)'{')
+
+		switch((int)statement->type)
 		{
-			parse_and_scope_unscoped(f, result->statements.list, statement);
+			case type_return:
+			{
+				auto defer_count = SDCount(f->defered);
+				for(i64 i = defer_count - 1; i >= 0; --i)
+					SDPush(result->statements.list, f->defered[i]);
+				for(size_t i = 0; i < defer_count; ++i)
+					SDPop(f->defered);
+
+				SDPush(result->statements.list, statement);
+			} break;
+			case type_scope_end:
+			{
+				if(is_func)
+				{
+					auto defer_count = SDCount(f->defered);
+					for(i64 i = defer_count - 1; i >= 0; --i)
+						SDPush(result->statements.list, f->defered[i]);
+					for(size_t i = 0; i < defer_count; ++i)
+						SDPop(f->defered);
+				}
+				SDPush(result->statements.list, statement);
+			} break;
+			case type_defer:
+			{
+				auto defered = parse_statement(f);
+				SDPush(f->defered, defered);
+			} break;
+			case type_if:
+			case type_for:
+			{
+				if(f->curr_token->type != (Token)'{')
+				{
+					parse_and_scope_unscoped(f, result->statements.list, statement);
+				}
+				else
+					SDPush(result->statements.list, statement);
+			} break;
+			default:
+			{
+				SDPush(result->statements.list, statement);
+			} break;
 		}
-		else
-			SDPush(result->statements.list, statement);
 	}
 	return result;
 }
@@ -867,13 +912,11 @@ parse_atom_expression(File_Contents *f, Ast_Node *operand, char stop_at, b32 is_
 			} break;
 			case '{':
 			{
+				if(is_lhs)
+					raise_parsing_unexpected_token("left-hand side expression", f);
+
 				if(f->expression_level < 0)
 					return operand;
-				if(is_lhs)
-				{
-					raise_parsing_unexpected_token("left-hand side of statement "
-												   ", not got struct initialization", f);
-				}
 				advance_token(f);
 				operand = parse_struct_initialize(f, operand);
 			} break;
@@ -1376,6 +1419,25 @@ parse_overload(File_Contents *f)
 	return overload_result;
 }
 
+u8 *
+get_func_name(Ast_Node *func)
+{
+	size_t to_allocate = vstd_strlen((char *)func->function.identifier.name);
+	to_allocate += 128 * SDCount(func->function.arguments);
+	u8 *out = (u8 *)AllocatePermanentMemory(to_allocate * 1.5f);
+	vstd_strcat((char *)out, (char *)func->function.identifier.name);	
+	vstd_strcat((char *)out, "!@");
+	for(size_t i = 0; i < SDCount(func->function.arguments); ++i)
+	{
+		vstd_strcat((char *)out, (char *)var_type_to_name(func->function.arguments[i]->variable.type, false));
+		if(i + 1 != SDCount(func->function.arguments))
+		{
+			vstd_strcat((char *)out, "!@");
+		}
+	}
+	return out;
+}
+
 Ast_Node *
 parse_func(File_Contents *f)
 {
@@ -1449,13 +1511,33 @@ parse_func(File_Contents *f)
 		Type_Info sym_type = {};
 		sym_type.type = T_FUNC;
 		sym_type.func.calling_convention = this_func.conv;
+		sym_type.is_const = true;
 
 		Symbol this_symbol = {S_FUNCTION};
 		this_symbol.token = func_id->identifier.token;
 		this_symbol.node = result;
 		this_symbol.identifier = this_func.identifier.name;
 		this_symbol.type = sym_type;
+		Symbol *maybe_overload = get_symbol_spot(f, func_id->identifier.token, false);
+		if(maybe_overload)
+		{
+			if(maybe_overload->node->function.overloads == NULL)
+			{
+				maybe_overload->node->function.overloads = SDCreate(Ast_Node *);
+				Ast_Node *copy = alloc_node();
+				memcpy(copy, maybe_overload->node, sizeof(Ast_Node));
+				SDPush(maybe_overload->node->function.overloads, copy);
+				maybe_overload->node->function.overloads[0]->function.identifier.name = get_func_name(maybe_overload->node);
+				Symbol first_overload = *maybe_overload;
+				first_overload.identifier = maybe_overload->node->function.overloads[0]->function.identifier.name;
+				add_symbol(f, first_overload);
+			}
+			result->function.identifier.name = get_func_name(result);
+			SDPush(maybe_overload->node->function.overloads, result);
+			this_symbol.identifier = result->function.identifier.name;
+		}
 		add_symbol(f, this_symbol);
+		// @TODO: interpreter add function overloading
 		interpret_add_function(this_symbol);
 	}
 

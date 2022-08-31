@@ -1,12 +1,21 @@
 
 func $intrinsic var_arg_start(list:** Any);
+func $intrinsic var_arg_stop(list:** Any);
 
 func main() -> i32
 {
 	result := init_builder("my big string");
+
+	puts("1");
+	defer puts("4");
+	defer {
+		puts("2");
+		puts("3");
+	}
 	result += " more text";
 	str := builder_to_string(@result);
-	print(str);
+
+	//print(str);
 	-> 0;
 }
 

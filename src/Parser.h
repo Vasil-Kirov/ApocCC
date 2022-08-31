@@ -20,6 +20,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_defer        = -68,
 	type_overload     = -67,
 	type_only_type    = -66,
 	type_union        = -65,
@@ -158,6 +159,7 @@ typedef struct
 	Ast_Node *body;
 	Call_Conv conv;
 	i32 flags;
+	Ast_Node **overloads;
 } Ast_Func;
 
 typedef struct
@@ -364,6 +366,9 @@ struct _abstract_syntax_tree
 	Ast_Node *right;
 };
 
+u8 *
+get_func_name(Ast_Node *func);
+
 Ast_Identifier
 pure_identifier(Token_Iden token);
 
@@ -392,7 +397,7 @@ Ast_Node *
 parse_statement(File_Contents *f);
 
 Ast_Node *
-parse_statement_list(File_Contents *f);
+parse_statement_list(File_Contents *f, b32 is_func);
 
 Ast_Node *
 parse_expression(File_Contents *f, Token stop_at, b32 is_lhs);

@@ -52,6 +52,7 @@ using namespace llvm;
 
 enum Variable_Types
 {
+	ID_INVALID,
 	ID_LOCAL,
 	ID_GLOBAL,
 	ID_CONST_GLOBAL,
@@ -132,6 +133,9 @@ struct Debug_Info
 	Debug_File_Table *file_map;
 	Stack scope;
 };
+
+llvm::Value *
+get_identifier(u8 *name, Variable_Types *returned_type);
 
 llvm::StructType *
 get_context_type();
