@@ -3,54 +3,18 @@ source_filename = "Test.apoc"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-%string = type { ptr, i64 }
 %__Internal_Context = type { ptr }
+%string = type { ptr, i64 }
 %String_Builder = type { [256 x i8], i64, ptr }
 
 @global_var = constant i8 1
 @global_var.1 = constant i8 0
 @global_var.2 = constant ptr null
 @global_var.3 = constant i64 256
-@0 = private unnamed_addr constant [14 x i8] c"my big string\00", align 1
-@1 = private unnamed_addr constant [8 x i8] c"Windows\00", align 1
-@2 = private unnamed_addr constant [2 x i8] c"1\00", align 1
-@3 = private unnamed_addr constant [11 x i8] c" more text\00", align 1
-@4 = private unnamed_addr constant [2 x i8] c"2\00", align 1
-@5 = private unnamed_addr constant [2 x i8] c"3\00", align 1
-@6 = private unnamed_addr constant [2 x i8] c"4\00", align 1
 
 declare void @var_arg_start(ptr, ptr)
 
 declare void @var_arg_stop(ptr, ptr)
-
-define i32 @main(ptr %__apoc_internal_context) {
-entry:
-  %str = alloca %string, align 16
-  %__apoc_internal_context3 = alloca %__Internal_Context, align 16
-  %result = alloca %String_Builder, align 16
-  %__apoc_internal_context2 = alloca %__Internal_Context, align 16
-  %__apoc_internal_context1 = alloca ptr, align 16
-  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
-  %0 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context2, i32 0, i32 0
-  call void @llvm.memset.p0.i64(ptr align 16 %result, i8 0, i64 272, i1 false)
-  %1 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context2, i32 0, i32 0
-  store ptr %result, ptr %1, align 8
-  call void @init_builder(ptr %__apoc_internal_context2, ptr @0)
-  %2 = call i32 @puts(ptr @1)
-  %3 = call i32 @puts(ptr @2)
-  %4 = load %String_Builder, ptr %result, align 8
-  call void @"overload[x]="(ptr %result, ptr @3)
-  %5 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
-  call void @llvm.memset.p0.i64(ptr align 16 %str, i8 0, i64 16, i1 false)
-  %6 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
-  store ptr %str, ptr %6, align 8
-  %7 = load %String_Builder, ptr %result, align 8
-  call void @builder_to_string(ptr %__apoc_internal_context3, ptr %result)
-  %8 = call i32 @puts(ptr @4)
-  %9 = call i32 @puts(ptr @5)
-  %10 = call i32 @puts(ptr @6)
-  ret i32 0
-}
 
 declare ptr @malloc(i64)
 

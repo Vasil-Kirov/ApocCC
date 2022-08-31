@@ -238,12 +238,46 @@ parse(File_Contents *f)
 	return root;
 }
 
+void
+parse_is_defined(File_Contents *f)
+{
+	advance_token(f);
+	auto to_check = advance_token(f);
+	if(to_check.type != tok_identifier)
+		raise_parsing_unexpected_token("identifier of define", f);
+
+	auto value = shget(f->build_commands.defines, to_check.identifier);
+	if(value == 0)
+	{
+		int scope_level = 0;
+		while(f->curr_token->type != tok_end_is || scope_level > 0)
+		{
+			advance_token(f);
+			if(f->curr_token->type == tok_is_defined)
+				scope_level++;
+			else if(f->curr_token->type == tok_end_is)
+				scope_level--;
+		}
+		advance_token(f);
+	}
+}
+
 Ast_Node *
 parse_file_level_statement(File_Contents *f)
 {
 	Ast_Node *result = alloc_node();
 	switch ((int)f->curr_token->type)
 	{
+		case tok_is_defined:
+		{
+			parse_is_defined(f);
+			result->type = type_dunn;
+		} break;
+		case tok_end_is:
+		{
+			advance_token(f);
+			result->type = type_dunn;
+		} break;
 		case tok_struct:
 		{
 			result = parse_struct(f);
@@ -296,7 +330,8 @@ parse_file_level_statement_list(File_Contents *f)
 		Ast_Node *statement = parse_file_level_statement(f);
 		if(statement == NULL)
 			break;
-		SDPush(result->statements.list, statement);
+		if(statement->type != type_dunn)
+			SDPush(result->statements.list, statement);
 	}
 	return result;
 }
@@ -503,30 +538,6 @@ parse_for_statement(File_Contents *f)
 
 	result->for_loop.token = token;
 	return result;
-}
-
-void
-parse_is_defined(File_Contents *f)
-{
-	advance_token(f);
-	auto to_check = advance_token(f);
-	if(to_check.type != tok_identifier)
-		raise_parsing_unexpected_token("identifier of define", f);
-
-	auto value = shget(f->build_commands.defines, to_check.identifier);
-	if(value == 0)
-	{
-		int scope_level = 0;
-		while(f->curr_token->type != tok_end_is || scope_level > 0)
-		{
-			advance_token(f);
-			if(f->curr_token->type == tok_is_defined)
-				scope_level++;
-			else if(f->curr_token->type == tok_end_is)
-				scope_level--;
-		}
-		advance_token(f);
-	}
 }
 
 Ast_Node *

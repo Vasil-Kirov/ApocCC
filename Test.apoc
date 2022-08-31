@@ -2,16 +2,10 @@
 func $intrinsic var_arg_start(list:** Any);
 func $intrinsic var_arg_stop(list:** Any);
 
+$is_defined Windows
 func main() -> i32
 {
 	result := init_builder("my big string");
-
-$is_defined Windows
-	puts("Windows");
-$end_is
-$is_defined Linux
-	puts("Linux");
-$end_is
 
 	puts("1");
 	defer puts("4");
@@ -25,4 +19,5 @@ $end_is
 	//print(str);
 	-> 0;
 }
+$end_is
 
