@@ -18,7 +18,7 @@ call lib FileTwo.o %LIBS% /nologo /OUT:Basic.lib > NUL
 
 echo --- Program ---
 REM ..\Basic.apoc 
-call apoc %Files% --optimize none --linker /subsystem:console
+call apoc %Files% --debug --optimize none --linker /subsystem:console
 call a.exe
 echo:
 echo %errorlevel%

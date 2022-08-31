@@ -863,6 +863,10 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			{
 				return Instruction::CastOps::PtrToInt;
 			}
+			else if (from.type == T_BOOLEAN)
+			{
+				return Instruction::CastOps::ZExt;
+			}
 			else
 			{
 				Assert(is_float(from));

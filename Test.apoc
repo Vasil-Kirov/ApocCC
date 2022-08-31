@@ -15,7 +15,7 @@ func main() -> i32
 	result += " more text";
 	str := builder_to_string(@result);
 
-	//print(str);
+	print(str);
 	-> 0;
 }
 

@@ -89,6 +89,7 @@ overload +=(str: *String_Builder, text:* u8)
 	
 }
 
+called := 0;
 overload +=(str: *String_Builder, c: u8)
 {
 	to_put := str;
@@ -100,6 +101,7 @@ overload +=(str: *String_Builder, c: u8)
 			to_put = to_put.next;
 	}
 	to_put.buffer[to_put.len] = c;
+	to_put.len += 1;
 }
 
 overload ==(str: string, text:* u8) -> bool
@@ -150,7 +152,9 @@ func parse_format(format: string, list:* Any) -> string
 			builder += format[i];
 		}
 	}
-	-> builder_to_string(@builder);
+	builder += #u8 10;
+	out := builder_to_string(@builder);
+	-> out;
 }
 
 func print(format:* u8)
@@ -158,16 +162,20 @@ func print(format:* u8)
 	str := to_string(format);
 	list:* Any;
 	var_arg_start(@list);
-	parse_format(str, list);
+	out := parse_format(str, list);
 	var_arg_stop(@list);
+	stdout := get_stdout();
+	write_file(stdout, #*u8 out.text, #u32 out.len);
 }
 
 func print(format: string, ...)
 {
 	list:* Any;
 	var_arg_start(@list);
-	parse_format(format, list);
+	out := parse_format(format, list);
 	var_arg_stop(@list);
+	stdout := get_stdout();
+	write_file(stdout, #*u8 out.text, #u32 out.len);
 }
 
 

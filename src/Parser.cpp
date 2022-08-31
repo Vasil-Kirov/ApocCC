@@ -1474,10 +1474,14 @@ get_func_name(Ast_Node *func)
 	u8 *out = (u8 *)AllocatePermanentMemory(to_allocate * 1.5f);
 	vstd_strcat((char *)out, (char *)func->function.identifier.name);	
 	vstd_strcat((char *)out, "!@");
+	auto args = func->function.arguments;
 	for(size_t i = 0; i < SDCount(func->function.arguments); ++i)
 	{
-		vstd_strcat((char *)out, (char *)var_type_to_name(func->function.arguments[i]->variable.type, false));
-		if(i + 1 != SDCount(func->function.arguments))
+		if(args[i]->variable.type.type == T_DETECT)
+			continue;
+		vstd_strcat((char *)out, (char *)var_type_to_name(args[i]->variable.type, false));
+		if(i + 1 != SDCount(func->function.arguments)
+				&& args[i + 1]->variable.type.type != T_DETECT)
 		{
 			vstd_strcat((char *)out, "!@");
 		}

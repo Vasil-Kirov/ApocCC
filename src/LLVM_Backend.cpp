@@ -1,8 +1,11 @@
 #include "llvm/ADT/EpochTracker.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Value.h"
@@ -26,7 +29,7 @@
 static Backend_State backend;
 static Debug_Info debug;
 
-#define ONLY_IR
+//#define ONLY_IR
 void
 do_passes()
 {
@@ -154,16 +157,18 @@ emit_location(File_Contents *f, Token_Iden token)
 	}
 }
 
-void
+DIGlobalVariableExpression *
 emit_global_var(File_Contents *f, Ast_Node *node, u8 *identifier, GlobalVariable *llvm_var)
 {
 	Assert(node->type == type_assignment);
 
 	DEBUG_INFO (
 			auto desc  = shget(debug.file_map, node->assignment.token.file);
-			debug.builder->createGlobalVariableExpression(desc.file, StringRef((char *)identifier), StringRef(), desc.file,
+			return debug.builder->createGlobalVariableExpression(desc.file, StringRef((char *)identifier), StringRef(), desc.file,
 				node->assignment.token.line, to_debug_type(node->assignment.decl_type, &debug), true);
+
 			)
+		return NULL;
 }
 
 void
@@ -461,7 +466,11 @@ generate_statement(File_Contents *f, Ast_Node *node)
 					GlobalValue::LinkageTypes::ExternalLinkage,
 					const_val, "global_var");
 			shput(backend.named_globals, node->assignment.token.identifier, global_var);
-			emit_global_var(f, node, node->assignment.token.identifier, global_var);
+			DEBUG_INFO (
+						auto d_info = emit_global_var(f, node,
+							node->assignment.token.identifier, global_var);
+						global_var->addDebugInfo(d_info);
+			)
 		} break;
 		case type_enum: break;
 		case type_struct: break;
@@ -901,7 +910,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		{
 			auto context_type = get_context_type();
 			ret = allocate_variable(func, (u8 *)"to_return", saved_ret, backend);
-			auto context_ret = backend.builder->CreateStructGEP(context_type, func_context, 0);
+			auto context_ret = backend.builder->CreateStructGEP(context_type, func_context, 0, "return_value_member");
 			backend.builder->CreateStore(ret, context_ret);
 		}
 		arg_exprs[0] = func_context;
@@ -937,10 +946,13 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	{
 		*call_node->func_call.operand_type.func.return_type = saved_ret;
 		backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
-		//auto ret_type = apoc_type_to_llvm(saved_ret,
-		//		backend);
-		//return backend.builder->CreateLoad(ret_type, ret);
+#if 0
+		auto ret_type = apoc_type_to_llvm(saved_ret,
+				backend);
+		return backend.builder->CreateLoad(ret_type, ret);
+#else
 		return ret;
+#endif
 	}
 	else
 		return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
@@ -1037,16 +1049,9 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			{
 				*idx += 1;
 				auto else_body = list->statements.list[*idx];
-				if(else_body->type == type_scope_start)
+				*idx += 1;
+				Assert(else_body->type == type_scope_start)
 					b_else = generate_blocks_from_list(f, else_body->scope_desc.body, func, NULL, "if.else", b_aftr);
-				else
-				{
-					b_else = BasicBlock::Create(*backend.context, "if.else", func);
-					backend.builder->SetInsertPoint(b_else);
-					generate_block(f, else_body, func, NULL, "if.else", b_aftr, list, idx);
-				}
-				if(b_else->getTerminator() == NULL)
-					create_branch(b_else, b_aftr, backend);
 			}
 
 			{
@@ -1330,6 +1335,10 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				return ((GlobalVariable *)value)->getInitializer();
 			else if(type == ID_FUNCTION)
 				return value;
+			else if(type == ID_GLOBAL)
+				return backend.builder->CreateLoad(
+						apoc_type_to_llvm(get_symbol_spot(f, node->identifier.token)->type,
+							backend), value);
 			else
 				return backend.builder->CreateLoad(
 						((llvm::AllocaInst *)value)->getAllocatedType(), value);
@@ -1534,7 +1543,10 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 				one_type.primitive.size = byte8;
 				one = create_cast(expr_type, one_type, one);
 
-				AllocaInst *to_store = shget(backend.named_values, node->unary_expr.expression->identifier.name);
+				Variable_Types returned_type = ID_INVALID;
+				auto to_store = get_identifier(node->unary_expr.expression->identifier.name,
+						&returned_type);
+				Assert(returned_type == ID_LOCAL || returned_type == ID_GLOBAL);
 				Assert(to_store);
 				if(is_float(expr_type))
 					result = backend.builder->CreateFAdd(expr, one);
