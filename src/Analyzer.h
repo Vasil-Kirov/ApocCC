@@ -65,12 +65,19 @@ typedef enum
 
 typedef struct
 {
+	u8 *key;
+	u64 value;
+} Define_Table;
+
+typedef struct
+{
 	Optimization_Level optimization;
 	Target_Arch target;
 	u8 *output_file;
 	u8 *linker_command;
 	b32 debug_info;
 	b32 call_linker;
+	Define_Table *defines;
 } Build_Commands;
 
 // @NOTE: this is poorly named, should probably be changed to something like `compile_state`

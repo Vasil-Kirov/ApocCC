@@ -20,6 +20,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_dunn         = -69,
 	type_defer        = -68,
 	type_overload     = -67,
 	type_only_type    = -66,

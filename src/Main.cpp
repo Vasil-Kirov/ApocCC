@@ -1,5 +1,4 @@
 
-
 #include <Basic.h>
 #include <stdlib/std.h>
 #include <Log.h>
@@ -146,12 +145,13 @@ int main(int argc, char *argv[])
 		SDPush(files, f);
 	}
 	TIME_FUNC(timers, File_Contents *f = append_token_streams(files), syncing_clock, syncing);	
-	TIME_FUNC(timers, f->ast_root = parse(f), parse_clock, parsing);
-	TIME_FUNC(timers, analyze(f, f->ast_root), analysis_clock, analysis);
 
 	f->build_commands = build_command;
 	f->build_commands.linker_command = build_command.linker_command;
 	f->build_commands.output_file = build_command.output_file;
+
+	TIME_FUNC(timers, f->ast_root = parse(f), parse_clock, parsing);
+	TIME_FUNC(timers, analyze(f, f->ast_root), analysis_clock, analysis);
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
 	
 	u8 *final_linker_command = (u8 *)AllocatePermanentMemory(4096);

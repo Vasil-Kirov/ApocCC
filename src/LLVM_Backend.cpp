@@ -936,8 +936,8 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	{
 		*call_node->func_call.operand_type.func.return_type = saved_ret;
 		backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
-		auto ret_type = apoc_type_to_llvm(saved_ret,
-				backend);
+		//auto ret_type = apoc_type_to_llvm(saved_ret,
+		//		backend);
 		//return backend.builder->CreateLoad(ret_type, ret);
 		return ret;
 	}

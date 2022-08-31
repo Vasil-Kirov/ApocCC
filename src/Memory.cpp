@@ -49,7 +49,6 @@ void *
 AllocateMemory(u64 Size, i8 Index)
 {
 	void *Result = MemoryAllocators[Index].Current;
-	memset(Result, 0, Size);
 	MemoryAllocators[Index].Current = (char *)MemoryAllocators[Index].Current + Size;
 	while((char *)MemoryAllocators[Index].Current > (char *)MemoryAllocators[Index].End)
 	{
@@ -62,6 +61,7 @@ AllocateMemory(u64 Size, i8 Index)
 		MemoryAllocators[Index].ChunkIndex++;
 		MemoryAllocators[Index].End = (u8 *)MemoryAllocators[Index].End + MemoryAllocators[Index].ChunkSize;
 	}
+	memset(Result, 0, Size);
 	return Result;
 }
 

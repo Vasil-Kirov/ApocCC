@@ -12,11 +12,12 @@ target triple = "x86_64-pc-windows-msvc"
 @global_var.2 = constant ptr null
 @global_var.3 = constant i64 256
 @0 = private unnamed_addr constant [14 x i8] c"my big string\00", align 1
-@1 = private unnamed_addr constant [2 x i8] c"1\00", align 1
-@2 = private unnamed_addr constant [11 x i8] c" more text\00", align 1
-@3 = private unnamed_addr constant [2 x i8] c"2\00", align 1
-@4 = private unnamed_addr constant [2 x i8] c"3\00", align 1
-@5 = private unnamed_addr constant [2 x i8] c"4\00", align 1
+@1 = private unnamed_addr constant [8 x i8] c"Windows\00", align 1
+@2 = private unnamed_addr constant [2 x i8] c"1\00", align 1
+@3 = private unnamed_addr constant [11 x i8] c" more text\00", align 1
+@4 = private unnamed_addr constant [2 x i8] c"2\00", align 1
+@5 = private unnamed_addr constant [2 x i8] c"3\00", align 1
+@6 = private unnamed_addr constant [2 x i8] c"4\00", align 1
 
 declare void @var_arg_start(ptr, ptr)
 
@@ -36,18 +37,54 @@ entry:
   store ptr %result, ptr %1, align 8
   call void @init_builder(ptr %__apoc_internal_context2, ptr @0)
   %2 = call i32 @puts(ptr @1)
-  %3 = load %String_Builder, ptr %result, align 8
-  call void @"overload[x]="(ptr %result, ptr @2)
-  %4 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
-  call void @llvm.memset.p0.i64(ptr align 16 %str, i8 0, i64 16, i1 false)
+  %3 = call i32 @puts(ptr @2)
+  %4 = load %String_Builder, ptr %result, align 8
+  call void @"overload[x]="(ptr %result, ptr @3)
   %5 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
-  store ptr %str, ptr %5, align 8
-  %6 = load %String_Builder, ptr %result, align 8
+  call void @llvm.memset.p0.i64(ptr align 16 %str, i8 0, i64 16, i1 false)
+  %6 = getelementptr inbounds %__Internal_Context, ptr %__apoc_internal_context3, i32 0, i32 0
+  store ptr %str, ptr %6, align 8
+  %7 = load %String_Builder, ptr %result, align 8
   call void @builder_to_string(ptr %__apoc_internal_context3, ptr %result)
-  %7 = call i32 @puts(ptr @3)
   %8 = call i32 @puts(ptr @4)
   %9 = call i32 @puts(ptr @5)
+  %10 = call i32 @puts(ptr @6)
   ret i32 0
+}
+
+declare ptr @malloc(i64)
+
+declare ptr @memset(ptr, i32, i64)
+
+declare i32 @scanf(ptr, ...)
+
+declare i32 @printf(ptr, ...)
+
+declare i32 @atoi(ptr)
+
+declare void @srand(i32)
+
+declare i32 @rand()
+
+declare i32 @puts(ptr)
+
+define ptr @mem_alloc(ptr %__apoc_internal_context, i64 %size) {
+entry:
+  %result = alloca ptr, align 8
+  %size2 = alloca i64, align 8
+  %__apoc_internal_context1 = alloca ptr, align 16
+  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
+  store i64 0, ptr %size2, align 4
+  store i64 %size, ptr %size2, align 4
+  %0 = load i64, ptr %size2, align 4
+  %1 = call ptr @malloc(i64 %0)
+  store i64 0, ptr %result, align 4
+  store ptr %1, ptr %result, align 8
+  %2 = load ptr, ptr %result, align 8
+  %3 = load i64, ptr %size2, align 4
+  %4 = call ptr @memset(ptr %2, i32 0, i64 %3)
+  %5 = load ptr, ptr %result, align 8
+  ret ptr %5
 }
 
 define void @builder_to_string(ptr %__apoc_internal_context, ptr %builder) {
@@ -614,41 +651,6 @@ for.incr:                                         ; preds = %for.body
   %4 = add i64 %3, 1
   store i64 %4, ptr %result, align 4
   br label %for.cond
-}
-
-declare ptr @malloc(i64)
-
-declare ptr @memset(ptr, i32, i64)
-
-declare i32 @scanf(ptr, ...)
-
-declare i32 @printf(ptr, ...)
-
-declare i32 @atoi(ptr)
-
-declare void @srand(i32)
-
-declare i32 @rand()
-
-declare i32 @puts(ptr)
-
-define ptr @mem_alloc(ptr %__apoc_internal_context, i64 %size) {
-entry:
-  %result = alloca ptr, align 8
-  %size2 = alloca i64, align 8
-  %__apoc_internal_context1 = alloca ptr, align 16
-  store ptr %__apoc_internal_context, ptr %__apoc_internal_context1, align 8
-  store i64 0, ptr %size2, align 4
-  store i64 %size, ptr %size2, align 4
-  %0 = load i64, ptr %size2, align 4
-  %1 = call ptr @malloc(i64 %0)
-  store i64 0, ptr %result, align 4
-  store ptr %1, ptr %result, align 8
-  %2 = load ptr, ptr %result, align 8
-  %3 = load i64, ptr %size2, align 4
-  %4 = call ptr @memset(ptr %2, i32 0, i64 %3)
-  %5 = load ptr, ptr %result, align 8
-  ret ptr %5
 }
 
 ; Function Attrs: alwaysinline

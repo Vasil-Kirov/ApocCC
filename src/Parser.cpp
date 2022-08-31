@@ -505,6 +505,30 @@ parse_for_statement(File_Contents *f)
 	return result;
 }
 
+void
+parse_is_defined(File_Contents *f)
+{
+	advance_token(f);
+	auto to_check = advance_token(f);
+	if(to_check.type != tok_identifier)
+		raise_parsing_unexpected_token("identifier of define", f);
+
+	auto value = shget(f->build_commands.defines, to_check.identifier);
+	if(value == 0)
+	{
+		int scope_level = 0;
+		while(f->curr_token->type != tok_end_is || scope_level > 0)
+		{
+			advance_token(f);
+			if(f->curr_token->type == tok_is_defined)
+				scope_level++;
+			else if(f->curr_token->type == tok_end_is)
+				scope_level--;
+		}
+		advance_token(f);
+	}
+}
+
 Ast_Node *
 parse_statement(File_Contents *f)
 {
@@ -515,6 +539,18 @@ parse_statement(File_Contents *f)
 		case '{':
 		{
 			return parse_body(f, false, advance_token(f));
+		} break;
+		case tok_is_defined:
+		{
+			parse_is_defined(f);
+			result = alloc_node();
+			result->type = type_dunn;
+		} break;
+		case tok_end_is:
+		{
+			advance_token(f);
+			result = alloc_node();
+			result->type = type_dunn;
 		} break;
 		case tok_if:
 		{
@@ -566,7 +602,6 @@ parse_statement(File_Contents *f)
 			result->type = type_scope_end;
 			result->scope_desc.token = advance_token(f);
 			pop_scope(f, result->scope_desc.token);
-			return result;
 		} break;
 		default:
 		{
@@ -660,6 +695,7 @@ parse_statement_list(File_Contents *f, b32 is_func)
 				else
 					SDPush(result->statements.list, statement);
 			} break;
+			case type_dunn: { } break;
 			default:
 			{
 				SDPush(result->statements.list, statement);

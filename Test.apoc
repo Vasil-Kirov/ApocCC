@@ -6,6 +6,13 @@ func main() -> i32
 {
 	result := init_builder("my big string");
 
+$is_defined Windows
+	puts("Windows");
+$end_is
+$is_defined Linux
+	puts("Linux");
+$end_is
+
 	puts("1");
 	defer puts("4");
 	defer {

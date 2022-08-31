@@ -2,6 +2,7 @@
 #include <CommandLine.h>
 #include <iterator>
 #include <map>
+#include <stdlib/std.h>
 
 void
 raise_build_error(const char *error_msg, ...)
@@ -22,6 +23,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	build_commands.call_linker = true;
 	build_commands.linker_command = NULL;
 	build_commands.output_file = NULL;
+	shdefault(build_commands.defines, 0);
 
 	std::string tmp_output_file;
 	std::string linker_command;
@@ -32,6 +34,12 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	{
 		args[i - 1] = std::string(c_argv[i]);
 	}
+
+#if defined(_WIN32)
+	shput(build_commands.defines, "Windows", true);
+#elif defined(CM_LINUX)
+	shput(build_commands.defines, "Linux", true);
+#endif
 	
 	FOR_EACH(args)
 	{
@@ -51,6 +59,35 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 					build_commands.target = TG_WASM;
 				else
 					raise_build_error("Unsupported target %s", target.c_str());
+			}
+			else if(arg == "--define")
+			{
+				auto define = args[++i];
+				auto eq_pos = define.find('=');
+				auto name = define.substr(0, eq_pos);
+				auto value = define.substr(eq_pos + 1, define.size() - (eq_pos + 1));
+				b32 found_dot = false;
+				for(char& c: value)
+				{
+					if(c == '.')
+					{
+						if(found_dot)
+							LG_FATAL("Defined value for %s has more than one decimal point",
+									name.c_str());
+						found_dot = true;
+					}
+					else if(!is_number(c) && c != '-')
+						LG_FATAL("Value for define %s is not a number", name.c_str());
+				}
+				u64 num = 0;
+				if(found_dot)
+					num = (u64)vstd_str_to_double((char *)value.c_str());
+				else
+					num = str_to_u64(value.c_str());
+
+				u8 *c_name = (u8 *)AllocatePermanentMemory(name.size() + 1);
+				memcpy(c_name, name.c_str(), name.size());
+				shput(build_commands.defines, c_name, num);
 			}
 			else if(arg == "--optimize")
 			{

@@ -89,9 +89,11 @@ typedef enum : signed short
 	tok_default   = -49, // struct default accessor
 	tok_intrinsic = -50, // declare compiler intrinsic
 	tok_call_conv = -51,
+	tok_is_defined= -52, // checks define
+	tok_end_is    = -53, // end if of is_defined
 
-	tok_overload  = -52,
-	tok_defer     = -53,
+	tok_overload  = -54,
+	tok_defer     = -55,
 } Token;
 
 typedef struct _str_hash_table
