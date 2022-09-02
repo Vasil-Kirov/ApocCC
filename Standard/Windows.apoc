@@ -1,9 +1,9 @@
 
 $is_defined Windows
 
-func $call c_decl GetLastError() -> u32;
+fn $call c_decl GetLastError() -> u32;
 
-func $call c_decl CreateFileA(
+fn $call c_decl CreateFileA(
   lpFileName: *u8,
   dwDesiredAccess: File_Permission,
   dwShareMode: u32,
@@ -13,7 +13,7 @@ func $call c_decl CreateFileA(
   hTemplateFile: *void
 ) ->* void;
 
-func $call c_decl WriteFile(
+fn $call c_decl WriteFile(
 	hFile: *void,
 	lpBuffer: *void,
 	nNumberOfBytesToWrite: u32,
@@ -21,9 +21,9 @@ func $call c_decl WriteFile(
 	lpOverlapped: *void // @Incomplete
 ) -> bool;
 
-func $call c_decl GetStdHandle(nStdHandle: STD_Handle) -> *void;
+fn $call c_decl GetStdHandle(nStdHandle: STD_Handle) -> *void;
 
-func open_file(f_name:* u8, access: File_Access) -> *void
+fn open_file(f_name:* u8, access: File_Access) -> *void
 {
 	win_access: File_Permission;
 	if #bool(access & File_Access.READ)    win_access |= File_Permission.GENERIC_READ;
@@ -35,7 +35,7 @@ func open_file(f_name:* u8, access: File_Access) -> *void
 	-> file;
 }
 
-func write_file(file: *void, data: *void, size: u32) -> bool
+fn write_file(file: *void, data: *void, size: u32) -> bool
 {
 	written: u32;
 	WriteFile(file, data, size, @written, null);
@@ -43,7 +43,7 @@ func write_file(file: *void, data: *void, size: u32) -> bool
 	-> result;
 }
 
-func get_stdout() -> *void
+fn get_stdout() -> *void
 {
 	-> GetStdHandle(STD_Handle.OUTPUT);
 }

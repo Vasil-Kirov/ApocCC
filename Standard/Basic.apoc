@@ -27,16 +27,16 @@ enum Var_Size: i32
 
 enum Type_Type: i32
 {
-	T_INTEGER = 3;
-	T_FLOAT;
-	T_STRUCT;
-	T_ARRAY;
-	T_POINTER;
-	T_VOID;
-	T_STRING;
-	T_BOOLEAN;
-	T_FUNC;
-	T_ENUM   = 12;
+	INTEGER = 3;
+	FLOAT;
+	STRUCT;
+	ARRAY;
+	POINTER;
+	VOID;
+	STRING;
+	BOOLEAN;
+	FUNC;
+	ENUM   = 12;
 }
 
 struct Va_List

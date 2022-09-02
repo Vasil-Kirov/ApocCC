@@ -197,6 +197,7 @@ typedef struct
 
 typedef struct _Ast_Call
 {
+	u8 *overload_name;
 	Ast_Node *operand;
 	Ast_Node **arguments; // Simple DArray of expressions
 	Type_Info *expr_types;

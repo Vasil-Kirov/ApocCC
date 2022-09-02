@@ -1,14 +1,15 @@
-func $call c_decl malloc(size: u64) ->* void;
-func $call c_decl memset(dst:* void, val: i32, count: u64) ->* void;
-func $call c_decl scanf(format:* u8, ...) -> i32;
-func $call c_decl printf(format:* u8, ...) -> i32;
-func $call c_decl atoi(num_str:* u8) -> i32;
-func $call c_decl srand(seed: i32);
-func $call c_decl rand() -> i32;
-func $call c_decl puts(str:* u8) -> i32;
-func $call c_decl putchar(c: u8) -> i32;
+fn $call c_decl malloc(size: u64) ->* void;
+fn $call c_decl memset(dst:* void, val: i32, count: u64) ->* void;
+fn $call c_decl scanf(format:* u8, ...) -> i32;
+fn $call c_decl printf(format:* u8, ...) -> i32;
+fn $call c_decl atoi(num_str:* u8) -> i32;
+fn $call c_decl srand(seed: i32);
+fn $call c_decl rand() -> i32;
+fn $call c_decl puts(str:* u8) -> i32;
+fn $call c_decl putchar(c: u8) -> i32;
+fn $call c_decl free(ptr: *void);
 
-func mem_alloc(size: u64) ->* void
+fn mem_alloc(size: u64) ->* void
 {
 	result := malloc(size);
 	memset(result, 0, size);

@@ -3,7 +3,6 @@ import os
 import time
 import subprocess
 
-
 start_time = time.time()
 
 os.system('cls')
@@ -12,17 +11,20 @@ os.system('cls')
 llvm_flags = ""
 compiler_args = ""
 
-if len(sys.argv) == 1 or sys.argv[1] == 'debug':
-	print('--- DEBUG ---')
-	compiler_args = '-g -O0 -Wall -DDEBUG'
-
-elif sys.argv[1] == 'release':
+if 'release' in sys.argv:
 	print('--- RELEASE ---')
 	compiler_args = '-O3 -Wall'
 
-elif sys.argv[1] == 'bounds':
+elif 'bounds' in sys.argv:
 	print('--- BOUNDS ---')
 	compiler_args = '-O0 -Wall -fsanitize=address'
+else:
+	print('--- DEBUG ---')
+	compiler_args = '-g -O0 -Wall -DDEBUG'
+
+if 'ir' in sys.argv:
+	print('--- ONLY IR ---')
+	compiler_args += ' -DONLY_IR'
 
 llvm_flags = r"-fno-exceptions -std=c++14 -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DUNICODE -D_UNICODE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
 

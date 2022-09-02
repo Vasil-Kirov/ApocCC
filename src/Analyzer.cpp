@@ -1645,6 +1645,7 @@ overload_overwrite(Token_Iden token, Ast_Node *expression, Ast_Node *left_expr, 
 	expression->func_call.arguments = SDCreate(Ast_Node *);
 	expression->func_call.arg_types = SDCreate(Type_Info);
 	expression->func_call.expr_types = SDCreate(Type_Info);
+	expression->func_call.overload_name = NULL;
 	SDPush(expression->func_call.arguments, left_expr);
 	if(right_expr)
 		SDPush(expression->func_call.arguments, right_expr);
@@ -1757,6 +1758,7 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, A
 		if(func_sym && func_sym->tag == S_FUNCTION && func_sym->node->function.overloads)
 		{
 			size_t to_allocate = vstd_strlen((char *)func_sym->node->function.identifier.name);
+			size_t id_len = to_allocate;
 			to_allocate += 128 * SDCount(func_sym->node->function.arguments);
 			u8 *out = (u8 *)AllocatePermanentMemory(to_allocate * 1.5f);
 			vstd_strcat((char *)out, (char *)func_sym->node->function.identifier.name);
@@ -1770,15 +1772,62 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, A
 					vstd_strcat((char *)out, "!@");
 				}
 			}
+			size_t out_len = vstd_strlen((char *)out);
 			auto overload_count = SDCount(func_sym->node->function.overloads);
 			Ast_Node *found_overload = NULL;
 			for(size_t i = 0; i < overload_count; ++i)
 			{
-				if(vstd_strcmp((char *)out, (char *)func_sym->node->function.overloads[i]->function.identifier.name))
+				char *overload_name = (char *)func_sym->node->function.overloads[i]->function.identifier.name;
+				size_t len = vstd_strlen(overload_name);
+				if(out_len == len && memcmp(out, overload_name, len) == 0)
 				{
 					found_overload = func_sym->node->function.overloads[i];
+					goto FOUND_OVERLOAD;
+				}
+
+				int found_ex = 0;
+				for(size_t j = 0; j < len; ++j)
+				{
+					if(overload_name[j] == '!')
+						found_ex++;
+					else if(overload_name[j] == '-')
+					{
+						if(found_ex < 2)
+						{
+							// @NOTE: if it's not an empty call
+							if(out_len != id_len + 2)
+							{
+								found_overload = func_sym->node->function.overloads[i];
+								goto FOUND_OVERLOAD;
+							}
+							else
+								continue;
+						}
+						size_t removed_index = j - 2;
+						u8 removed_char = overload_name[removed_index];
+						overload_name[removed_index] = 0;
+						u8 saved_out;
+						for(size_t k = 0; k < out_len; ++k)
+						{
+							if(out[k] == '!')
+							{
+								saved_out = out[k];
+								out[k] = 0;
+								if(k == removed_index && memcmp(overload_name, out, k) == 0)
+								{
+									out[k] = saved_out;
+									overload_name[removed_index] = removed_char;
+									found_overload = func_sym->node->function.overloads[i];
+									goto FOUND_OVERLOAD;
+								}
+								out[k] = saved_out;
+							}
+						}
+						overload_name[removed_index] = removed_char;
+					}
 				}
 			}
+FOUND_OVERLOAD:
 			if(!found_overload)
 			{
 				char *error = (char *)AllocatePermanentMemory(512 * overload_count);			
@@ -1791,10 +1840,11 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, A
 				raise_formated_semantic_error(f, func_call->func_call.token, "No overload found for function call: \n\t%s", error);
 			}
 			Token_Iden custom_token = func_call->func_call.token;
-			custom_token.identifier = out;
+			custom_token.identifier = found_overload->function.identifier.name;
 			auto overload_sym = get_symbol_spot(f, custom_token);
 			operand_type = overload_sym->type;
 			func_call->func_call.operand_type = operand_type;
+			func_call->func_call.overload_name = found_overload->function.identifier.name;
 		}
 	}
 
@@ -2008,7 +2058,6 @@ get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out)
 
 
 
-// TODO: operator overloading
 b32
 are_op_compatible(Type_Info a, Type_Info b)
 {
@@ -2160,7 +2209,7 @@ var_type_to_name(Type_Info type, b32 bracket)
 	else if(type.type == T_FUNC)
 	{
 		size_t param_count = SDCount(type.func.param_types);
-		vstd_strcat(result, "func ");
+		vstd_strcat(result, "fn ");
 		switch(type.func.calling_convention)
 		{
 			case CALL_APOC:
@@ -2219,7 +2268,7 @@ var_type_to_name(Type_Info type, b32 bracket)
 	}
 	else if(type.type == T_STRING)
 	{
-		vstd_strcat(result, "string");
+		vstd_strcat(result, "* u8");
 	}
 	else
 	{

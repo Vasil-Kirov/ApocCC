@@ -52,7 +52,7 @@ initialize_compiler(File_Contents *f)
 	// NOTE(Vasko): Add keywords to string hash table
 	if(!keyword_table)
 	{
-		shput(keyword_table, "func",       tok_func);
+		shput(keyword_table, "fn",       tok_func);
 		shput(keyword_table, "extern",     tok_extern);
 		shput(keyword_table, "struct",     tok_struct);
 		shput(keyword_table, "enum",       tok_enum);

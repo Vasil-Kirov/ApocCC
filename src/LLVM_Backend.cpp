@@ -724,13 +724,11 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	}
 
 
-	backend.builder->SetInsertPoint(aftr);
-	Assert(aftr->getTerminator() == NULL);
-
 	{
+		backend.builder->SetInsertPoint(aftr);
 		size_t count = SDCount(list);
 		for(; *idx < count; *idx += 1)
-			generate_block(f, list[*idx], func, body, "for.aftr", aftr, statements, idx);
+			generate_block(f, list[*idx], func, aftr, "for.aftr", NULL, statements, idx);
 	}
 
 
@@ -809,44 +807,22 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 llvm::FunctionCallee
 get_callee_maybe_overloaded(llvm::Value *operand, Ast_Node *call_node)
 {
-	size_t arg_count = SDCount(call_node->func_call.arg_types);
-	if(arg_count == 0)
+	if(call_node->func_call.overload_name)
 	{
-RETURN_NOT_OVERLOADED:
+		Variable_Types val_type = ID_INVALID;
+		auto func_val = get_identifier(call_node->func_call.overload_name, &val_type);
+		Assert(val_type == ID_FUNCTION);
+		auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
+		auto callee = FunctionCallee(func_pointer_type, func_val);
+		return callee;
+	}
+	else
+	{
 		auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
 		auto callee = FunctionCallee(func_pointer_type, operand);
 		return callee;
 	}
 
-	auto str = operand->getName().str();
-	size_t to_allocate = str.size();
-	to_allocate += 128 * arg_count;
-	auto overloaded_name = (char *)AllocateCompileMemory(to_allocate);
-	vstd_strcat(overloaded_name, str.c_str());
-	vstd_strcat(overloaded_name, "!@");
-
-	for(size_t i = 0; i < arg_count; ++i)
-	{
-		vstd_strcat(overloaded_name,
-				(char *)var_type_to_name(call_node->func_call.expr_types[i], false));
-		if(i + 1 != arg_count)
-		{
-			vstd_strcat(overloaded_name, "!@");
-		}
-	}
-	//@TODO: check for invalid overloads
-	//@TODO: check for invalid overloads
-	//@TODO: check for invalid overloads
-	//@TODO: check for invalid overloads
-	//@TODO: check for invalid overloads
-	Variable_Types id_type = {};
-	auto func_val = get_identifier((u8 *)overloaded_name, &id_type);
-	if(func_val == NULL)
-		goto RETURN_NOT_OVERLOADED;
-
-	auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
-	auto callee = FunctionCallee(func_pointer_type, func_val);
-	return callee;
 }
 
 llvm::Value *
@@ -932,8 +908,8 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 			found_var_args = true;
 			if(call_node->func_call.operand_type.func.calling_convention == CALL_APOC)
 			{
-				auto type_ptr = generate_type_info(expr_types[i], func);
-				auto val_ptr  = allocate_variable(func, (u8 *)"any_val", expr_types[i],
+				auto type_ptr = generate_type_info(expr_types[i - 1], func);
+				auto val_ptr  = allocate_variable(func, (u8 *)"any_val", expr_types[i - 1],
 						backend);
 				backend.builder->CreateStore(arg_exprs[i], val_ptr);
 				arg_exprs[i] = to_any(type_ptr, val_ptr, func);
@@ -1625,7 +1601,7 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 			left  = backend.builder->CreateCast(Instruction::CastOps::Trunc, left , llvm::Type::getInt1Ty(*backend.context), "left_logical" );
 			right = backend.builder->CreateCast(Instruction::CastOps::Trunc, right, llvm::Type::getInt1Ty(*backend.context), "right_logical");
 		}
-		else
+		else if(node->binary_expr.left.type != T_POINTER)
 			right = create_cast(node->binary_expr.left, node->binary_expr.right, right);
 
 		llvm::Value *result = NULL;
@@ -1633,9 +1609,17 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 		{
 			case '+':
 			{
-				if(is_float(node->binary_expr.left))
+				if(node->binary_expr.left.type == T_POINTER) {
+					auto type = apoc_type_to_llvm(node->binary_expr.left,
+							backend);
+					llvm::Value *idx_list[] = {
+						right
+					};
+					result = backend.builder->CreateGEP(type, left, idx_list);
+				}
+				else if(is_float(node->binary_expr.left))
 					result = backend.builder->CreateFAdd(left, right);
-				else
+				else 
 					result = backend.builder->CreateAdd(left, right);
 			} break;
 			case '-':

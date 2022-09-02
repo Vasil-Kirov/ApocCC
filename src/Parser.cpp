@@ -532,8 +532,7 @@ parse_for_statement(File_Contents *f)
 	if(f->curr_token->type != '{')
 		result->for_loop.expr3 = parse_expression(f, (Token)NO_EXPECT, false);
 	else
-		advance_token(f);
-
+		LG_DEBUG("YES");
 	f->expression_level = 0;
 
 	result->for_loop.token = token;
@@ -1478,10 +1477,10 @@ get_func_name(Ast_Node *func)
 	for(size_t i = 0; i < SDCount(func->function.arguments); ++i)
 	{
 		if(args[i]->variable.type.type == T_DETECT)
-			continue;
-		vstd_strcat((char *)out, (char *)var_type_to_name(args[i]->variable.type, false));
-		if(i + 1 != SDCount(func->function.arguments)
-				&& args[i + 1]->variable.type.type != T_DETECT)
+			vstd_strcat((char *)out, "-");
+		else
+			vstd_strcat((char *)out, (char *)var_type_to_name(args[i]->variable.type, false));
+		if(i + 1 != SDCount(func->function.arguments))
 		{
 			vstd_strcat((char *)out, "!@");
 		}
