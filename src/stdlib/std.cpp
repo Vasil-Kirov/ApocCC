@@ -18,24 +18,24 @@ strcpy_secure(char *destination, size_t max_size, const char *source)
 f64
 vstd_pow(f64 a, f64 b)
 {
-	if(b == 0) return 1;
-	
-	if (b < 0) 
+	f64 result = 1;
+
+	b32 is_neg = false;
+	if(b < 0)
 	{
 		b = -b;
-		while(b--)
-		{
-			a *= 1/a; 
-		}
+		is_neg = true;
 	}
-	else
+
+	while(b != 0)
 	{
-		while(b--)
-		{
-			a*=a;
-		}
+		result *= a;
+		--b;
 	}
-	return a;
+
+	if(is_neg)
+		result = 1.0 / result;
+	return result;
 }
 
 void
@@ -123,8 +123,9 @@ vstd_str_to_double(char *str)
 			LG_FATAL("Expected number, got something else");
 		}
 	}
-	return result * vstd_pow(10, magic);
-	
+	result *= vstd_pow(10, magic);
+	LG_DEBUG("str: %s\nnum:%f", str, result);
+	return result;
 }
 
 u64
@@ -340,7 +341,7 @@ str_to_u64(const char *string)
 	Assert(scan[0] != '-')
 	for(size_t i = 0; scan[i] != 0; ++i)
 	{
-		result = scan[i] - '0';
+		result += scan[i] - '0';
 		if(scan[i+1] != 0)
 			result *= 10;
 	}

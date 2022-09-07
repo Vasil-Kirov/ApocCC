@@ -531,8 +531,6 @@ parse_for_statement(File_Contents *f)
 	f->expression_level = -1;
 	if(f->curr_token->type != '{')
 		result->for_loop.expr3 = parse_expression(f, (Token)NO_EXPECT, false);
-	else
-		LG_DEBUG("YES");
 	f->expression_level = 0;
 
 	result->for_loop.token = token;
@@ -629,6 +627,8 @@ parse_and_scope_unscoped(File_Contents *f, Ast_Node **list, Ast_Node *statement)
 		token = statement->condition.token;
 	else if(statement->type == type_for)
 		token = statement->for_loop.token;
+	else if(statement->type == type_else)
+		token = statement->condition.token;
 	else
 		Assert(false);
 	Ast_Node *scope_start = alloc_node();
@@ -641,18 +641,31 @@ parse_and_scope_unscoped(File_Contents *f, Ast_Node **list, Ast_Node *statement)
 	scope_end->scope_desc.token = token;
 	auto new_list = SDCreate(Ast_Node *);
 	auto body = parse_statement(f);
-
-	if((body->type == type_if || body->type == type_for)
+	
+	if(statement->type == type_else && body->type == type_if &&
+			f->curr_token->type == '{')
+	{
+		auto scope = parse_statement(f);
+		SDPush(new_list, body);
+		SDPush(new_list, scope);
+	}
+	else if((body->type == type_if || body->type == type_for || body->type == type_else)
 				&& f->curr_token->type != (Token)'{')
 	{
 		parse_and_scope_unscoped(f, new_list, body);
 	}
 	else
 		SDPush(new_list, body);
+
+	if(body->type == type_if && f->curr_token->type == tok_else)
+	{
+		auto else_statement = parse_statement(f);
+		parse_and_scope_unscoped(f, new_list, else_statement);
+	}
 	scope_start->scope_desc.body->statements.list = new_list;
 	SDPush(list, statement);
 	SDPush(list, scope_start);
-	SDPush(list, scope_end);
+	SDPush(new_list, scope_end);
 }
 
 Ast_Node *
@@ -696,6 +709,7 @@ parse_statement_list(File_Contents *f, b32 is_func)
 				SDPush(f->defered, defered);
 			} break;
 			case type_if:
+			case type_else:
 			case type_for:
 			{
 				if(f->curr_token->type != (Token)'{')
@@ -1029,6 +1043,7 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 			_vstd_IntToStr(as_num, num_str);
 			Ast_Identifier ast_id = {char_tok, (u8 *)num_str, NULL};
 			result->atom.identifier = ast_id;
+			result->atom.type = LIT_CHAR;
 		} break;
 		case tok_number:
 		{
@@ -1040,6 +1055,7 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 			result = alloc_node();
 			result->type = type_literal;
 			result->atom.identifier = pure_identifier(advance_token(f));
+			result->atom.type = LIT_NORMAL_NUMBER;
 		} break;
 		case tok_const_str:
 		{

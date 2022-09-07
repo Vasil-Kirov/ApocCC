@@ -38,22 +38,26 @@ llvm_zero_out_memory(llvm::Value *ptr, u64 size, llvm::Align alignment, IRBuilde
 		case 1:
 		{
 			auto zero = builder->getInt8(0);
-			builder->CreateStore(zero, ptr);
+			auto store_inst = builder->CreateStore(zero, ptr);
+			store_inst->setAlignment(alignment);
 		} break;
 		case 2:
 		{
 			auto zero = builder->getInt16(0);
-			builder->CreateStore(zero, ptr);
+			auto store_inst = builder->CreateStore(zero, ptr);
+			store_inst->setAlignment(alignment);
 		} break;
 		case 4:
 		{
 			auto zero = builder->getInt32(0);
-			builder->CreateStore(zero, ptr);
+			auto store_inst = builder->CreateStore(zero, ptr);
+			store_inst->setAlignment(alignment);
 		} break;
 		case 8:
 		{
 			auto zero = builder->getInt64(0);
-			builder->CreateStore(zero, ptr);
+			auto store_inst = builder->CreateStore(zero, ptr);
+			store_inst->setAlignment(alignment);
 		} break;
 		default:
 		{
@@ -64,7 +68,7 @@ llvm_zero_out_memory(llvm::Value *ptr, u64 size, llvm::Align alignment, IRBuilde
 }
 
 AllocaInst *
-allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
+allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type,
 		u64 align)
 {
 	Assert(func);
@@ -76,18 +80,18 @@ allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type, Backe
 }
 
 AllocaInst *
-allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
+allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State *backend,
 		u64 align, u64 size_in_bytes)
 {
 	Assert(func);
-	auto location = allocate_with_llvm_no_zero(func, var_name, type, backend, align);
+	auto location = allocate_with_llvm_no_zero(func, var_name, type, align);
 	auto alignment = Align(align);
-	llvm_zero_out_memory(location, size_in_bytes, alignment, backend.builder);
+	llvm_zero_out_memory(location, size_in_bytes, alignment, backend->builder);
 	return location;
 }
 
 AllocaInst *
-allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State backend)
+allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State *backend)
 {
 	if(func)
 	{
@@ -96,7 +100,7 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State ba
 		auto location = temp_builder.CreateAlloca(alloc_type, 0, (char *)var_name);
 		auto alignment = Align(get_type_alignment(type));
 		location->setAlignment(alignment);
-		llvm_zero_out_memory(location, get_type_size(type), alignment, backend.builder);
+		//llvm_zero_out_memory(location, get_type_size(type), alignment, backend->builder);
 		return location;
 	}
 	else
@@ -107,17 +111,17 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State ba
 }
 
 void
-create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State backend)
+create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State *backend)
 {
-	backend.builder->SetInsertPoint(from);
+	backend->builder->SetInsertPoint(from);
 	if(from && to && from->getTerminator() == NULL)
-		backend.builder->CreateBr(to);
+		backend->builder->CreateBr(to);
 }
 
 llvm::StructType *
-get_type_info_kind(const char *name, Backend_State backend)
+get_type_info_kind(const char *name, Backend_State *backend)
 {
-	auto result = shget(backend.struct_types, name);
+	auto result = shget(backend->struct_types, name);
 	if(!result)
 	{
 		LG_FATAL("%s is not defined, this type is needed for using\n"
@@ -129,7 +133,7 @@ get_type_info_kind(const char *name, Backend_State backend)
 }
 
 void
-gep_and_write_val_int(llvm::Value *ptr, llvm::StructType *type, Backend_State backend, int index,
+gep_and_write_val_int(llvm::Value *ptr, llvm::StructType *type, Backend_State *backend, int index,
 		u64 val, int bit_size)
 {
 	Constant *constant;
@@ -138,29 +142,29 @@ gep_and_write_val_int(llvm::Value *ptr, llvm::StructType *type, Backend_State ba
 	{
 		case 8:
 		{
-			size_type = llvm::Type::getInt8Ty(*backend.context);
+			size_type = llvm::Type::getInt8Ty(*backend->context);
 		} break;
 		case 16:
 		{
-			size_type = llvm::Type::getInt16Ty(*backend.context);
+			size_type = llvm::Type::getInt16Ty(*backend->context);
 		} break;
 		case 32:
 		{
-			size_type = llvm::Type::getInt32Ty(*backend.context);
+			size_type = llvm::Type::getInt32Ty(*backend->context);
 		} break;
 		case 64:
 		{
-			size_type = llvm::Type::getInt64Ty(*backend.context);
+			size_type = llvm::Type::getInt64Ty(*backend->context);
 		} break;
 	}
 	constant = ConstantInt::get(size_type, val);
-	auto to_write = backend.builder->CreateStructGEP(type, ptr, index);
-	backend.builder->CreateStore(constant, to_write);
+	auto to_write = backend->builder->CreateStructGEP(type, ptr, index);
+	llvm_store(to_write, constant, backend, bit_size);
 }
 
 void
 write_type_info_pointer_to_llvm(Type_Info *type_ptr, llvm::Value *ptr,
-		llvm::StructType *type_info_type, Backend_State backend, llvm::Function *func)
+		llvm::StructType *type_info_type, Backend_State *backend, llvm::Function *func)
 {
 	if(type_ptr)
 	{
@@ -168,13 +172,13 @@ write_type_info_pointer_to_llvm(Type_Info *type_ptr, llvm::Value *ptr,
 		auto ptr_ptr = temp_builder.CreateAlloca(type_info_type, 0, (char *)"type_info_ptr");
 		ptr_ptr->setAlignment(Align(16));
 		write_type_info_to_llvm(*type_ptr, ptr_ptr, type_info_type, backend, func);
-		auto pointed_ptr = backend.builder->CreateStructGEP(type_info_type, ptr, 1);
-		backend.builder->CreateStore(ptr_ptr, pointed_ptr);
+		auto pointed_ptr = backend->builder->CreateStructGEP(type_info_type, ptr, 1);
+		backend->builder->CreateStore(ptr_ptr, pointed_ptr);
 	}
 }
 
 AllocaInst *
-write_string(u8 *str, llvm::Function *func, Backend_State backend)
+write_string(u8 *str, llvm::Function *func, Backend_State *backend)
 {
 	size_t len = vstd_strlen((char *)str);
 	Type_Info u8_t = {};
@@ -189,39 +193,42 @@ write_string(u8 *str, llvm::Function *func, Backend_State backend)
 
 	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
 	auto ptr_ptr = temp_builder.CreateAlloca(llvm_array, 0, (char *)"str_ptr");
-	GlobalVariable *global_str_lit = backend.builder->CreateGlobalString(
+	GlobalVariable *global_str_lit = backend->builder->CreateGlobalString(
 			StringRef((char *)str, len)
 			);
-	backend.builder->CreateStore(global_str_lit, ptr_ptr);
+	auto store_inst = backend->builder->CreateStore(global_str_lit, ptr_ptr);
+	store_inst->setAlignment(Align(8));
 	return ptr_ptr;
 }
 
 void
-write_struct_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State backend,
+write_struct_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State *backend,
 		Function *func, llvm::Type *type_info_type)
 {
 	auto llvm_type = get_type_info_kind("Type_Struct", backend);
 	gep_and_write_val_int(ptr, llvm_type, backend, 1, to_write.structure.member_count, 32);
 	gep_and_write_val_int(ptr, llvm_type, backend, 2, to_write.structure.is_union, 8);
 	gep_and_write_val_int(ptr, llvm_type, backend, 3, to_write.structure.is_packed, 8);
-	auto name_idx = backend.builder->CreateStructGEP(llvm_type, ptr, 4);
+	auto name_idx = backend->builder->CreateStructGEP(llvm_type, ptr, 4);
 	auto name_ptr = write_string(to_write.structure.name, func, backend);
-	backend.builder->CreateStore(name_ptr, name_idx);
-	auto member_names = backend.builder->CreateStructGEP(llvm_type, ptr, 5);
-	auto member_types = backend.builder->CreateStructGEP(llvm_type, ptr, 6);
-	auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
+	auto store_inst = backend->builder->CreateStore(name_ptr, name_idx);
+	store_inst->setAlignment(Align(8));
+	auto member_names = backend->builder->CreateStructGEP(llvm_type, ptr, 5);
+	auto member_types = backend->builder->CreateStructGEP(llvm_type, ptr, 6);
+	auto zero = ConstantInt::get(*backend->context, llvm::APInt(64, 0, true));
 	for(size_t i = 0; i < to_write.structure.member_count; ++i)
 	{
 		llvm::Value *idx_list[2] = {
 			zero,
-			ConstantInt::get(Type::getInt64Ty(*backend.context), i),
+			ConstantInt::get(Type::getInt64Ty(*backend->context), i),
 		};
-		auto name_elem_ptr = backend.builder->CreateGEP(member_names->getType(), member_names,
+		auto name_elem_ptr = backend->builder->CreateGEP(member_names->getType(), member_names,
 				idx_list);
 		auto name_ptr = write_string(to_write.structure.member_names[i], func, backend);
-		backend.builder->CreateStore(name_ptr, name_elem_ptr);
+		store_inst = backend->builder->CreateStore(name_ptr, name_elem_ptr);
+		store_inst->setAlignment(Align(8));
 
-		auto type_elem_ptr = backend.builder->CreateGEP(member_types->getType(), member_types,
+		auto type_elem_ptr = backend->builder->CreateGEP(member_types->getType(), member_types,
 				idx_list);
 		write_type_info_to_llvm(to_write.structure.member_types[i], type_elem_ptr,
 				type_info_type, backend, func);
@@ -230,7 +237,7 @@ write_struct_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State backend
 
 void
 write_array_to_llvm(Type_Info to_write, llvm::Value *ptr,
-		Backend_State backend, llvm::Function *func)
+		Backend_State *backend, llvm::Function *func)
 {
 	auto llvm_type = get_type_info_kind("Type_Array", backend);
 	write_type_info_pointer_to_llvm(to_write.array.type, ptr, llvm_type, backend, func);
@@ -238,7 +245,7 @@ write_array_to_llvm(Type_Info to_write, llvm::Value *ptr,
 }
 
 void
-write_primitive_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State backend)
+write_primitive_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State *backend)
 {
 	auto llvm_type = get_type_info_kind("Type_Primitive", backend);
 	gep_and_write_val_int(ptr, llvm_type, backend, 1, to_write.primitive.size, 32);
@@ -246,7 +253,7 @@ write_primitive_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State back
 
 void
 write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_type,
-		Backend_State backend, llvm::Function *func)
+		Backend_State *backend, llvm::Function *func)
 {
 	if(to_write.type == T_UNTYPED_INTEGER)
 	{
@@ -292,7 +299,7 @@ write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_t
 
 // @TODO: remove Function * argument
 llvm::Constant *
-interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func)
+interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 {
 	llvm::Constant *result = NULL;
 	switch((int)val.type.type)
@@ -330,12 +337,12 @@ interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func)
 		} break;
 		case T_POINTER:
 		{
-			result = ConstantInt::get(Type::getInt64Ty(*backend.context), (u64)val.pointed);
+			result = ConstantInt::get(Type::getInt64Ty(*backend->context), (u64)val.pointed);
 			Type_Info int_type = {};
 			int_type.type = T_INTEGER;
 			int_type.primitive.size = ubyte8;
 			result = (Constant *)create_cast(val.type, int_type, result);
-			//result = ConstantExpr::getIntToPtr(result, PointerType::get(*backend.context, 0));
+			//result = ConstantExpr::getIntToPtr(result, PointerType::get(*backend->context, 0));
 		} break;
 		default:
 			Assert(false);
@@ -485,7 +492,7 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 }
 
 llvm::FunctionType *
-type_to_func_type(Type_Info type, Backend_State backend)
+type_to_func_type(Type_Info type, Backend_State *backend)
 {
 	b32 is_apoc = type.func.calling_convention == CALL_APOC;
 	size_t param_count = SDCount(type.func.param_types);
@@ -517,48 +524,50 @@ type_to_func_type(Type_Info type, Backend_State backend)
 }
 
 llvm::Type *
-apoc_type_to_llvm(Type_Info type, Backend_State backend)
+apoc_type_to_llvm(Type_Info type, Backend_State *backend)
 {
 	if (is_untyped(type))
 	{
 		if(is_integer(type))
 		{
-			return llvm::Type::getInt64Ty(*backend.context);
+			return llvm::Type::getInt64Ty(*backend->context);
 		}
 		else if(is_float(type))
 		{
-			return llvm::Type::getDoubleTy(*backend.context);
+			return llvm::Type::getDoubleTy(*backend->context);
 		}
 	}
 	if (is_integer(type))
 	{
-		return llvm_int_types[type.primitive.size](*backend.context);
+		Assert(type.primitive.size != 0);
+		return llvm_int_types[type.primitive.size](*backend->context);
 	}
 	else if (is_float(type))
 	{
-		if(type.primitive.size == real32) return llvm::Type::getFloatTy(*backend.context);
-		else if(type.primitive.size == real64) return llvm::Type::getDoubleTy(*backend.context);
+		Assert(type.primitive.size != 0);
+		if(type.primitive.size == real32) return llvm::Type::getFloatTy(*backend->context);
+		else if(type.primitive.size == real64) return llvm::Type::getDoubleTy(*backend->context);
 		Assert(false);
 	}
 	else if (type.type == T_BOOLEAN)
 	{
-		return llvm::Type::getInt8Ty(*backend.context);
+		return llvm::Type::getInt8Ty(*backend->context);
 	}
 	else if (type.type == T_STRING)
 	{
-		llvm::Type *u8_type = llvm::Type::getInt8Ty(*backend.context);
+		llvm::Type *u8_type = llvm::Type::getInt8Ty(*backend->context);
 		return llvm::PointerType::get(u8_type, 0);
 	}
 	else if (type.type == T_POINTER)
 	{
 		llvm::Type *base_type = apoc_type_to_llvm(*type.pointer.type, backend);
 		if(!base_type)
-			return llvm::PointerType::get(*backend.context, 0);
+			return llvm::PointerType::get(*backend->context, 0);
 		return llvm::PointerType::get(base_type, 0);
 	}
 	else if (type.type == T_STRUCT)
 	{
-		auto struct_type = shget(backend.struct_types, type.identifier);
+		auto struct_type = shget(backend->struct_types, type.identifier);
 		return struct_type;
 	}
 	else if (type.type == T_ARRAY)
@@ -569,7 +578,7 @@ apoc_type_to_llvm(Type_Info type, Backend_State backend)
 	}
 	else if (type.type == T_VOID)
 	{
-		return llvm::Type::getVoidTy(*backend.context);
+		return llvm::Type::getVoidTy(*backend->context);
 	}
 	else if (type.type == T_FUNC)
 	{
@@ -578,6 +587,29 @@ apoc_type_to_llvm(Type_Info type, Backend_State backend)
 	}
 	Assert(false);
 	return NULL;
+}
+
+
+LoadInst *
+llvm_load(Type_Info *type, llvm::Value *ptr, const char *name, Backend_State *backend)
+{
+	auto llvm_type = apoc_type_to_llvm(*type, backend);
+	auto load_inst = backend->builder->CreateLoad(llvm_type, ptr, name);
+	load_inst->setAlignment(Align(get_type_alignment(*type)));
+	return load_inst;
+}
+
+void
+llvm_store(llvm::Value *ptr, llvm::Value *value, Backend_State *backend, int alignment)
+{
+	auto store_inst = backend->builder->CreateStore(value, ptr);
+	store_inst->setAlignment(Align(alignment));
+}
+
+void
+llvm_store(Type_Info *type, llvm::Value *ptr, llvm::Value *value, Backend_State *backend)
+{
+	llvm_store(ptr, value, backend, get_type_alignment(*type));
 }
 
 DIType *
@@ -760,7 +792,15 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			}
 			else
 			{
-				return Instruction::CastOps::UIToFP;
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				return Instruction::CastOps::SIToFP;
+				//return Instruction::CastOps::UIToFP;
 			}
 		}
 	}
@@ -870,7 +910,15 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			else
 			{
 				Assert(is_float(from));
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
+				// @TODO: Why doesn't fptoui work???
 				return Instruction::CastOps::FPToSI;
+				//return Instruction::CastOps::FPToUI;
 			}
 		}
 	}

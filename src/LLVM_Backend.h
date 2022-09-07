@@ -32,6 +32,7 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files);
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/CommandLine.h>
 #include <llvm/Target/TargetOptions.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/MC/TargetRegistry.h>

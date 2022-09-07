@@ -1,0 +1,11 @@
+
+
+
+fn $call c_decl give_num() -> f32
+{
+	the_float: f32= 1.3;
+	-> the_float;
+}
+
+
+

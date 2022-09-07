@@ -47,10 +47,19 @@ else:
 	backend_files = '..\\src\\C_Backend.cpp'
 
 
-linker_args += r' -lE:/GitClone/llvm-project/llvm/build/Release/lib/*.lib'
-linker_args += r' -LE:/GitClone/llvm-project/llvm/build/Release/lib'
-includes += r' -IE:/GitClone/llvm-project/llvm/build/include'
-includes += r' -IE:/GitClone/llvm-project/llvm/include'
+llvm_version = 14;
+
+if llvm_version == 14:
+    print("--- LLVM 14 ---")
+    linker_args += r' -lE:/GitClone/llvm-14/lib/*.lib'
+    includes += r' -IE:/GitClone/llvm-14/include'
+
+elif llvm_version == 15:
+    print("--- LLVM 15 ---")
+    linker_args += r' -lE:/GitClone/llvm-project/llvm/build/Release/lib/*.lib'
+    linker_args += r' -LE:/GitClone/llvm-project/llvm/build/Release/lib'
+    includes += r' -IE:/GitClone/llvm-project/llvm/build/include'
+    includes += r' -IE:/GitClone/llvm-project/llvm/include'
 
 c_command = ['clang++', '-oapoc.exe', '../src/Main.cpp']
 c_command += linker_args.split(' ')

@@ -1,14 +1,20 @@
+#include "llvm-c/Core.h"
+#include "llvm-c/Types.h"
 #include "llvm/ADT/EpochTracker.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
@@ -189,6 +195,13 @@ emit_assignment(File_Contents *f, Ast_Node *node, llvm::Value *location, u8 *ide
 	}
 }
 
+void set_asm_syntax_to_intel()
+{
+    char const *args[] = { "some-exe-name", "--x86-asm-syntax=intel" };
+    auto const res = llvm::cl::ParseCommandLineOptions(std::size(args), args);
+    Assert(res);
+}
+
 void
 generate_obj(File_Contents *f)
 {
@@ -249,6 +262,8 @@ generate_obj(File_Contents *f)
 	char *obj_file = change_file_extension(
 			platform_path_to_file_name((char *)f->path), (char *)"o");
 	f->obj_name = obj_file;
+
+	//set_asm_syntax_to_intel();
 #if !defined(ONLY_IR)
 	LLVMTargetMachineEmitToFile(machine, file_mod, obj_file, LLVMObjectFile, &error);
 	LLVMTargetMachineEmitToFile(machine, file_mod, (char *)"asm.s", LLVMAssemblyFile, &error);
@@ -266,6 +281,9 @@ void
 llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files)
 {
 	backend = llvm_initialize(f, files);
+
+	if(sizeof(size_t) == 8)
+		backend.module->setDataLayout(StringRef("i64:64:64"));
 
 	generate_signatures(f);
 	i32 func_count = 0;
@@ -310,7 +328,7 @@ generate_struct_type(File_Contents *f, Type_Info type)
 				// emit_location(f, type.token);
 				debug_types[i] = to_debug_type(members[i], &debug);
 				)
-		mem_types[i] = apoc_type_to_llvm(members[i], backend);
+		mem_types[i] = apoc_type_to_llvm(members[i], &backend);
 		if(mem_types[i] == NULL)
 		{
 			if(members[i].type== T_STRUCT)
@@ -343,7 +361,7 @@ generate_union_type(File_Contents *f, Type_Info passed_type)
 
 	llvm::Type *llvm_type = NULL;
 	if(type.type != T_STRUCT)
-		llvm_type = apoc_type_to_llvm(type, backend);
+		llvm_type = apoc_type_to_llvm(type, &backend);
 	else
 		llvm_type = generate_struct_type(f, type);
 	auto array_ref = makeArrayRef(&llvm_type, 1);
@@ -437,7 +455,7 @@ generate_statement(File_Contents *f, Ast_Node *node)
 						node->assignment.token);
 				LG_FATAL(".");
 			}
-			Constant* const_val = interp_val_to_llvm(interp_val, backend, NULL);
+			Constant* const_val = interp_val_to_llvm(interp_val, &backend, NULL);
 
 			Type_Info from = node->assignment.decl_type;
 			if(is_integer(from))
@@ -460,7 +478,7 @@ generate_statement(File_Contents *f, Ast_Node *node)
 			}
 			const_val = (Constant *)create_cast(node->assignment.decl_type, from, const_val);
 
-			auto global_type = apoc_type_to_llvm(node->assignment.decl_type, backend);
+			auto global_type = apoc_type_to_llvm(node->assignment.decl_type, &backend);
 			auto global_var = new GlobalVariable(
 					*backend.module, global_type, node->assignment.is_const,
 					GlobalValue::LinkageTypes::ExternalLinkage,
@@ -525,11 +543,13 @@ generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count)
 llvm::Value *
 create_cast(Type_Info to, Type_Info from, llvm::Value *castee)
 {
-	b32 should_cast;
+	b32 should_cast = true;
 	auto to_cast = get_cast_type(to, from, &should_cast);
 
 	if (should_cast)
-		castee = backend.builder->CreateCast(to_cast, castee, apoc_type_to_llvm(to, backend), "cast");
+	{
+		castee = backend.builder->CreateCast(to_cast, castee, apoc_type_to_llvm(to, &backend), "cast");
+	}
 	return castee;
 }
 
@@ -568,12 +588,7 @@ generate_func_signature(File_Contents *f, Ast_Node *node, b32 is_overload)
 	
 	if(is_apoc && get_type_size(node->function.type) > 8)
 	{
-		Type_Info void_ty = {};
-		void_ty.type = T_VOID;
-		void_ty.identifier = (u8 *)"void";
-		void_ty.token = node->function.type.token;
-		void_ty.primitive.size = empty_void;
-		node->function.type = void_ty;
+		node->function.type = get_type(f, (u8 *)"void");
 	}
 	size_t param_count = SDCount(node->function.arguments);
 	size_t i = 0;
@@ -597,12 +612,12 @@ generate_func_signature(File_Contents *f, Ast_Node *node, b32 is_overload)
 			Assert(i == param_count - 1);
 		}
 		else
-			param_types[i] = apoc_type_to_llvm(param_type, backend);
+			param_types[i] = apoc_type_to_llvm(param_type, &backend);
 		++arg_i;
 	}
 
 	llvm::ArrayRef<llvm::Type *> params_ref = makeArrayRef((llvm::Type **)param_types, has_var_args ? param_count - 1 : param_count);
-	llvm::Type *ret_type = apoc_type_to_llvm(node->function.type, backend);
+	llvm::Type *ret_type = apoc_type_to_llvm(node->function.type, &backend);
 	FunctionType *func_type = FunctionType::get(ret_type, params_ref, has_var_args);
 	Function *func = Function::Create(func_type, Function::ExternalLinkage,
 									  (char *)node->function.identifier.name, backend.module);
@@ -635,11 +650,11 @@ get_type_info_type()
 llvm::AllocaInst *
 generate_type_info(Type_Info type, llvm::Function *func)
 {
-	auto llvm_type = get_type_info_kind("Type_Info", backend);
+	auto llvm_type = get_type_info_kind("Type_Info", &backend);
 	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
 	auto ptr = temp_builder.CreateAlloca(llvm_type, 0, (char *)"runtime_type_info");
 	ptr->setAlignment(Align(16));
-	write_type_info_to_llvm(type, ptr, llvm_type, backend, func);
+	write_type_info_to_llvm(type, ptr, llvm_type, &backend, func);
 	return ptr;
 }
 
@@ -659,7 +674,7 @@ create_context(llvm::Function *func)
 	auto type = get_context_type();
 	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
 	auto location = temp_builder.CreateAlloca(type, 0, (char *)"__apoc_internal_context");
-	location->setAlignment(Align(16));
+	location->setAlignment(Align(8));
 	backend.builder->CreateStructGEP(type, location, 0);
 	return location;
 }
@@ -740,8 +755,8 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 llvm::Value *
 to_any(llvm::AllocaInst *type, llvm::AllocaInst *value, llvm::Function *func)
 {
-	auto any_type  = get_type_info_kind("Any", backend);
-	auto result    = allocate_with_llvm(func, (u8 *)"to_any", any_type, backend, 16, 16);
+	auto any_type  = get_type_info_kind("Any", &backend);
+	auto result    = allocate_with_llvm(func, (u8 *)"to_any", any_type, &backend, 8, 16);
 	auto type_ptr  = backend.builder->CreateStructGEP(any_type, result, 0);
 	auto value_ptr = backend.builder->CreateStructGEP(any_type, result, 1);
 	backend.builder->CreateStore(type, type_ptr);
@@ -763,7 +778,7 @@ generate_intrinsic(File_Contents *f, Symbol *intrinsic_sym, Ast_Node *call_node,
 	else if(vstd_strcmp(name, (char *)"get_next_arg"))
 	{
 		auto list = generate_expression(f, call_node->func_call.arguments[0], func);
-		return backend.builder->CreateVAArg(list, get_type_info_kind("Any", backend));
+		return backend.builder->CreateVAArg(list, get_type_info_kind("Any", &backend));
 	}
 	else if(vstd_strcmp(name, (char *)"var_arg_stop"))
 	{
@@ -812,13 +827,13 @@ get_callee_maybe_overloaded(llvm::Value *operand, Ast_Node *call_node)
 		Variable_Types val_type = ID_INVALID;
 		auto func_val = get_identifier(call_node->func_call.overload_name, &val_type);
 		Assert(val_type == ID_FUNCTION);
-		auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
+		auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, &backend);
 		auto callee = FunctionCallee(func_pointer_type, func_val);
 		return callee;
 	}
 	else
 	{
-		auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, backend);
+		auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, &backend);
 		auto callee = FunctionCallee(func_pointer_type, operand);
 		return callee;
 	}
@@ -858,12 +873,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	{
 		ret_ptr = true;
 		saved_ret = *call_node->func_call.operand_type.func.return_type;
-		Type_Info void_ty = {};
-		void_ty.type = T_VOID;
-		void_ty.identifier = (u8 *)"void";
-		void_ty.token = saved_ret.token;
-		void_ty.primitive.size = empty_void;
-		*call_node->func_call.operand_type.func.return_type = void_ty;
+		*call_node->func_call.operand_type.func.return_type = get_type(f, (u8 *)"void");
 	}
 	if(call_node->func_call.operand_type.func.calling_convention == CALL_APOC)
 		is_apoc = true;
@@ -885,7 +895,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		if(ret_ptr)
 		{
 			auto context_type = get_context_type();
-			ret = allocate_variable(func, (u8 *)"to_return", saved_ret, backend);
+			ret = allocate_variable(func, (u8 *)"to_return", saved_ret, &backend);
 			auto context_ret = backend.builder->CreateStructGEP(context_type, func_context, 0, "return_value_member");
 			backend.builder->CreateStore(ret, context_ret);
 		}
@@ -910,7 +920,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 			{
 				auto type_ptr = generate_type_info(expr_types[i - 1], func);
 				auto val_ptr  = allocate_variable(func, (u8 *)"any_val", expr_types[i - 1],
-						backend);
+						&backend);
 				backend.builder->CreateStore(arg_exprs[i], val_ptr);
 				arg_exprs[i] = to_any(type_ptr, val_ptr, func);
 			}
@@ -961,7 +971,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			DEBUG_INFO (
 			emit_location(f, node->ret.token);
 			)
-			if(apoc_type_to_llvm(node->ret.func_type, backend) != func->getReturnType())
+			if(apoc_type_to_llvm(node->ret.func_type, &backend) != func->getReturnType())
 			{
 				Assert(node->ret.expression);
 				auto context = get_context(func);
@@ -969,10 +979,12 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				auto pointer_type = PointerType::get(*backend.context, 0);
 				Assert(context);
 				auto context_struct = backend.builder->CreateLoad(pointer_type, context);
+				context_struct->setAlignment(Align(sizeof(size_t)));
 				auto ret_ptr = backend.builder->CreateStructGEP(context_type, context_struct, 0, "ret_ptr"); // address of void *
 				ret_ptr = backend.builder->CreateLoad(pointer_type, ret_ptr);
+				((LoadInst *)ret_ptr)->setAlignment(Align(sizeof(size_t)));
 				auto to_ret = generate_expression(f, node->ret.expression, func);
-				backend.builder->CreateStore(to_ret, ret_ptr);
+				llvm_store(&node->ret.func_type, ret_ptr, to_ret, &backend);
 				// @TODO: memcpy maybe?
 				// auto alignment = Align(get_type_alignment(node->ret.func_type));
 				// backend.builder->CreateMemCpy(ret_ptr, alignment, to_ret, alignment, get_type_size(node->ret.func_type));
@@ -1042,7 +1054,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 							b_aftr = got;
 					}
 				}
-				create_branch(b_aftr, to_go, backend);
+				create_branch(b_aftr, to_go, &backend);
 			}
 			backend.builder->SetInsertPoint(passed_block);
 			backend.builder->CreateCondBr(evaluation, b_true,
@@ -1098,7 +1110,7 @@ generate_blocks_from_list(File_Contents *f, Ast_Node *list_node, Function *func,
 			break;
 	}
 
-	create_branch(body_block, to_go, backend);
+	create_branch(body_block, to_go, &backend);
 	return body_block;
 }
 
@@ -1108,7 +1120,7 @@ generate_index(File_Contents *f, Ast_Node *node, Function *func, llvm::Value *rh
 	auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
 	llvm::Value *idx = generate_expression(f, node->index.expression, func);
 	llvm::Value *array = NULL;
-	auto array_type = apoc_type_to_llvm(node->index.operand_type, backend);
+	auto array_type = apoc_type_to_llvm(node->index.operand_type, &backend);
 	if(node->index.operand_type.type == T_ARRAY)
 	{
 		llvm::Value *idx_list[] = {
@@ -1123,9 +1135,10 @@ generate_index(File_Contents *f, Ast_Node *node, Function *func, llvm::Value *rh
 		llvm::Value *idx_list[] = {
 			idx
 		};
-		auto elem_ptr = apoc_type_to_llvm(*node->index.operand_type.pointer.type, backend);
+		auto elem_ptr = apoc_type_to_llvm(*node->index.operand_type.pointer.type, &backend);
 		array = generate_lhs(f, func, node->index.operand, rhs, is_decl, decl_type); 
-		array = backend.builder->CreateLoad(array_type, array, "ptr_load");
+		array = llvm_load(&node->index.operand_type, array, "ptr_load", &backend);
+		//array = backend.builder->CreateLoad(array_type, array, "ptr_load");
 		return backend.builder->CreateGEP(elem_ptr, array, idx_list, "elem_ptr");
 	}
 	else
@@ -1161,7 +1174,8 @@ generate_func(File_Contents *f, Ast_Node *node)
 	// @TODO: put source info in the function
 	BasicBlock *body_block = BasicBlock::Create(*backend.context, "entry", func);
 	backend.builder->SetInsertPoint(body_block);
-	shfree(backend.named_values);
+	if(backend.named_values)
+		shfree(backend.named_values);
 
 	{
 		b32 is_apoc = node->function.conv == CALL_APOC;
@@ -1174,14 +1188,15 @@ generate_func(File_Contents *f, Ast_Node *node)
 			{
 				arg_string = (u8 *)"__apoc_internal_context";
 				auto context_type = PointerType::get(get_context_type(), 0);
-				variable = allocate_with_llvm_no_zero(func, arg_string, context_type, backend, 16);
+				variable = allocate_with_llvm_no_zero(func, arg_string, context_type, 8);
+				llvm_store(variable, &arg, &backend, 8);
 			}
 			else
 			{
 				Ast_Node *apoc_arg = node->function.arguments[arg_index - (is_apoc ? 1 : 0)];
 				arg_string = (u8 *)AllocateCompileMemory(arg.getName().size() + 1);
 				memcpy(arg_string, arg.getName().str().c_str(), arg.getName().size());
-				variable = allocate_variable(func, arg_string, apoc_arg->variable.type, backend);
+				variable = allocate_variable(func, arg_string, apoc_arg->variable.type, &backend);
 				if(f->build_commands.debug_info)
 				{
 						DILocalVariable *debug_var = debug.builder->createParameterVariable(subprogram, arg.getName().str(),
@@ -1191,9 +1206,9 @@ generate_func(File_Contents *f, Ast_Node *node)
 							DILocation::get(subprogram->getContext(), apoc_arg->variable.identifier.token.line, 0, subprogram),
 							backend.builder->GetInsertBlock());
 				}
+				llvm_store(&apoc_arg->variable.type, variable, &arg, &backend);
 			}
 			arg_index++;
-			backend.builder->CreateStore(&arg, variable);
 			shput(backend.named_values, arg_string, variable);
 		}
 	}
@@ -1253,8 +1268,7 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 
 	while(op_type.type == T_POINTER)
 	{
-		auto llvm_type = apoc_type_to_llvm(op_type, backend);
-		operand = backend.builder->CreateLoad(llvm_type, operand, "derefrence struct");
+		operand = llvm_load(&op_type, operand, "derefrence struct", &backend);
 		op_type = *op_type.pointer.type;
 	}
 
@@ -1288,7 +1302,7 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 	{
 		auto enumerator = op_type.enumerator.node->enumerator;
 		auto member = enumerator.members[node->selector.selected_index];
-		llvm::Value *val = interp_val_to_llvm(member->interp_val.val, backend, func);
+		llvm::Value *val = interp_val_to_llvm(member->interp_val.val, &backend, func);
 		return create_cast(enumerator.type, member->interp_val.val.type, val);
 	}
 	else
@@ -1311,26 +1325,29 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				return ((GlobalVariable *)value)->getInitializer();
 			else if(type == ID_FUNCTION)
 				return value;
+			// @TODO: switch to llvm_load, idk how
+			// @TODO: switch to llvm_load, idk how
+			// @TODO: switch to llvm_load, idk how
+			// @TODO: switch to llvm_load, idk how
+			// @TODO: switch to llvm_load, idk how
 			else if(type == ID_GLOBAL)
-				return backend.builder->CreateLoad(
-						apoc_type_to_llvm(get_symbol_spot(f, node->identifier.token)->type,
-							backend), value);
+				llvm_load(&(get_symbol_spot(f, node->identifier.token)->type), value, "", &backend);
 			else
 				return backend.builder->CreateLoad(
 						((llvm::AllocaInst *)value)->getAllocatedType(), value);
 		} break;
 		case type_run:
 		{
-			auto constant_val = interp_val_to_llvm(node->run.ran_val, backend, func);
+			auto constant_val = interp_val_to_llvm(node->run.ran_val, &backend, func);
 			if(!is_integer(node->run.ran_val.type) && !is_float(node->run.ran_val.type))
 			{
 				Type_Info val_type = node->run.ran_val.type;
-				auto llvm_type = apoc_type_to_llvm(val_type, backend);
+				auto llvm_type = apoc_type_to_llvm(val_type, &backend);
 				auto to_global = new llvm::GlobalVariable(*backend.module, llvm_type, true,
 						GlobalValue::LinkageTypes::PrivateLinkage,
 						constant_val, "constant_array");
 
-				auto location = allocate_variable(func, (u8 *)"compile_time_array", node->run.ran_val.type, backend);
+				auto location = allocate_variable(func, (u8 *)"compile_time_array", node->run.ran_val.type, &backend);
 
 				auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
 				llvm::Value *idx_list[] = {
@@ -1350,17 +1367,21 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_literal:
 		{
-			// check size in case of uint64 sized integer
-			// @NOTE: don't
 			char *name = (char *)node->atom.identifier.name;
+			if(node->atom.type == LIT_CHAR)
+			{
+				auto ap = APInt(8, (u64)str_to_u64(name), false);
+				return ConstantInt::get(apoc_type_to_llvm(get_type(f, (u8 *)"u8"), &backend), ap);
+			}
 			Type_Info type = number_to_untyped_type((u8 *)name);
 			if(is_float(type))
 			{
-				auto ap = APFloat(vstd_str_to_double(name));
-				return ConstantFP::get(apoc_type_to_llvm(type, backend), ap);;
+				//double value = vstd_str_to_double(name);
+				auto llvm_type = apoc_type_to_llvm(type, &backend);
+				return ConstantFP::get(llvm_type, StringRef(name, vstd_strlen(name)));
 			}
 			auto ap = APInt(64, (u64)str_to_i64(name), true);
-			return ConstantInt::get(apoc_type_to_llvm(type, backend), ap);
+			return ConstantInt::get(apoc_type_to_llvm(type, &backend), ap);
 		} break;
 		case type_func_call:
 		{
@@ -1398,8 +1419,7 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			else
 			{
 				auto elem_ptr = generate_selector(f, node, func);
-				auto llvm_op_type = apoc_type_to_llvm(node->selector.selected_type, backend);
-				return backend.builder->CreateLoad(llvm_op_type, elem_ptr, "selected");
+				return llvm_load(&node->selector.selected_type, elem_ptr, "selected", &backend);
 			}
 		} break;
 		case type_array_list:
@@ -1412,9 +1432,9 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				values[i] = generate_expression(f, list[i], func);
 			}
 			auto array_loc = allocate_variable(func, (u8 *)"array_list",
-					node->array_list.type, backend);
+					node->array_list.type, &backend);
 		
-			llvm::Type *array_type = apoc_type_to_llvm(node->array_list.type, backend);
+			llvm::Type *array_type = apoc_type_to_llvm(node->array_list.type, &backend);
 			llvm::Value *zero = ConstantInt::get(Type::getInt64Ty(*backend.context), 0);
 			for(size_t i = 0; i < list_count; ++i)
 			{
@@ -1424,7 +1444,8 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				};
 				auto element_ptr = backend.builder->CreateGEP(array_type, 
 						array_loc, idx_list, "array_elem");
-				backend.builder->CreateStore(values[i], element_ptr);
+				llvm_store(node->array_list.type.array.type, element_ptr, zero, &backend);
+				//backend.builder->CreateStore(values[i], element_ptr);
 			}
 			auto arr_size = node->array_list.type.array.elem_count;
 
@@ -1438,14 +1459,15 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				};
 				auto element_ptr = backend.builder->CreateGEP(array_type, 
 						array_loc, idx_list, "array_elem");
-				backend.builder->CreateStore(zero, element_ptr);
+				llvm_store(node->array_list.type.array.type, element_ptr, zero, &backend);
+				//backend.builder->CreateStore(zero, element_ptr);
 			}
 			
 			return array_loc;
 		} break;
 		case type_struct_init:
 		{
-			AllocaInst *struct_loc = allocate_variable(func, node->struct_init.operand->identifier.name, node->struct_init.type, backend);
+			AllocaInst *struct_loc = allocate_variable(func, node->struct_init.operand->identifier.name, node->struct_init.type, &backend);
 			StructType *type = shget(backend.struct_types, node->struct_init.operand->identifier.name);
 			if(node->struct_init.is_empty_init)
 			{
@@ -1463,17 +1485,15 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 					expr_val = create_cast(members[i], node->struct_init.expr_types[i], expr_val);
 				
 					llvm::Value *member_loc = backend.builder->CreateStructGEP(type, struct_loc, i);
-					backend.builder->CreateStore(expr_val, member_loc);
+					llvm_store(&node->struct_init.expr_types[i], member_loc, expr_val, &backend);
 				}
 			}
 			return struct_loc;
 		} break;
 		case type_index:
 		{
-			auto elem_type = apoc_type_to_llvm(node->index.idx_type, backend);
 			auto elem_ptr = generate_index(f, node, func, NULL, false, (Type_Info){});
-			return backend.builder->CreateLoad(elem_type,
-					elem_ptr, "indexed_val");
+			return llvm_load(&node->index.idx_type, elem_ptr, "indexed_val", &backend);
 		} break;
 		
 		default:
@@ -1501,11 +1521,14 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 			case '*':
 			{
 				Assert(expr_type.type == T_POINTER);
-				result = backend.builder->CreateLoad(apoc_type_to_llvm(*expr_type.pointer.type, backend), expr);
+				result = llvm_load(expr_type.pointer.type, expr, "derefrenced", &backend);
 			} break;
 			case tok_minus:
 			{
-				result = backend.builder->CreateNeg(expr);
+				if(is_float(node->unary_expr.expr_type))
+					result = backend.builder->CreateFNeg(expr);
+				else
+					result = backend.builder->CreateNeg(expr);
 			} break;
 			case tok_bits_not:
 			{
@@ -1528,7 +1551,7 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 					result = backend.builder->CreateFAdd(expr, one);
 				else
 					result = backend.builder->CreateAdd(expr, one);
-				backend.builder->CreateStore(result, to_store);
+				llvm_store(&expr_type, to_store, result, &backend);
 			} break;
 			case tok_minusminus:
 			{
@@ -1544,7 +1567,7 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 					result = backend.builder->CreateFSub(expr, one);
 				else
 					result = backend.builder->CreateSub(expr, one);
-				backend.builder->CreateStore(result, to_store);
+				llvm_store(&expr_type, to_store, result, &backend);
 			} break;
 			default:
 			{
@@ -1568,7 +1591,7 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 			llvm::Value *idx_list[] = {
 				zero,
 			};
-			auto ptr_type = apoc_type_to_llvm(node->cast.expr_type, backend);
+			auto ptr_type = apoc_type_to_llvm(node->cast.expr_type, &backend);
 			auto ptr = generate_lhs(f, func, node->cast.expression, NULL, false, (Type_Info){}); 
 			return backend.builder->CreateGEP(ptr_type, ptr, idx_list, "elem_ptr");
 		}
@@ -1611,7 +1634,7 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 			{
 				if(node->binary_expr.left.type == T_POINTER) {
 					auto type = apoc_type_to_llvm(node->binary_expr.left,
-							backend);
+							&backend);
 					llvm::Value *idx_list[] = {
 						right
 					};
@@ -1776,7 +1799,7 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, 
 			llvm::Value *result;
 			if(is_decl)
 			{
-				result = allocate_variable(func, lhs->identifier.name, decl_type, backend);
+				result = allocate_variable(func, lhs->identifier.name, decl_type, &backend);
 				shput(backend.named_values, lhs->identifier.name, (AllocaInst *)result);
 			}
 			else
@@ -1861,7 +1884,7 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 		if(node->assignment.decl_type.type == T_STRUCT)
 		{
 			expression_value = allocate_variable(func, (u8 *)"zero_init_struct",
-					node->assignment.decl_type, backend);
+					node->assignment.decl_type, &backend);
 		}
 		else
 		{
@@ -1884,7 +1907,7 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 			expression_value = create_cast(var_type, cast_type, expression_value);
 		}
 
-		backend.builder->CreateStore(expression_value, location);
+		llvm_store(&node->assignment.decl_type, location, expression_value, &backend);
 	}
 	else
 	{

@@ -59,8 +59,9 @@ get_type_alignment(Type_Info type)
 		case T_POINTER:
 		return sizeof(size_t);
 		case T_STRUCT:
+		return get_struct_alignment(type);
 		case T_ARRAY:
-		return sizeof(size_t) * 2;
+		return get_type_alignment(*type.array.type);
 		case T_BOOLEAN:
 		return 1;
 		default:

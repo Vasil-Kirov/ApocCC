@@ -126,9 +126,16 @@ typedef struct _Ast_Struct
 	b32 is_union;
 } Ast_Struct;
 
+typedef enum
+{
+	LIT_NORMAL_NUMBER,
+	LIT_CHAR
+} Literal_Type;
+
 typedef struct
 {
     Ast_Identifier identifier;
+	Literal_Type type;
 } Ast_Atom;
 
 typedef struct

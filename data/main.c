@@ -1,15 +1,12 @@
 #include <stdio.h>
 #include <stdint.h>
 
-extern uint8_t increment_u8(int8_t a);
+extern double give_num();
 
 
 int main()
 {
-	uint8_t a = 0;
-	a = increment_u8(a);
-	a = increment_u8(a);
-	a = increment_u8(a);
-	printf("%d", a);
+	float the_num = give_num();
+	printf("%f", the_num);
 	return 0;	
 }

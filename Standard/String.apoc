@@ -139,7 +139,7 @@ fn terminate_string(str: string) -> string
 
 fn build_unsigned_int(num: u64, num_size: i64, builder:* String_Builder) {
 	if num_size != 0 {
-		digit := (num % 10) + '0';
+		digit := (num % 10) + #u64 '0';
 		build_unsigned_int(num / 10, num_size - 1, builder);
 		*builder += #u8 digit;
 	}
@@ -165,6 +165,37 @@ fn int_to_str(num: i64, builder:* String_Builder)
 	build_unsigned_int(#u64 num, num_size, builder);
 }
 
+fn float_to_str(num: f64, builder: *String_Builder)
+{
+	
+	printf("num %f\n", #f32 num);
+	if num < 0 {
+		*builder += '-';
+		num = -num;
+	}
+
+	decimal := #u64 num;
+	num -= #f64 decimal;
+
+	if decimal == 0 {
+		*builder += '0';
+	}
+	else int_to_str(#i64 decimal, builder);
+	*builder += '.';
+	zeroes_to_append := 0;
+	
+	for ; #f64 #u64 num != num ; {
+		num *= 10;
+		if #u64 num == 0 zeroes_to_append += 1;
+	}
+
+	for i := 0; i < zeroes_to_append; ++i {
+		*builder += '0';
+	}
+	
+	int_to_str(#i64 num, builder);
+}
+
 fn parse_format(format: string, list:* Any) -> string
 {
 	builder := init_builder("");
@@ -176,6 +207,11 @@ fn parse_format(format: string, list:* Any) -> string
 			type := item.type.kind;
 			if type == Type_Type.INTEGER {
 				int_to_str(*#*i64 item.value, @builder);
+			} else if type == Type_Type.FLOAT {
+				printf("int: %f\n", *#*f64 item.value);
+				float_to_str(*#*f64 item.value, @builder);
+			} else {
+				builder += format[i];
 			}
 		} else {
 			builder += format[i];

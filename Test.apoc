@@ -4,12 +4,20 @@ fn $intrinsic var_arg_stop(list:** Any);
 
 fn main() -> i32
 {
+	a_f:f64 = 10.123;
+	printf("a f: %f\n", a_f);
+	/*
 	result := init_builder("my big string");
 	result += " more text %";
 	str := builder_to_string(@result);
 
-	print(str, 10);
+	print(str, 10.123);
 	print("Number: %", 20);
+
+	asd := 13.12;
+	abd := 10;
+	-> #i32 asd;
+	*/
 	-> 0;
 }
 

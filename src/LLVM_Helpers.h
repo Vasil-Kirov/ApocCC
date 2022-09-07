@@ -4,32 +4,41 @@
 #include <LLVM_Backend.h>
 #include <llvm-c/DebugInfo.h>
 
+LoadInst *
+llvm_load(Type_Info *type, llvm::Value *ptr, const char *name, Backend_State *backend);
+
+void
+llvm_store(Type_Info *type, llvm::Value *ptr, llvm::Value *value, Backend_State *backend);
+
+void
+llvm_store(llvm::Value *ptr, llvm::Value *value, Backend_State *backend, int alignment);
+
 llvm::FunctionType *
-type_to_func_type(Type_Info type, Backend_State backend);
+type_to_func_type(Type_Info type, Backend_State *backend);
 
 void
 write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_type,
-		Backend_State backend, llvm::Function *func);
+		Backend_State *backend, llvm::Function *func);
 
 llvm::StructType *
-get_type_info_kind(const char *name, Backend_State backend);
+get_type_info_kind(const char *name, Backend_State *backend);
 
 void
-create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State backend);
+create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State *backend);
 
 AllocaInst *
-allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
+allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type,
 		u64 align);
 
 AllocaInst *
-allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State backend,
+allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State *backend,
 		u64 align, u64 size_in_bytes);
 
 AllocaInst *
-allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State backend);
+allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State *backend);
 
 llvm::Type *
-apoc_type_to_llvm(Type_Info type, Backend_State backend);
+apoc_type_to_llvm(Type_Info type, Backend_State *backend);
 
 Instruction::CastOps
 get_cast_type(Type_Info to, Type_Info from, b32 *should_cast);
@@ -38,6 +47,6 @@ DIType *
 to_debug_type(Type_Info type, Debug_Info *debug);
 
 llvm::Constant *
-interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func);
+interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func);
 
 #endif // _LLVM_HELPERS_H

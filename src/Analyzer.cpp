@@ -715,6 +715,19 @@ verify_func(File_Contents *f, Ast_Node *node)
 	}	
 }
 
+b32
+is_else_valid(Ast_Node **list, size_t idx)
+{
+	if(list[idx]->type == type_if)
+		return true;
+	else if(list[idx]->type == type_else)
+	{
+		Assert(list[idx+1]->type == type_scope_start);
+		return is_else_valid(list[idx+1]->scope_desc.body->statements.list, 0);
+	}
+	return false;
+}
+
 void
 verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_node, 
 		Ast_Node *current_list, size_t *idx)
@@ -783,19 +796,12 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 			}
 			*idx += 1;
 			auto next_node = current_list->statements.list[*idx];
-			if(next_node->type == type_scope_start)
-			{
-				verify_func_level_statement_list(f, next_node->scope_desc.body, func_node);
-			}
-			else
-			{
-				verify_func_level_statement(f, next_node, func_node, current_list, idx);
-				pop_scope(f, scope_tok);
-			}
+			Assert(next_node->type == type_scope_start)
+			verify_func_level_statement_list(f, next_node->scope_desc.body, func_node);
 		} break;
 		case type_else:
 		{
-			if(current_list->statements.list[*idx - 2]->type != type_if)
+			if(!is_else_valid(current_list->statements.list, *idx - 2))
 			{
 				raise_semantic_error(f, "else statement doesn't have a matching if",
 						node->condition.token);
@@ -1022,7 +1028,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 			if(is_untyped(expression_type))
 			{
 				expression_type = untyped_to_type(expression_type);
-				expression_type.identifier = (u8 *)"i64";
+				//expression_type.identifier = (u8 *)"i64";
 			}
 			else if(expression_type.type == T_ARRAY)
 			{
@@ -1392,7 +1398,10 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 		} break;
 		case type_literal:
 		{
-			return number_to_untyped_type(expression->atom.identifier.name);
+			if(expression->atom.type == LIT_CHAR)
+				return get_type(f, (u8 *)"u8");
+			else
+				return number_to_untyped_type(expression->atom.identifier.name);
 		} break;
 		case type_const_str:
 		{
