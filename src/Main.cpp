@@ -12,6 +12,7 @@
 #include <Errors.h>
 #include <Interpret.h>
 #include <CommandLine.h>
+#include <DumpInfo.h>
 
 
 #include <platform/platform.h>
@@ -27,6 +28,7 @@
 #include <Errors.cpp>
 #include <Interpret.cpp>
 #include <CommandLine.cpp>
+#include <DumpInfo.cpp>
 
 #include <LLVM_Helpers.h>
 #include <LLVM_Backend.h>
@@ -118,11 +120,13 @@ int main(int argc, char *argv[])
 {
 	Timers timers = {};
 	timers.total_clock = std::chrono::high_resolution_clock::now();
-	
+
 	initialize_memory();
 	initialize_logger();
 	platform_initialize();
 	initialize_interpreter();
+
+	LG_DEBUG("Initialized!");
 
 	if(argc < 2)
 	{
@@ -152,6 +156,16 @@ int main(int argc, char *argv[])
 
 	TIME_FUNC(timers, f->ast_root = parse(f), parse_clock, parsing);
 	TIME_FUNC(timers, analyze(f, f->ast_root), analysis_clock, analysis);
+	if (f->build_commands.dump_symbols)
+	{
+		TIME_FUNC(timers, dump_program_info(f), codegen_clock, codegen);
+		LG_INFO("Symbol dump mode, no code will be generated");
+		LG_INFO("Lexing:            %f.4s", timers.lexing);
+		LG_INFO("Parsing:           %f.4s", timers.parsing);
+		LG_INFO("Semantic Analysis: %f.4s", timers.analysis);
+		LG_INFO("Dumping Symbols:   %f.4s", timers.codegen);
+		return 0;
+	}
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
 	
 	u8 *final_linker_command = (u8 *)AllocatePermanentMemory(4096);

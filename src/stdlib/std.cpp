@@ -440,7 +440,10 @@ vstd_strcmp(char *str1, char *str2)
 size_t
 vstd_strlen(char *str)
 {
-    
+	// @NOTE: Causes a crash otherwise
+	if (str[0] == 0)
+		return 0;
+
     size_t result = 0;
     
     const __m128i zeros = _mm_setzero_si128();

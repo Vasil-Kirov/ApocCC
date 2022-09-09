@@ -37,7 +37,7 @@ static Debug_Info debug;
 
 //#define ONLY_IR
 void
-do_passes()
+do_passes(File_Contents *f)
 {
 	#if 0
 	// Create a new pass manager attached to it.
@@ -90,8 +90,11 @@ do_passes()
 								cg_analysis, module_analysis);
 
 	// Create the pass manager.
-	// This one corresponds to a typical -O2 optimization pipeline.
-	auto mod_pass = pass_builder.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
+	ModulePassManager mod_pass;
+	if (f->build_commands.optimization == OPT_MAX)
+		mod_pass = pass_builder.buildPerModuleDefaultPipeline(OptimizationLevel::O3);
+	else if (f->build_commands.optimization == OPT_SOME)
+		mod_pass = pass_builder.buildPerModuleDefaultPipeline(OptimizationLevel::O1);
 
 	mod_pass.run(*backend.module, module_analysis);
 #endif
@@ -108,25 +111,34 @@ llvm_initialize(File_Contents *f, File_Contents **files)
 
 	shdefault(backend.struct_types, 0);
 	
-	DEBUG_INFO (
+	if (f->build_commands.debug_info) {
 		debug.builder = new DIBuilder(*backend.module);
-		debug.scope = stack_allocate(DINode *);
+		debug.scope = stack_allocate(DINode*);
 		size_t file_count = SDCount(files);
-		for(size_t i = 0; i < file_count; ++i)
+		DICompileUnit* compile_unit = NULL;
+		for (size_t i = 0; i < file_count; ++i)
 		{
-			char *name = platform_path_to_file_name((char *)files[i]->path);
-			size_t file_name_len = vstd_strlen((char *)files[i]->path);
-			u8 *lookup_name = (u8 *)AllocateCompileMemory(file_name_len + 1);
+			char* name = platform_path_to_file_name((char*)files[i]->path);
+			size_t file_name_len = vstd_strlen((char*)files[i]->path);
+			u8* lookup_name = (u8*)AllocateCompileMemory(file_name_len + 1);
 			memcpy(lookup_name, files[i]->path, file_name_len);
-			char *scanner = (char *)lookup_name + file_name_len;
-			while(*scanner != '\\' && *scanner != '/') --scanner;
+			char* scanner = (char*)lookup_name + file_name_len;
+			while (*scanner != '\\' && *scanner != '/') --scanner;
 			*scanner = 0;
 
+			char* file_name = (char*)AllocateCompileMemory(vstd_strlen(name) + 3);
+			if (compile_unit)
+				vstd_strcat_multiple(file_name, 2, "./", name);
+			else
+				vstd_strcat(file_name, name); // @NOTE: kinda pointless
+
 			File_And_Unit result = {};
-			result.file = debug.builder->createFile(name, (char *)lookup_name);
-			result.unit = debug.builder->createCompileUnit(dwarf::DW_LANG_C99, 
-				result.file, "Apoc Compiler", f->build_commands.optimization > OPT_NONE,
-				"", 0);
+			result.file = debug.builder->createFile(file_name, (char*)lookup_name);
+			if (!compile_unit)
+				compile_unit = debug.builder->createCompileUnit(dwarf::DW_LANG_C99,
+					result.file, "Apoc Compiler", f->build_commands.optimization > OPT_NONE,
+					"", 0);
+			result.unit = compile_unit;
 			shput(debug.file_map, files[i]->path, result);
 		}
 
@@ -138,7 +150,7 @@ llvm_initialize(File_Contents *f, File_Contents **files)
 #else
 #error Unkown debug fromat for this OS
 #endif
-	)
+	}
 	
 	return backend;
 }
@@ -202,12 +214,37 @@ void set_asm_syntax_to_intel()
     Assert(res);
 }
 
-void
-generate_obj(File_Contents *f)
+bool
+emit_file(TargetMachine* target_machine, CodeGenFileType file_type, char *file_name)
 {
-	
-	if(f->build_commands.optimization != OPT_NONE)
-		do_passes();
+	bool result = true;
+	std::error_code EC;
+	raw_fd_ostream dest(file_name, EC, sys::fs::OF_None);
+	if (EC)
+	{
+		LG_ERROR("%s", EC.message().c_str());
+		return false;
+	}
+	legacy::PassManager pass;
+	std::string error;
+	backend.module->setDataLayout(target_machine->createDataLayout());
+	if (target_machine->addPassesToEmitFile(pass, dest, nullptr, file_type))
+	{
+		result = false;
+		LG_ERROR("Target machine can't emit file!");
+	}
+
+	pass.run(*backend.module);
+	dest.flush();
+	return result;
+}
+
+void
+generate_obj(File_Contents* f)
+{
+
+	if (f->build_commands.optimization != OPT_NONE)
+		do_passes(f);
 	llvm::Target a_target = {};
 
 	INITIALIZE_TARGET(AArch64);
@@ -215,59 +252,45 @@ generate_obj(File_Contents *f)
 	INITIALIZE_TARGET(WebAssembly);
 
 	auto target_triple = sys::getDefaultTargetTriple();
-	const char *c_str_triplet;
 
-	const char *features;
-	if(f->build_commands.target == TG_X64)
+	char* features = (char *)"";
+	if (f->build_commands.target == TG_X64)
 	{
 		backend.module->setTargetTriple(target_triple);
-		c_str_triplet = target_triple.c_str();
 		features = LLVMGetHostCPUFeatures();
 	}
-	else if(f->build_commands.target == TG_WASM)
+	else if (f->build_commands.target == TG_WASM)
 	{
 		backend.module->setTargetTriple(std::string("wasm32"));
-		c_str_triplet = "wasm32";
-		features = (char *)"";
 	}
 
-	char *error = NULL;
-	LLVMTargetRef c_target = NULL;
-	if (LLVMGetTargetFromTriple(c_str_triplet, &c_target, &error) != 0)
-	{
-		LG_FATAL("Target not found %s", error);
+	std::string error;
+	auto target = TargetRegistry::lookupTarget(target_triple, error);
+	if (!target) {
+		errs() << error;
+		LG_FATAL("Couldn't find target triple");
 	}
 
-	const char *cpu = "generic";
+	const char* cpu = "generic";
 
-	LLVMCodeGenOptLevel opt;
-	// @TODO: optimization flag
-	switch(f->build_commands.optimization)
-	{
-		case OPT_NONE: opt = LLVMCodeGenLevelNone; break;
-		case OPT_SOME: opt = LLVMCodeGenLevelDefault; break;
-		case OPT_MAX:  opt = LLVMCodeGenLevelAggressive; break;
-	}
-	LLVMTargetMachineRef machine = LLVMCreateTargetMachine(c_target, c_str_triplet, cpu, features,
-		opt, LLVMRelocDefault, LLVMCodeModelDefault);
-	
-	LLVMModuleRef file_mod = llvm::wrap(backend.module);
+	TargetOptions opt;
+	auto rm = Optional<Reloc::Model>();
+	auto target_machine = target->createTargetMachine(target_triple, cpu, features, opt, rm);
+	backend.module->setDataLayout(target_machine->createDataLayout());
+	backend.module->setTargetTriple(target_triple);
 
-	LLVMSetTarget(file_mod, c_str_triplet);
-	LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(machine);
-	char *data_layout_str = LLVMCopyStringRepOfTargetData(data_layout);
-	LLVMSetDataLayout(file_mod, data_layout_str);
-	LLVMDisposeMessage(data_layout_str);
-
-	char *obj_file = change_file_extension(
-			platform_path_to_file_name((char *)f->path), (char *)"o");
+	char* obj_file = change_file_extension(
+		platform_path_to_file_name((char*)f->path), (char*)"o");
 	f->obj_name = obj_file;
+	char* asm_file = change_file_extension(
+		platform_path_to_file_name((char*)f->path), (char*)"asm");
 
-	//set_asm_syntax_to_intel();
 #if !defined(ONLY_IR)
-	LLVMTargetMachineEmitToFile(machine, file_mod, obj_file, LLVMObjectFile, &error);
-	LLVMTargetMachineEmitToFile(machine, file_mod, (char *)"asm.s", LLVMAssemblyFile, &error);
-#endif	
+	
+	emit_file(target_machine, CGFT_ObjectFile, obj_file);
+	emit_file(target_machine, CGFT_AssemblyFile, asm_file);
+
+#endif
 
 #if defined(DEBUG)
 	std::error_code std_err;
@@ -484,11 +507,12 @@ generate_statement(File_Contents *f, Ast_Node *node)
 					GlobalValue::LinkageTypes::ExternalLinkage,
 					const_val, "global_var");
 			shput(backend.named_globals, node->assignment.token.identifier, global_var);
-			DEBUG_INFO (
-						auto d_info = emit_global_var(f, node,
-							node->assignment.token.identifier, global_var);
-						global_var->addDebugInfo(d_info);
-			)
+			if (f->build_commands.debug_info) {
+				auto d_info = emit_global_var(f, node,
+					node->assignment.token.identifier, global_var);
+				if (d_info)
+					global_var->addDebugInfo(d_info);
+			}
 		} break;
 		case type_enum: break;
 		case type_struct: break;
@@ -1038,8 +1062,8 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				*idx += 1;
 				auto else_body = list->statements.list[*idx];
 				*idx += 1;
-				Assert(else_body->type == type_scope_start)
-					b_else = generate_blocks_from_list(f, else_body->scope_desc.body, func, NULL, "if.else", b_aftr);
+				Assert(else_body->type == type_scope_start);
+				b_else = generate_blocks_from_list(f, else_body->scope_desc.body, func, NULL, "if.else", b_aftr);
 			}
 
 			{
@@ -1047,11 +1071,10 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 				size_t count = SDCount(list->statements.list);
 				for(; *idx < count; *idx += 1)
 				{
-					auto got = generate_block(f, list->statements.list[*idx], func, b_aftr, "if.aftr", to_go, list, idx);
+					generate_block(f, list->statements.list[*idx], func, b_aftr, "if.aftr", to_go, list, idx);
 					if(b_aftr->getTerminator() != NULL)
 					{
-						if(got)
-							b_aftr = got;
+						break;
 					}
 				}
 				create_branch(b_aftr, to_go, &backend);
@@ -1161,7 +1184,7 @@ generate_func(File_Contents *f, Ast_Node *node)
 			u64 line = node->function.identifier.token.line;
 			u64 scope_line = node->function.body->scope_desc.token.line;
 			subprogram = debug.builder->createFunction((DIScope *)debug_unit.file, debug_name, StringRef(),
-					debug_unit.file, line, create_func_debug_type(node), scope_line, DINode::FlagPrototyped, DISubprogram::SPFlagDefinition);
+					debug_unit.file, line, create_func_debug_type(node), scope_line, DINode::FlagZero, DISubprogram::SPFlagDefinition);
 			Assert(subprogram);
 			func->setSubprogram(subprogram);
 			stack_push(debug.scope, subprogram);

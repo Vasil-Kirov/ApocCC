@@ -100,6 +100,7 @@ update_type(File_Contents *f, Type_Info new_type, u8 *name)
 void
 push_scope(File_Contents *f, Scope_Info current_scope)
 {
+	Assert(current_scope.file && current_scope.file[0] != 0);
 	current_scope.symbol_table = SDCreate(Symbol);
 	stack_push(f->scope_stack, current_scope);
 	size_t to_add_count = SDCount(f->to_add_next_scope);
@@ -143,6 +144,8 @@ pop_scope(File_Contents *f, Token_Iden scope_tok)
 	popped.end_line = scope_tok.line;
 	Symbol *popped_table = popped.symbol_table;
 	size_t symbol_table_size = SDCount(popped_table);
+	if (symbol_table_size == 0)
+		return;
 	while(!is_scope_stack_empty(f))
 	{
 		Scope_Info to_scan = stack_pop(f->scope_stack, Scope_Info);
@@ -780,7 +783,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 		}break;
 		case type_if:
 		{
-			Token_Iden scope_tok = node->for_loop.token;
+			Token_Iden scope_tok = node->condition.token;
 			Scope_Info new_scope = {};
 			new_scope.file = scope_tok.file;
 			new_scope.start_line = scope_tok.line;

@@ -42,7 +42,7 @@ void
 initialize_memory()
 {
 	InitAPMem(&MemoryAllocators[PERM_INDEX], PERM_SIZE, PERM_CHUNK);
-	InitAPMem(&MemoryAllocators[COMP_INDEX], COMP_SIZE, PERM_CHUNK);
+	InitAPMem(&MemoryAllocators[COMP_INDEX], COMP_SIZE, COMP_CHUNK);
 }
 
 void *

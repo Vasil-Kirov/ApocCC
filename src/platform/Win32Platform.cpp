@@ -69,7 +69,7 @@ platform_message_box(const char *Caption, const char *Text)
 }
 
 b32
-platform_write_file(void *Data, i32 BytesToWrite, const char *InPath, b32 Overwrite)
+platform_write_file(void *Data, u32 BytesToWrite, const char *InPath, b32 Overwrite)
 {
 	wchar_t	*Path = platform_ascii_to_wchar(InPath);
 	b32 IsSTD = false;
@@ -144,7 +144,11 @@ platform_output_string(char *String, log_level Level)
 	//		8 = intense
     u8 Colors[] = {13, 4, 6, FOREGROUND_GREEN | FOREGROUND_INTENSITY, 
 	FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE};
-	HANDLE STDOUT = GetStdHandle(STD_OUTPUT_HANDLE);
+	HANDLE STDOUT;
+	if (Level > LOG_ERROR)
+		STDOUT = GetStdHandle(STD_OUTPUT_HANDLE);
+	else
+		STDOUT = GetStdHandle(STD_ERROR_HANDLE);
 	//		FATAL = 0
 	//		ERROR = 1
 	//		WARN = 2

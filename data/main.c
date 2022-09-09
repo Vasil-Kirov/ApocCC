@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-extern double give_num();
+extern float give_num();
 
 
 int main()

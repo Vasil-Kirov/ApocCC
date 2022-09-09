@@ -1,1 +1,1 @@
-clang -g main.c test.o
+clang -g main.c quick_test.o

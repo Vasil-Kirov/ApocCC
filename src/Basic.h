@@ -1,8 +1,8 @@
 
 /* date = January 19th 2022 9:04 pm */
 
-#ifndef _BASIC_H
-#define _BASIC_H
+#ifndef BASIC_HEADER_GUARD
+#define BASIC_HEADER_GUARD
 
 #include <stdint.h>
 #include <stddef.h>
@@ -11,7 +11,6 @@
 #define STB_DS_IMPLEMENTATION
 #endif
 #include <stb_ds.h>
-
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -81,4 +80,4 @@ change_file_extension(char *file_name, char *new_extension)
 	return result;
 }
 
-#endif //_BASIC_H
+#endif // BASIC_HEADER_GUARD

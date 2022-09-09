@@ -71,13 +71,14 @@ typedef struct
 
 typedef struct
 {
-	Optimization_Level optimization;
-	Target_Arch target;
 	u8 *output_file;
 	u8 *linker_command;
+	Define_Table *defines;
 	b32 debug_info;
 	b32 call_linker;
-	Define_Table *defines;
+	b32 dump_symbols;
+	Optimization_Level optimization;
+	Target_Arch target;
 } Build_Commands;
 
 // @NOTE: this is poorly named, should probably be changed to something like `compile_state`

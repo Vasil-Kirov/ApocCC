@@ -100,7 +100,7 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State *b
 		auto location = temp_builder.CreateAlloca(alloc_type, 0, (char *)var_name);
 		auto alignment = Align(get_type_alignment(type));
 		location->setAlignment(alignment);
-		//llvm_zero_out_memory(location, get_type_size(type), alignment, backend->builder);
+		llvm_zero_out_memory(location, get_type_size(type), alignment, backend->builder);
 		return location;
 	}
 	else
@@ -712,8 +712,7 @@ to_debug_type(Type_Info type, Debug_Info *debug)
 	}
 	else if (type.type == T_VOID)
 	{
-		static auto void_ty = debug->builder->createUnspecifiedType("void");
-		return void_ty;	
+		return 0;	
 	}
 	else if (type.type == T_FUNC)
 	{
@@ -792,15 +791,8 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			}
 			else
 			{
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				return Instruction::CastOps::SIToFP;
-				//return Instruction::CastOps::UIToFP;
+				//return Instruction::CastOps::SIToFP;
+				return Instruction::CastOps::UIToFP;
 			}
 		}
 	}
@@ -910,15 +902,8 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 			else
 			{
 				Assert(is_float(from));
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				// @TODO: Why doesn't fptoui work???
-				return Instruction::CastOps::FPToSI;
-				//return Instruction::CastOps::FPToUI;
+				//return Instruction::CastOps::FPToSI;
+				return Instruction::CastOps::FPToUI;
 			}
 		}
 	}

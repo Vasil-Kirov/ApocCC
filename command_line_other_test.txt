@@ -1,1 +1,4 @@
-W:\Engine\src\main.apoc W:\Engine\src\sdl_bindings.apoc W:\Apocalypse\FileTwo.apoc --debug --optimize none --linker ../libs/*.lib /entry:main
+--debug Test.apoc Standard\String.apoc Standard\OS.apoc Standard\Windows.apoc Standard\Basic.apoc Standard\C_Standard.apoc
+
+
+E:\C_Projects\Apocalypse\Test.apoc E:\C_Projects\Apocalypse\Standard\String.apoc E:\C_Projects\Apocalypse\Standard\OS.apoc E:\C_Projects\Apocalypse\Standard\Windows.apoc E:\C_Projects\Apocalypse\Standard\Basic.apoc E:\C_Projects\Apocalypse\Standard\C_Standard.apoc

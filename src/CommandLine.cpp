@@ -94,13 +94,15 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 				if(build_commands.optimization != 0)
 					raise_build_error("--optimize has been defined twice");
 				auto level = args[++i];
-				if(level == "max")
+				if (level == "max")
 					build_commands.optimization = OPT_MAX;
+				else if (level == "some")
+					build_commands.optimization = OPT_SOME;
 				else if(level == "none")
 					build_commands.optimization = OPT_NONE;
 				else
 					raise_build_error("Unkown optimization option %s.\nOptions:"
-							"\n\tmax\n\tnone", level.c_str());
+							"\n\tmax\n\tsome\n\tnone", level.c_str());
 			}
 			else if(arg == "--linker")
 			{
@@ -109,6 +111,10 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 					linker_append += " ";
 					linker_append += args[i];
 				}
+			}
+			else if (arg == "--dump-symbols")
+			{
+				build_commands.dump_symbols = true;
 			}
 			else if(arg == "--debug")
 			{

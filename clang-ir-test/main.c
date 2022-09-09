@@ -1,11 +1,10 @@
+#include "other.c"
 
-float give_num()
-{
-	float the_float = 1.3;
-	return the_float;
-}
+static int my_f_var = 123;
+static void *null = 1234;
 
-int main()
+void main()
 {
-	return 0;
+	int a = give_num() + (long long)null;
+	a + my_f_var;
 }

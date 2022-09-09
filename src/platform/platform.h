@@ -97,7 +97,7 @@ Platform_State
 platform_get_state();
 
 b32
-platform_write_file(void *Data, i32 BytesToWrite, const char *Path, b32 Overwrite);
+platform_write_file(void *Data, u32 BytesToWrite, const char *Path, b32 Overwrite);
 
 b32
 platform_read_entire_file(void *Data, u64 *Size, char *Path);

@@ -75,7 +75,7 @@ overload +(str: string, text:* u8) -> string
 overload +=(str: *String_Builder, text:* u8)
 {
 	text_len := len(text);
-	times := text_len / str.len;
+	times := text_len / STRING_BUFFER_SIZE;
 	current := str;
 	for i := 0; i - 1 < times; ++i {
 		copy_size := text_len;
@@ -167,8 +167,6 @@ fn int_to_str(num: i64, builder:* String_Builder)
 
 fn float_to_str(num: f64, builder: *String_Builder)
 {
-	
-	printf("num %f\n", #f32 num);
 	if num < 0 {
 		*builder += '-';
 		num = -num;
