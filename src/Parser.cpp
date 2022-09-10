@@ -673,6 +673,7 @@ parse_statement_list(File_Contents *f, b32 is_func)
 {
 	Ast_Node *result = ast_statements();
 	b32 should_break = false;
+	int already_defered = SDCount(f->defered);
 	while(!should_break)
 	{
 		if(f->curr_token->type == '}')
@@ -686,8 +687,6 @@ parse_statement_list(File_Contents *f, b32 is_func)
 				auto defer_count = SDCount(f->defered);
 				for(i64 i = defer_count - 1; i >= 0; --i)
 					SDPush(result->statements.list, f->defered[i]);
-				for(size_t i = 0; i < defer_count; ++i)
-					SDPop(f->defered);
 
 				SDPush(result->statements.list, statement);
 			} break;
@@ -696,9 +695,9 @@ parse_statement_list(File_Contents *f, b32 is_func)
 				if(is_func)
 				{
 					auto defer_count = SDCount(f->defered);
-					for(i64 i = defer_count - 1; i >= 0; --i)
+					for(i64 i = defer_count - 1; i >= already_defered; --i)
 						SDPush(result->statements.list, f->defered[i]);
-					for(size_t i = 0; i < defer_count; ++i)
+					for(i64 i = defer_count - 1; i >= already_defered; --i)
 						SDPop(f->defered);
 				}
 				SDPush(result->statements.list, statement);

@@ -126,8 +126,6 @@ int main(int argc, char *argv[])
 	platform_initialize();
 	initialize_interpreter();
 
-	LG_DEBUG("Initialized!");
-
 	if(argc < 2)
 	{
 		LG_FATAL("apoc [files]");	

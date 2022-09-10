@@ -738,6 +738,10 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 	if(node == NULL) return;
 	switch(node->type)
 	{
+		case type_identifier:
+		{
+			get_symbol_spot(f, node->identifier.token, true);
+		} break;
 		case type_for:
 		{
 			Token_Iden scope_tok = node->for_loop.token;
@@ -745,6 +749,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 			new_scope.file = scope_tok.file;
 			new_scope.start_line = scope_tok.line;
 			push_scope(f, new_scope);
+			Assert(scope_tok.file && scope_tok.file[0] != 0);
 			if(node->for_loop.expr1)
 			{
 				verify_assignment(f, node->for_loop.expr1, false);

@@ -1,15 +1,20 @@
 
-fn $intrinsic var_arg_start(list:** Any);
-fn $intrinsic var_arg_stop(list:** Any);
+fn $intrinsic var_arg_start(list:**Any);
+fn $intrinsic var_arg_stop(list:**Any);
+fn $intrinsic get_type(ptr:*void) -> Type_Info;
 
-fn main() -> i32
+fn $call c_decl main() -> i32
 {
-	result := init_builder("suffering");
-	result += " floating point number %";
-	str := builder_to_string(@result);
+	defer {
+		puts("4th");
+	}
+	
+	defer puts("3rd");
 
-	print(str, 10.123);
-	print("Number: %", 20);
+	{
+		defer puts("2nd");
+		defer puts("1st");
+	}
 	-> 0;
 }
 
