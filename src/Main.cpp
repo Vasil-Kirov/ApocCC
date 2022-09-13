@@ -13,6 +13,8 @@
 #include <Interpret.h>
 #include <CommandLine.h>
 #include <DumpInfo.h>
+#include <Bytecode.h>
+#include <x64_Gen.h>
 
 
 #include <platform/platform.h>
@@ -29,6 +31,8 @@
 #include <Interpret.cpp>
 #include <CommandLine.cpp>
 #include <DumpInfo.cpp>
+#include <Bytecode.cpp>
+#include <x64_Gen.cpp>
 
 #include <LLVM_Helpers.h>
 #include <LLVM_Backend.h>
@@ -164,6 +168,10 @@ int main(int argc, char *argv[])
 		LG_INFO("Dumping Symbols:   %f.4s", timers.codegen);
 		return 0;
 	}
+	IR *ir = ast_to_bytecode(f->ast_root);
+	x64_generate_code(ir);
+	LG_DEBUG("done");
+#if 0
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
 	
 	u8 *final_linker_command = (u8 *)AllocatePermanentMemory(4096);
@@ -211,7 +219,9 @@ int main(int argc, char *argv[])
 	LG_INFO("Syncing Files:     %f.4s", timers.syncing);
 	LG_INFO("Code Generation:   %f.4s", timers.codegen);
 	LG_INFO("Total:             %f.4s", timers.total);
+#endif
 	
-	ResetCompileMemory();
+	//	@NOTE: wut
+	//	ResetCompileMemory();
 	return 0;
 }

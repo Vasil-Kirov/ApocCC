@@ -3,18 +3,16 @@ fn $intrinsic var_arg_start(list:**Any);
 fn $intrinsic var_arg_stop(list:**Any);
 fn $intrinsic get_type(ptr:*void) -> Type_Info;
 
+my_global_var := 54321;
+
 fn $call c_decl main() -> i32
 {
-	defer {
-		puts("4th");
-	}
-	
-	defer puts("3rd");
-
-	{
-		defer puts("2nd");
-		defer puts("1st");
-	}
+	var_one :f32 = 4.35;
+	var_two := 4.53;
+	if var_two == 4.53
+		my_global_var = 12345;
+	b := my_global_var;
+	print("The var 1 is %\nand var 2 is %", var_one, b);
 	-> 0;
 }
 

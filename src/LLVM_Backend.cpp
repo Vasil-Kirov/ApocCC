@@ -799,49 +799,21 @@ generate_intrinsic(File_Contents *f, Symbol *intrinsic_sym, Ast_Node *call_node,
 					llvm::Intrinsic::vastart, None), 
 				generate_expression(f, call_node->func_call.arguments[0], func));
 	}
-	else if(vstd_strcmp(name, (char *)"get_next_arg"))
-	{
-		auto list = generate_expression(f, call_node->func_call.arguments[0], func);
-		return backend.builder->CreateVAArg(list, get_type_info_kind("Any", &backend));
-	}
 	else if(vstd_strcmp(name, (char *)"var_arg_stop"))
 	{
 		return backend.builder->CreateCall(Intrinsic::getDeclaration(backend.module,
 					llvm::Intrinsic::vaend, None),
 				generate_expression(f, call_node->func_call.arguments[0], func));
 	}
+	else if(vstd_strcmp(name, (char *)"get_type"))
+	{
+		Assert(call_node->func_call.expr_types[0].type == T_POINTER);
+		return generate_type_info(*call_node->func_call.expr_types[0].pointer.type, func);
+	}
 	else
 		raise_semantic_error(f, "Function marked as intrinsic is not an intrinsic", intrinsic_sym->token);
 	return NULL;
 }
-
-#if 0
-llvm::Value *
-generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
-{
-	// @TODO: func pointers
-	//Assert(call_node->func_call.operand->type == type_identifier);
-	//auto callee = FunctionCallee(shget(backend.func_table, call_node->func_call.operand->identifier.name));
-	auto operand = generate_expression(f, call_node->func_call.operand, func);
-	auto call_type = type_to_func_type(call_node->func_call.operand_type, backend);
-	auto callee = FunctionCallee(call_type, operand);
-
-	size_t arg_count = SDCount(call_node->func_call.arguments);
-	llvm::Value *arg_exprs[arg_count];
-	auto arg_types = call_node->func_call.arg_types;
-	auto expr_types = call_node->func_call.expr_types;
-	for (size_t i = 0; i < arg_count; ++i)
-	{
-		arg_exprs[i] = generate_expression(f, call_node->func_call.arguments[i], func);
-		if(arg_types[i].type != T_DETECT)
-		{
-			//arg_exprs[i] = backend.builder->CreateCast(, Value *V, Type *DestTy)
-			arg_exprs[i] = create_cast(arg_types[i], expr_types[i], arg_exprs[i]);
-		}
-	}
-	return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
-}
-#else
 
 llvm::FunctionCallee
 get_callee_maybe_overloaded(llvm::Value *operand, Ast_Node *call_node)
@@ -967,7 +939,6 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	else
 		return backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
 }
-#endif
 
 BasicBlock *
 generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block,
@@ -1099,7 +1070,7 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 					break;
 			}
 		} break;
-		case type_scope_end: { DEBUG_INFO ( emit_location(f, node->scope_desc.token); ) } break;
+		case type_scope_end: {} break;
 		default:
 		{
 			LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
@@ -1353,8 +1324,10 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			// @TODO: switch to llvm_load, idk how
 			// @TODO: switch to llvm_load, idk how
 			// @TODO: switch to llvm_load, idk how
-			else if(type == ID_GLOBAL)
-				llvm_load(&(get_symbol_spot(f, node->identifier.token)->type), value, "", &backend);
+			else if(type == ID_GLOBAL) {
+				Symbol *sym = get_symbol_spot(f, node->identifier.token);
+				return llvm_load(&sym->type, value, "", &backend);
+			}
 			else
 				return backend.builder->CreateLoad(
 						((llvm::AllocaInst *)value)->getAllocatedType(), value);
@@ -1726,13 +1699,21 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 			{
 				result = backend.builder->CreateAnd(left, right, "&&");
 			} break;
+			case tok_logical_or:
+			{
+				result = backend.builder->CreateLogicalOr(left, right);
+			} break;
 			case tok_bits_rshift:
 			{
-				result = backend.builder->CreateShl(left, right);
+				if(is_signed(node->binary_expr.left)) {
+					result = backend.builder->CreateAShr(left, right);
+				} else {
+					result = backend.builder->CreateLShr(left, right);
+				}
 			} break;
 			case tok_bits_lshift:
 			{
-				result = backend.builder->CreateLShr(left, right);
+				result = backend.builder->CreateShl(left, right);
 			} break;
 			case '<':
 			{

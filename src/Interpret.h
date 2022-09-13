@@ -10,7 +10,7 @@
 	if(is_float(l.type))                   \
 	{                                      \
 		out.type.type = T_UNTYPED_FLOAT;   \
-		out.tf64 = l.tf64 op r.tf64;       \
+		out._f64 = l._f64 op r._f64;       \
 	}                                      \
 	else if(is_integer(l.type))            \
 	{                                      \
@@ -18,12 +18,12 @@
 				if(is_signed(l.type))                 \
 				{                                     \
 					out.type.primitive.size = byte8;  \
-					out.ti64 = l.ti64 op r.ti64;      \
+					out._i64 = l._i64 op r._i64;      \
 				}                                     \
 				else                                  \
 				{                                     \
 					out.type.primitive.size = ubyte8; \
-					out.tu64 = l.tu64 op r.tu64;      \
+					out._u64 = l._u64 op r._u64;      \
 				}                          \
 	}                                      \
 	else                                   \
@@ -34,7 +34,7 @@
 	if(is_float(l.type))                   \
 	{                                      \
 		out.type.type = T_UNTYPED_FLOAT;   \
-		out.tf64 = l.tf64 op r;            \
+		out._f64 = l._f64 op r;            \
 	}                                      \
 	else if(is_integer(l.type))            \
 	{                                      \
@@ -42,12 +42,12 @@
 				if(is_signed(l.type))                 \
 				{                                     \
 					out.type.primitive.size = byte8;  \
-					out.ti64 = l.ti64 op r;           \
+					out._i64 = l._i64 op r;           \
 				}                                     \
 				else                                  \
 				{                                     \
 					out.type.primitive.size = ubyte8; \
-					out.tu64 = l.tu64 op r;           \
+					out._u64 = l._u64 op r;           \
 				}                          \
 	}                                      \
 	else                                   \
@@ -58,7 +58,7 @@
 	if(is_float(l.type))                   \
 	{                                      \
 		out.type.type = T_UNTYPED_FLOAT;   \
-		out.tf64 = op l.tf64;              \
+		out._f64 = op l._f64;              \
 	}                                      \
 	else if(is_integer(l.type))            \
 	{                                      \
@@ -66,12 +66,12 @@
 				if(is_signed(l.type))                 \
 				{                                     \
 					out.type.primitive.size = byte8;  \
-					out.ti64 = op l.ti64;             \
+					out._i64 = op l._i64;             \
 				}                                     \
 				else                                  \
 				{                                     \
 					out.type.primitive.size = ubyte8; \
-					out.tu64 = op l.tu64;             \
+					out._u64 = op l._u64;             \
 				}                          \
 	}                                      \
 	else                                   \
@@ -87,16 +87,16 @@ typedef struct
 	void *location;
 	union
 	{
-		f32 tf32;
-		f64 tf64;
-		i8  ti8;
-		i16 ti16;
-		i32 ti32;
-		i64 ti64;
-		u8  tu8;
-		u16 tu16;
-		u32 tu32;
-		u64 tu64;
+		f32 _f32;
+		f64 _f64;
+		i8  _i8;
+		i16 _i16;
+		i32 _i32;
+		i64 _i64;
+		u8  _u8;
+		u16 _u16;
+		u32 _u32;
+		u64 _u64;
 		void *pointed;
 	};
 } Interp_Val;

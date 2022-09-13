@@ -5,7 +5,7 @@
 void *
 _ISimpleDArrayCreate(size_t TypeSize)
 {
-	u64 CurrentlyCommited = TypeSize * 2048 + sizeof(DArray_Header);
+	u64 CurrentlyCommited = TypeSize * 8 + sizeof(DArray_Header);
 	void *Result = platform_allocate_chunk(CurrentlyCommited);
 	DArray_Header *Header = (DArray_Header *)Result;
 	Header->Count = 0;
@@ -28,7 +28,6 @@ _ISimpleDArrayPush(void **Array, void *Item)
 		if(NewPtr == 0)
 			LG_FATAL("Failed to allocate needed memory");
 		
-		SDHeader(ArrayPtr)->CurrentlyAllocated = NewSize;
 		
 		void *MemoryStartPointer = (char *)ArrayPtr - sizeof(DArray_Header);
 		memcpy(NewPtr, MemoryStartPointer,
@@ -37,6 +36,7 @@ _ISimpleDArrayPush(void **Array, void *Item)
 		platform_free_chunk(*Array);
 		*Array = (char *)NewPtr + sizeof(DArray_Header);
 		ArrayPtr = *Array;	
+		SDHeader(ArrayPtr)->CurrentlyAllocated = NewSize;
 	}
 	
 	void *NewItemLocation = (char *)ArrayPtr + SDHeader(ArrayPtr)->CurrentlyUsed;
@@ -66,9 +66,7 @@ _ISimpleDArrayInsert(void **Array, void *Item, int Index)
 		u64 NewSize = (u64)(SDHeader(ArrayPtr)->CurrentlyAllocated * 1.5);
 		void *NewPtr = platform_allocate_chunk(NewSize);
 		if(NewPtr == 0) LG_FATAL("Failed to allocate needed memory");
-		
-		SDHeader(ArrayPtr)->CurrentlyAllocated = NewSize;
-		
+			
 		void *MemoryStartPointer = (char *)ArrayPtr - sizeof(DArray_Header);
 		memcpy(NewPtr, MemoryStartPointer,
 			   SDHeader(ArrayPtr)->CurrentlyUsed + sizeof(DArray_Header));
@@ -76,6 +74,7 @@ _ISimpleDArrayInsert(void **Array, void *Item, int Index)
 		platform_free_chunk(*Array);
 		*Array = (char *)NewPtr + sizeof(DArray_Header);
 		ArrayPtr = *Array;	
+		SDHeader(ArrayPtr)->CurrentlyAllocated = NewSize;
 	}
 	void *NewItemLocation = (char *)ArrayPtr + Offset;
 	memcpy(NewItemLocation, Item, SDHeader(ArrayPtr)->TypeSize);

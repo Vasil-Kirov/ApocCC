@@ -384,6 +384,8 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 						node->assignment.token);
 			verify_assignment(f, node, true);
 			b32 failed = false;
+			// @TODO: make it so we don't have to interpret the expression
+			// multiple times, it will save some performance
 			auto expr = interpret_expression(node->assignment.rhs, &failed);
 			if(failed)
 				raise_semantic_error(f, "Expression for global declaration is not constant",
@@ -460,11 +462,11 @@ verify_enum(File_Contents *f, Ast_Node *node)
 	Interp_Val d = {};
 	d.type.type = T_INTEGER;
 	d.type.primitive.size = byte8;
-	d.ti64 = 1;
+	d._i64 = 1;
 	Interp_Val first_val = {};
 	first_val.type.type = T_INTEGER;
 	first_val.type.primitive.size = byte8;
-	first_val.ti64 = 0;
+	first_val._i64 = 0;
 
 	if(first_rhs && first_rhs != last_rhs)
 	{
@@ -492,7 +494,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		{
 			bot.type.type = T_FLOAT;
 			bot.type.primitive.size = real64;
-			bot.tf64 = n - 1;
+			bot._f64 = n - 1;
 		}
 		else if(is_integer(top.type))
 		{
@@ -500,12 +502,12 @@ verify_enum(File_Contents *f, Ast_Node *node)
 			if(is_signed(top.type))
 			{
 				bot.type.primitive.size = byte8;
-				bot.ti64 = n - 1;
+				bot._i64 = n - 1;
 			}
 			else
 			{
 				bot.type.primitive.size = ubyte8;
-				bot.tu64 = n - 1;
+				bot._u64 = n - 1;
 			}
 		}
 		else
@@ -740,7 +742,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 	{
 		case type_identifier:
 		{
-			get_symbol_spot(f, node->identifier.token, true);
+			node->identifier.symbol_spot = get_symbol_spot(f, node->identifier.token, true);
 		} break;
 		case type_for:
 		{
@@ -1102,7 +1104,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 			else
 			{
 				count_val.type.type = T_UNTYPED_INTEGER;
-				count_val.tu64 = elem_count;
+				count_val._u64 = elem_count;
 			}
 			Assert(is_integer(count_val.type));
 			if(failed)
@@ -1111,14 +1113,14 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 			}
 			if(is_signed(count_val.type))
 			{
-				if(count_val.ti64 < 0)
+				if(count_val._i64 < 0)
 					raise_semantic_error(f, "Expression must evaluate to a value higher than 0",
 							type_token);
-				node->assignment.decl_type.array.elem_count = count_val.ti64;
+				node->assignment.decl_type.array.elem_count = count_val._i64;
 			}
 			else
 			{
-				node->assignment.decl_type.array.elem_count = count_val.tu64;
+				node->assignment.decl_type.array.elem_count = count_val._u64;
 			}
 
 			// @TODO: this is a hack
@@ -1311,14 +1313,14 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 	{
 		case type_identifier:
 		{
-			Symbol *symbol = get_symbol_spot(f, expression->identifier.token);
-			if(symbol->tag == S_STRUCT_MEMBER)
+			expression->identifier.symbol_spot = get_symbol_spot(f, expression->identifier.token);
+			if(expression->identifier.symbol_spot->tag == S_STRUCT_MEMBER)
 			{
 				raise_formated_semantic_error(f, expression->identifier.token,
 						"Unkown identifier %s",
 						expression->identifier.name);
 			}
-			return symbol->type;
+			return expression->identifier.symbol_spot->type;
 		} break;
 		case type_run:
 		{

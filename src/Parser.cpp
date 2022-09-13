@@ -1273,9 +1273,9 @@ parse_type(File_Contents *f)
 				raise_parsing_unexpected_token("constant integer expression", f);
 			
 			if(is_signed(count.type))
-				result.array.elem_count = count.ti64;
+				result.array.elem_count = count._i64;
 			else
-				result.array.elem_count = count.tu64;
+				result.array.elem_count = count._u64;
 		}
 		Type_Info arr_type = parse_type(f);
 		result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));

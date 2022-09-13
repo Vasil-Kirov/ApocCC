@@ -29,11 +29,11 @@ perform_cast(Interp_Val operand, Type_Info cast)
 		Assert(is_integer(cast));
 		if(is_signed(cast))
 		{
-			operand.ti64 = (i64)operand.tf64;
+			operand._i64 = (i64)operand._f64;
 		}
 		else 
 		{
-			operand.tu64 = (u64)operand.tf64;
+			operand._u64 = (u64)operand._f64;
 		}
 	}
 	else if(is_integer(operand.type))
@@ -42,11 +42,11 @@ perform_cast(Interp_Val operand, Type_Info cast)
 		{
 			if(is_float(cast))
 			{
-				operand.tf64 = (f64)operand.ti64;
+				operand._f64 = (f64)operand._i64;
 			}
 			else if(cast.type == T_POINTER)
 			{
-				operand.pointed = (void *)operand.ti64;
+				operand.pointed = (void *)operand._i64;
 			}
 			else if(is_integer(cast))
 			{
@@ -56,7 +56,7 @@ perform_cast(Interp_Val operand, Type_Info cast)
 				}
 				else
 				{
-					operand.tu64 = operand.ti64;
+					operand._u64 = operand._i64;
 				}
 			}
 		}
@@ -64,17 +64,17 @@ perform_cast(Interp_Val operand, Type_Info cast)
 		{
 			if(is_float(cast))
 			{
-				operand.tf64 = (f64)operand.tu64;
+				operand._f64 = (f64)operand._u64;
 			}
 			else if(cast.type == T_POINTER)
 			{
-				operand.pointed = (void *)operand.tu64;
+				operand.pointed = (void *)operand._u64;
 			}
 			else if(is_integer(cast))
 			{
 				if(is_signed(cast))
 				{
-					operand.ti64 = (u64)operand.tu64;
+					operand._i64 = (u64)operand._u64;
 				}
 				else
 				{
@@ -88,9 +88,9 @@ perform_cast(Interp_Val operand, Type_Info cast)
 		if(is_integer(cast))
 		{
 			if(is_signed(cast))
-				operand.ti64 = (i64)operand.pointed;
+				operand._i64 = (i64)operand.pointed;
 			else
-				operand.tu64 = (u64)operand.pointed;
+				operand._u64 = (u64)operand.pointed;
 		}
 		else if(cast.type == T_POINTER)
 			return operand;
@@ -193,7 +193,7 @@ interpret_lhs(Ast_Node *lhs)
 			Assert(is_integer(index.type));
 			if(is_signed(index.type))
 			{
-				i64 index_val = index.ti64;
+				i64 index_val = index._i64;
 				if(index_val < 0)
 				{
 					// @TODO: Hack
@@ -205,7 +205,7 @@ interpret_lhs(Ast_Node *lhs)
 			}
 			else
 			{
-				return ((Interp_Val *)indexed->pointed) + index.tu64;
+				return ((Interp_Val *)indexed->pointed) + index._u64;
 			}
 		} break;
 	}
@@ -245,7 +245,7 @@ interpret_assignment(Ast_Node *node, b32 *failed)
 			size_t to_fill = (type_size - expr_size) / sizeof(Interp_Val);
 			Interp_Val integer = {};
 			integer.type.type = T_UNTYPED_INTEGER;
-			integer.ti64 = 0;
+			integer._i64 = 0;
 			for (size_t i = 0; i < to_fill; ++i)
 			{
 				fill[i] = integer;
@@ -264,7 +264,7 @@ interpret_assignment(Ast_Node *node, b32 *failed)
 	{
 		Interp_Val *lhs_ptr = interpret_lhs(node->assignment.lhs);
 		// @NOTE: covers all types
-		lhs_ptr->tu64 = result.tu64;
+		lhs_ptr->_u64 = result._u64;
 	}
 }
 
@@ -273,9 +273,9 @@ val_to_bool(Interp_Val val)
 {
 	b32 is_true = false;
 	if(is_integer(val.type))
-		is_true = val.tu64 > 0;
+		is_true = val._u64 > 0;
 	else
-		is_true = val.tf64 > 0;
+		is_true = val._f64 > 0;
 	return is_true;
 }
 
@@ -464,7 +464,7 @@ str_to_interp_val(u8 *str)
 		{
 			result.type.type = T_UNTYPED_FLOAT;
 			result.type.primitive.size = real64;
-			result.tf64 = vstd_str_to_double((char *)str);
+			result._f64 = vstd_str_to_double((char *)str);
 			return result;
 		}
 	}
@@ -473,11 +473,11 @@ str_to_interp_val(u8 *str)
 	if(str[0] != '-' && str_len > 19)
 	{
 		result.type.primitive.size = ubyte8;
-		result.tu64 = str_to_u64((char *)str);
+		result._u64 = str_to_u64((char *)str);
 		return result;
 	}
 	result.type.primitive.size = byte8;
-	result.ti64 = str_to_i64((char *)str);
+	result._i64 = str_to_i64((char *)str);
 	return result;
 }
 
@@ -534,11 +534,11 @@ interpret_operand(Ast_Node *node, b32 *failed)
 			void *pointed = NULL;
 			if(is_signed(operand.type))
 			{
-				pointed = ptr + operand.ti64;
+				pointed = ptr + operand._i64;
 			}
 			else
 			{
-				pointed = ptr + operand.ti64;
+				pointed = ptr + operand._i64;
 			}
 			result = *(Interp_Val *)pointed;
 			// @NOTE: not sure if it's needed
@@ -568,7 +568,7 @@ interpret_operand(Ast_Node *node, b32 *failed)
 				Assert(false);
 
 			// @NOTE: put the temp variable back in
-			location->tu64 = tmp.tu64;
+			location->_u64 = tmp._u64;
 		}
 		case type_array_list:
 		{
@@ -615,13 +615,13 @@ interpret_unary(Ast_Node *node, b32 *failed)
 				{
 					DO_U_OP(result, ++, operand);
 					if(operand.location)
-						((Interp_Val *)operand.location)->tu64 = result.tu64;
+						((Interp_Val *)operand.location)->_u64 = result._u64;
 				} break;
 				case tok_minusminus:
 				{
 					DO_U_OP(result, --, operand);
 					if(operand.location)
-						((Interp_Val *)operand.location)->tu64 = result.tu64;
+						((Interp_Val *)operand.location)->_u64 = result._u64;
 				} break;
 				case tok_minus:
 				{
@@ -699,9 +699,9 @@ interpret_binary(Ast_Node *node, b32 *failed)
 				{
 					result.type.type = T_UNTYPED_FLOAT;
 					if(is_float(node->binary_expr.right))
-						result.tf64 = fmod(left.tf64, right.tf64);
+						result._f64 = fmod(left._f64, right._f64);
 					else
-						result.tf64 = fmod(left.tf64,  (f64)right.ti64);
+						result._f64 = fmod(left._f64,  (f64)right._i64);
 				}
 				else
 				{
@@ -709,10 +709,10 @@ interpret_binary(Ast_Node *node, b32 *failed)
 					if(is_float(node->binary_expr.right))
 					{
 						result.type.type = T_UNTYPED_FLOAT;
-						result.tf64 = fmod(left.tf64, right.tf64);
+						result._f64 = fmod(left._f64, right._f64);
 					}
 					else
-						result.ti64 = left.ti64 % right.ti64;
+						result._i64 = left._i64 % right._i64;
 				}
 			} break;
 			case tok_logical_is:
@@ -729,12 +729,12 @@ interpret_binary(Ast_Node *node, b32 *failed)
 				if(is_signed(left.type))
 				{
 					result.type.primitive.size = byte8;
-					result.ti64 = left.ti64 >> right.ti64;
+					result._i64 = left._i64 >> right._i64;
 				}
 				else
 				{
 					result.type.primitive.size = ubyte8;
-					result.tu64 = left.tu64 >> right.tu64;
+					result._u64 = left._u64 >> right._u64;
 				}
 			} break;
 			case tok_bits_lshift:
@@ -743,12 +743,12 @@ interpret_binary(Ast_Node *node, b32 *failed)
 				if(is_signed(left.type))
 				{
 					result.type.primitive.size = byte8;
-					result.ti64 = left.ti64 << right.ti64;
+					result._i64 = left._i64 << right._i64;
 				}
 				else
 				{
 					result.type.primitive.size = ubyte8;
-					result.tu64 = left.tu64 << right.tu64;
+					result._u64 = left._u64 << right._u64;
 				}
 			} break;
 			case '<':
@@ -773,12 +773,12 @@ interpret_binary(Ast_Node *node, b32 *failed)
 				if(is_signed(left.type))
 				{
 					result.type.primitive.size = byte8;
-					result.ti64 = left.ti64 & right.ti64;
+					result._i64 = left._i64 & right._i64;
 				}
 				else
 				{
 					result.type.primitive.size = ubyte8;
-					result.tu64 = left.tu64 & right.tu64;
+					result._u64 = left._u64 & right._u64;
 				}
 			} break;
 			case tok_bits_xor:
@@ -787,12 +787,12 @@ interpret_binary(Ast_Node *node, b32 *failed)
 				if(is_signed(left.type))
 				{
 					result.type.primitive.size = byte8;
-					result.ti64 = left.ti64 ^ right.ti64;
+					result._i64 = left._i64 ^ right._i64;
 				}
 				else
 				{
 					result.type.primitive.size = ubyte8;
-					result.tu64 = left.tu64 ^ right.tu64;
+					result._u64 = left._u64 ^ right._u64;
 				}
 			} break;
 			case tok_bits_or:
@@ -801,12 +801,12 @@ interpret_binary(Ast_Node *node, b32 *failed)
 				if(is_signed(left.type))
 				{
 					result.type.primitive.size = byte8;
-					result.ti64 = left.ti64 | right.ti64;
+					result._i64 = left._i64 | right._i64;
 				}
 				else
 				{
 					result.type.primitive.size = ubyte8;
-					result.tu64 = left.tu64 | right.tu64;
+					result._u64 = left._u64 | right._u64;
 				}
 			} break;	
 			default:

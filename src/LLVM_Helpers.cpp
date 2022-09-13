@@ -308,14 +308,14 @@ interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 		case T_INTEGER:
 		{
 			if(is_signed(val.type))
-				result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val.ti64, true);
+				result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val._i64, true);
 			else
-				result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val.tu64, false);
+				result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val._u64, false);
 		} break;
 		case T_UNTYPED_FLOAT:
 		case T_FLOAT:
 		{
-			auto ap = APFloat(val.tf64);
+			auto ap = APFloat(val._f64);
 			result = ConstantFP::get(apoc_type_to_llvm(val.type, backend), ap);
 		} break;
 		case T_ARRAY:
@@ -333,7 +333,7 @@ interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 		} break;
 		case T_BOOLEAN:
 		{
-			result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val.ti64, false);
+			result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val._i64, false);
 		} break;
 		case T_POINTER:
 		{

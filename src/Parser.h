@@ -1,3 +1,4 @@
+
 /* date = February 10th 2022 2:54 pm */
 #ifndef _PARSER_H
 #define _PARSER_H
@@ -121,7 +122,7 @@ typedef struct _Ast_Variable
 typedef struct _Ast_Struct
 {
 	Ast_Identifier struct_id;
-    Ast_Variable *members;
+	Ast_Variable *members;
 	int member_count;
 	b32 is_union;
 } Ast_Struct;

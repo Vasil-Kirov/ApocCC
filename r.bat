@@ -18,7 +18,8 @@ set LIBS=legacy_stdio_definitions.lib vcruntime.lib UCRT.LIB
 
 echo --- Program ---
 :: ..\Basic.apoc 
-call apoc %Files% --debug --optimize some --linker /subsystem:console
+:: call apoc %Files% --debug --optimize some --linker /subsystem:console
+call apoc ..\quick_test_2.apoc
 call a.exe
 echo:
 echo %errorlevel%

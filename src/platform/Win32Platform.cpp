@@ -223,6 +223,12 @@ platform_handle_messages()
 }
 
 void *
+platform_allocate_executable_memory(u64 size)
+{
+	return VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+}
+
+void *
 platform_reserve_memory(u64 Size)
 {
 	return VirtualAlloc(NULL, Size, MEM_RESERVE, PAGE_READWRITE);

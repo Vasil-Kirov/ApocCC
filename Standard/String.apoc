@@ -204,10 +204,26 @@ fn parse_format(format: string, list:* Any) -> string
 			list_index += 1;
 			type := item.type.kind;
 			if type == Type_Type.INTEGER {
-				int_to_str(*#*i64 item.value, @builder);
+				to_parse := 0;
+				size := item.type.primitive.size;
+				if size == Var_Size.byte1 || size == Var_Size.ubyte1
+					to_parse = #i64 *#*u8 item.value;
+				else if size == Var_Size.byte2 || size == Var_Size.ubyte2
+					to_parse = #i64 *#*u16 item.value;
+				else if size == Var_Size.byte4 || size == Var_Size.ubyte4
+					to_parse = #i64 *#*u32 item.value;
+				else
+					to_parse = *#*i64 item.value;
+				int_to_str(to_parse, @builder);
 			} else if type == Type_Type.FLOAT {
-				printf("int: %f\n", *#*f64 item.value);
-				float_to_str(*#*f64 item.value, @builder);
+				to_parse :f64= 0;
+				size := item.type.primitive.size;
+				if size == Var_Size.real32
+					to_parse = #f64 *#*f32 item.value;
+				else
+					to_parse = *#*f64 item.value;
+
+				float_to_str(to_parse, @builder);
 			} else {
 				builder += format[i];
 			}

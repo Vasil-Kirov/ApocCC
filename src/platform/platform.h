@@ -38,6 +38,9 @@ typedef struct _Quad
 Platform_Thread
 platform_create_thread(void *Func, void *Args);
 
+void *
+platform_allocate_executable_memory(u64 size);
+
 void
 platform_wait_for_thread(Platform_Thread Thread);
 
