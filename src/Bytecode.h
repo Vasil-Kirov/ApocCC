@@ -18,10 +18,11 @@ typedef enum {
 
 typedef enum {
 	BC_INVALID,
-	BC_MOVE_VALUE_TO_MEMORY,
+	BC_STORE,
 	BC_MOVE_VALUE_TO_REG,
 	BC_MOVE_FLOAT_TO_REG,
 	BC_MOVE_REG_TO_REG,
+	BC_COPY,
 	BC_PUSH_REG,
 	BC_POP_REG,
 	BC_LOAD_STACK,
@@ -70,7 +71,7 @@ typedef enum {
 	BC_CAST_TRUNC,
 	BC_CAST_F_TRUNC,
 	BC_CAST_F_EXT,
-	BC_NO_CAST
+	BC_NO_OP
 } BC_OP ;
 
 typedef struct {
@@ -82,10 +83,9 @@ typedef struct {
 		};
 		u64 big_idx;
 	};
-	i32 opt;
+	i32 result;
 	Type_Info *type;
 } Bytecode;
-
 
 typedef enum {
 	OP_REGISTER,
@@ -101,9 +101,10 @@ typedef struct {
 } Operand;
 
 typedef struct {
-	i32 position;
 	u64 init_val;
 	u64 size;
+	i32 position;
+	i32 virtual_register;
 } Data_Segment;
 
 typedef struct {
@@ -114,10 +115,22 @@ typedef struct {
 typedef struct _IR {
 	Data_Segment_Table *allocated;
 	Data_Segment_Table *global_allocated_ref;
+	Data_Segment *ds_out;
 	Bytecode *bc;
-	Operand *registers;
-	struct _IR *next;
+	i32 reg_count;
+	i32 ds_count;
+	i32 bc_count;
 } IR;
+
+typedef struct {
+	i32 in_memory;
+	Register in_register;
+} Virtual_Register_Tracker;
+
+typedef struct {
+	i32 last_updated;
+	i32 current_virtual_register;
+} Register_Allocation_Tracker;
 
 IR *
 ast_to_bytecode(Ast_Node *node);
@@ -127,6 +140,12 @@ ast_to_bc_file_level_list(Ast_Node **list, IR *ir);
 
 void
 ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func);
+
+void
+register_allocation_first_pass(IR *ir);
+
+void
+print_bytecode(IR *ir);
 
 IR
 ast_to_bc_func_level_list(Ast_Node **list, Data_Segment_Table *global_table);

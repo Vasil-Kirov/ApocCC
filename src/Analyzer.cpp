@@ -1,13 +1,10 @@
-#include "llvm/IR/Type.h"
 #include <Analyzer.h>
 #include <Log.h>
-#include <functional>
 #include <stdlib/std.h>
 #include <Memory.h>
 #include <Type.h>
 #include <Errors.h>
 #include <Interpret.h>
-#include <vcruntime_typeinfo.h>
 
 void
 initialize_analyzer(File_Contents *f)

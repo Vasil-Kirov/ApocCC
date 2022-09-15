@@ -424,6 +424,35 @@ vstd_str_ends_with(char *str, char *end)
 	return vstd_strcmp(str, end);
 }
 
+void
+_vstd_u32_to_x(u32 num, char *arr_to_fill, b32 lower_case)
+{
+	u32 digit_count = 0;
+	u32 num_copy = num;
+
+	if (num == 0)
+		digit_count = 1;
+	else
+		while (num_copy != 0)
+		{
+			++digit_count;
+			num_copy /= 16;
+		}
+
+	const char CONV_TABLE[] = {
+		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+	int at = 0;
+	arr_to_fill[at++] = '0';
+	arr_to_fill[at++] = 'x';
+	at = 1 + digit_count;
+	do
+	{
+		u8 digit = num % 16;
+		arr_to_fill[at--] = CONV_TABLE[digit] > '9' ? CONV_TABLE[digit] + (lower_case * 32) : CONV_TABLE[digit];
+		num /= 16;
+	} while (num != 0);
+}
+
 b32
 vstd_strcmp(char *str1, char *str2)
 {
@@ -437,6 +466,7 @@ vstd_strcmp(char *str1, char *str2)
 	return false;
 }
 
+__attribute__((no_sanitize("address")))
 size_t
 vstd_strlen(char *str)
 {
@@ -444,24 +474,24 @@ vstd_strlen(char *str)
 	if (str[0] == 0)
 		return 0;
 
-    size_t result = 0;
-    
-    const __m128i zeros = _mm_setzero_si128();
-    __m128i* mem = (__m128i*)str;
-    
-    for (/**/; /**/; mem++, result += 16) 
+	size_t result = 0;
+
+	const __m128i zeros = _mm_setzero_si128();
+	__m128i* mem = (__m128i*)str;
+
+	for (/**/; /**/; mem++, result += 16) 
 	{
-        
-        const __m128i data = _mm_loadu_si128(mem);
-        const __m128i cmp  = _mm_cmpeq_epi8(data, zeros);
-        
-        if (!_mm_testc_si128(zeros, cmp)) 
+
+		const __m128i data = _mm_loadu_si128(mem);
+		const __m128i cmp  = _mm_cmpeq_epi8(data, zeros);
+
+		if (!_mm_testc_si128(zeros, cmp)) 
 		{
-            int mask = _mm_movemask_epi8(cmp);
-            
-            return result + psnip_builtin_ctz(mask);
-        }
-    }
+			int mask = _mm_movemask_epi8(cmp);
+
+			return result + psnip_builtin_ctz(mask);
+		}
+	}
 }
 
 #if 0
@@ -478,6 +508,7 @@ i32
 FormatString(char *Buffer, const char *Format, i32 FormatSize, va_list args)
 {
     i32 BufferIndex = 0;
+    b32 lower_case = false;
     for (int FormatIndex = 0; FormatIndex < FormatSize; ++FormatIndex)
 	{
 		char FormatChar = Format[FormatIndex];
@@ -499,16 +530,16 @@ FormatString(char *Buffer, const char *Format, i32 FormatSize, va_list args)
 				{
 					int Number = va_arg(args, int);
 					
-                    // NOTE(Vasko): YOU CANT INCREMENT AN ARRAY AS A POINTER
-                    char Arr[100] = {0};
-                    char *ToCopy = Arr;
-                    
-                    _vstd_IntToStr(Number, ToCopy);
-                    while (*ToCopy != 0)
-                    {
-                        Buffer[BufferIndex++] = *ToCopy;
-                        ++ToCopy;
-                    }
+					// NOTE(Vasko): YOU CANT INCREMENT AN ARRAY AS A POINTER
+					char Arr[100] = {0};
+					char *ToCopy = Arr;
+
+					_vstd_IntToStr(Number, ToCopy);
+					while (*ToCopy != 0)
+					{
+						Buffer[BufferIndex++] = *ToCopy;
+						++ToCopy;
+					}
 					
 				}break;
 				case 'f':
@@ -559,20 +590,36 @@ FormatString(char *Buffer, const char *Format, i32 FormatSize, va_list args)
 							++ToCopy;
 						}
 					}
-				}break;
+				} break;
 				case 'c':
 				{
 					char c = (char)va_arg(args, int);
 					Buffer[BufferIndex++] = c;
-				}break;
+				} break;
+				case 'x':
+				lower_case = true;
+				case 'X':
+				{
+
+					u32 number = (u32)va_arg(args, unsigned);
+					char arr[100] = {};
+					char *to_copy = arr;
+					_vstd_u32_to_x(number, to_copy, lower_case);
+					lower_case = false;
+					while (*to_copy != 0)
+					{
+						Buffer[BufferIndex++] = *to_copy;
+						++to_copy;
+					}
+				} break;
 				case 'l':
 				{
 					if(Format[FormatIndex+1] == 'l' && Format[FormatIndex + 2] == 'u')
 					{
-                        u64 Number = (u64)va_arg(args, u64);
+						u64 Number = (u64)va_arg(args, u64);
 						char Arr[100] = {0};
-                        char *ToCopy = Arr;
-                        
+						char *ToCopy = Arr;
+
 						_vstd_U64ToStr(Number, ToCopy);
 						while (*ToCopy != 0)
 						{
@@ -585,17 +632,17 @@ FormatString(char *Buffer, const char *Format, i32 FormatSize, va_list args)
 					{
 						goto NORMAL_FORMAT;
 					}
-				}break;
+				} break;
 				case '\\':
 				{
 					Buffer[BufferIndex++] = '%';
-				}break;
+				} break;
 				default:
 				{
 					NORMAL_FORMAT:
 					Buffer[BufferIndex++] = '%';
 					Buffer[BufferIndex++] = Format[FormatIndex];
-				}break;
+				} break;
 			}
 		}
 		else
@@ -619,14 +666,16 @@ void _vstd_Printf(int FormatSize, const char* Format, ...)
     platform_write_file(Buffer, BufferSize, "0", false);
 }
 
-void _vstd_sPrintf(int FormatSize, char *Buffer, const char* Format, ...)
+i32
+_vstd_sPrintf(int FormatSize, char *Buffer, const char* Format, ...)
 {
     va_list Args;
     va_start(Args, Format);
     
-    FormatString(Buffer, Format, FormatSize, Args);
+    i32 result = FormatString(Buffer, Format, FormatSize, Args);
     
     va_end(Args);
+    return result;
 }
 
 

@@ -1,4 +1,3 @@
-#include "llvm/IR/Intrinsics.h"
 #include <x64_Gen.h>
 #include <platform/platform.h>
 
@@ -14,6 +13,9 @@ x64_generate_code(IR *ir)
 	}
 	i32 (*exe)(void) = (i32(*)())platform_allocate_executable_memory(SDCount(buffer));
 	memcpy((void *)exe, buffer, SDCount(buffer));
+	int a = 10;
+	int b = 3;
+	int c = a / b;
 	i32 result = exe();
 	LG_DEBUG("result: %d", result);
 
@@ -22,7 +24,7 @@ x64_generate_code(IR *ir)
 void
 x64_gen_ir(IR *ir, u8 **buffer)
 {
-	size_t bytecode_count = SDCount(ir->bc);
+	size_t bytecode_count = ir->bc_count;
 	for(size_t i = 0; i < bytecode_count; ++i)
 	{
 		x64_gen_from_bytecode(ir, ir->bc[i], buffer);
@@ -104,7 +106,7 @@ push_displacement(MOD mod, i32 displacement, u8 **buffer)
 }
 
 inline void
-push_generic_mov(MOD mod, u8 mov_opcode, Register left_rm, Register right_rm, i32 displacement, u8 **buffer)
+push_generic_mov(MOD mod, u8 mov_opcode, i32 left_rm, i32 right_rm, i32 displacement, u8 **buffer)
 {
 	push_byte(buffer, mov_opcode);
 	u8 mod_reg_rm;
@@ -234,79 +236,124 @@ get_r_rm_mov_and_prefix(u8 **buffer, Type_Info *type)
 	return mov_opcode;
 }
 
+inline void
+encode_int_op(u8 opcode, Bytecode *bc, u8 **buffer, IR *ir)
+{
+	if(bc->type->primitive.size == ubyte8 || bc->type->primitive.size == byte8)
+		prefix64(buffer);
+	push_byte(buffer, opcode);
+	u8 postfix = encode_postfix(MOD_register, bc->right_idx, bc->left_idx);
+	push_byte(buffer, postfix);
+}
+
 void
 x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer)
 {
 	switch(bc.op)
 	{
-		case BC_MOVE_VALUE_TO_MEMORY:
+		case BC_STORE:
 		{
-			Data_Segment seg = ir->allocated[bc.left_idx].value;
+			Data_Segment seg = ir->ds_out[bc.left_idx];
 			i32 displacement = seg.position + seg.size;
 			displacement = -displacement;
 			MOD mod = MOD_displacement_i32;
 			if(displacement > -129 && displacement < 128 )
 				mod = MOD_displacement_i8;
 			u8 mov_opcode = get_rm_r_mov_and_prefix(buffer, bc.type);
-			push_generic_mov(mod, mov_opcode, reg_bp, ir->registers[bc.right_idx].reg, displacement, buffer);
+			push_generic_mov(mod, mov_opcode, reg_bp, bc.right_idx, displacement, buffer);
 		} break;
 		case BC_MOVE_FLOAT_TO_REG:
 		case BC_MOVE_VALUE_TO_REG:
 		{
 			u8 mov_opcode = get_r_i_mov_and_prefix(buffer, bc.type);
+			mov_opcode |= bc.result & 0b111;
 			push_byte(buffer, mov_opcode);
 			push_any(buffer, &bc.big_idx, bc.type);
-			ir->registers[bc.opt].reg = reg_a;
 		} break;
 		case BC_LOAD_DATA_SEG:
 		case BC_LOAD_STACK:
 		{
-			if(ir->registers[bc.left_idx].reg == reg_invalid)
-			{
-				ir->registers[bc.left_idx].reg = reg_a;
-			}
-
 			Data_Segment seg;
 			if(bc.op == BC_LOAD_DATA_SEG)
 				seg = ir->global_allocated_ref[bc.right_idx].value;
 			else
-				seg = ir->allocated[bc.right_idx].value;
+				seg = ir->ds_out[bc.right_idx];
 			i32 displacement = seg.position + seg.size;
 			displacement = -displacement;
 			MOD mod = MOD_displacement_i32;
 			if( displacement > -129 && displacement < 128 )
 				mod = MOD_displacement_i8;
 			u8 mov_opcode = get_r_rm_mov_and_prefix(buffer, bc.type);
-			push_generic_mov(mod, mov_opcode, reg_bp, ir->registers[bc.left_idx].reg, displacement, buffer);
+			push_generic_mov(mod, mov_opcode, reg_bp, bc.result, displacement, buffer);
 		} break;
 		case BC_MOVE_REG_TO_REG:
 		{
-			if(ir->registers[bc.left_idx].reg == ir->registers[bc.right_idx].reg)
+			if(bc.left_idx == bc.right_idx)
 				break;
 			MOD mod = MOD_register;
 			u8 mov_opcode = get_r_rm_mov_and_prefix(buffer, bc.type);
-			push_generic_mov(mod, mov_opcode, ir->registers[bc.left_idx].reg, ir->registers[bc.right_idx].reg, 0, buffer);
+			push_generic_mov(mod, mov_opcode, bc.left_idx, bc.right_idx, 0, buffer);
 		} break;
 		case BC_PUSH_REG:
 		{
-			push_byte(buffer, 0x50 + ir->registers[bc.left_idx].reg);
+			push_byte(buffer, 0x50 + bc.left_idx);
 		} break;
 		case BC_POP_REG:
 		{
-			push_byte(buffer, 0x58 + ir->registers[bc.left_idx].reg);
+			push_byte(buffer, 0x58 + bc.left_idx);
 		} break;
 		case BC_RETURN:
 		{
 			MOD mod = MOD_register;
-			Register ret_register = ir->registers[bc.left_idx].reg;
-			u8 mov_opcode = get_r_rm_mov_and_prefix(buffer, bc.type);
-			push_generic_mov(mod, mov_opcode, ret_register, reg_a, 0, buffer);
+			i32 ret_register = bc.left_idx;
+			if(ret_register != reg_a)
+			{
+				u8 mov_opcode = get_r_rm_mov_and_prefix(buffer, bc.type);
+				push_generic_mov(mod, mov_opcode, reg_a, ret_register, 0, buffer);
+			}
+			// POP rbp
+			push_byte(buffer, 0x58 + reg_bp);
 			push_byte(buffer, 0xc3);
 		} break;
 		case BC_ADD:
 		{
+			encode_int_op(0x01, &bc, buffer, ir);
+		} break;
+		case BC_SUB:
+		{
+			encode_int_op(0x29, &bc, buffer, ir);
+		} break;
+		case BC_I_MUL:
+		{
+			bc.left_idx = bc.right_idx;
+			bc.right_idx = 5; // /5 instruction
+			encode_int_op(0xf7, &bc, buffer, ir);
+		} break;
+		case BC_U_MUL:
+		{
+			bc.left_idx = bc.right_idx;
+			bc.right_idx = 4; // /4 instruction
+			encode_int_op(0xf7, &bc, buffer, ir);
+		} break;
+		case BC_U_DIV:
+		{
+			bc.left_idx = bc.right_idx;
+			bc.right_idx = 6; // /6 instruction
+			encode_int_op(0xf7, &bc, buffer, ir);
 
 		} break;
+		case BC_I_DIV:
+		{
+			bc.left_idx = bc.right_idx;
+			bc.right_idx = 7; // /7 instruction
+			encode_int_op(0xf7, &bc, buffer, ir);
+		} break;
+		case BC_BIT_XOR:
+		{
+			encode_int_op(0x33, &bc, buffer, ir);
+		} break;
+		case BC_NO_OP:
+		{}break;
 		default:
 		{
 			Assert(false);

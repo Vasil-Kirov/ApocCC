@@ -5,7 +5,10 @@
 #include <Lexer.h>
 #include <Parser.h>
 #include <string>
+
+#if !defined(NOVM)
 #include <LLVM_Backend.h>
+#endif
 
 typedef struct
 {
@@ -92,7 +95,9 @@ typedef struct _File_Contents
 	Type_Table *type_table;
 	Ast_Node  **overloads;
 	Ast_Node  **defered;
+#if !defined(NOVM)
 	llvm::Function  **overload_gens;
+#endif
 	Stack		scope_stack;
 	Scope_Info *scopes;
 	u64         file_size;

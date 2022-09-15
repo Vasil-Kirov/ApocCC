@@ -2,39 +2,39 @@
 #include <Analyzer.h>
 #include <Memory.h>
 
-static b32 reached_eof;
-static Token_Iden last_read_token;
-static const char *expected;
-static const Token_Iden invalid_token = {};
+	static b32 reached_eof;
+	static Token_Iden last_read_token;
+	static const char *expected;
+	static const Token_Iden invalid_token = {};
 
 #define parse_expect(func, str) \
-	func();                     \
-	expected = str
+		func();                     \
+		expected = str
 #define tok_expect(token_id, exp_tok, expect)                 \
-	{                                                         \
-		if (token_id.type != exp_tok)                         \
-		{                                                     \
-			raise_parsing_unexpected_token(expect, token_id); \
-		}                                                     \
-	}
+		{                                                         \
+			if (token_id.type != exp_tok)                         \
+			{                                                     \
+				raise_parsing_unexpected_token(expect, token_id); \
+			}                                                     \
+		}
 #define tok_not_expect(token_id, nexp_tok, expect)           \
-	{                                                        \
-		if (token_id.type == nexp_tok)                       \
-		{                                                    \
-			raise_parsing_unexpected_token(expect, token_id) \
-		}                                                    \
+		{                                                        \
+			if (token_id.type == nexp_tok)                       \
+			{                                                    \
+				raise_parsing_unexpected_token(expect, token_id) \
+			}                                                    \
+		}
+
+	Ast_Node *
+	alloc_node()
+	{
+		Ast_Node *result = (Ast_Node *)AllocateCompileMemory(sizeof(Ast_Node));
+		memset(result, 0, sizeof(Ast_Node));
+		return result;
 	}
 
-Ast_Node *
-alloc_node()
-{
-	Ast_Node *result = (Ast_Node *)AllocateCompileMemory(sizeof(Ast_Node));
-	memset(result, 0, sizeof(Ast_Node));
-	return result;
-}
-
-Ast_Node *
-ast_array_list(Token_Iden start_tok, Ast_Node **list)
+	Ast_Node *
+	ast_array_list(Token_Iden start_tok, Ast_Node **list)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_array_list;
@@ -787,41 +787,41 @@ get_precedence(Token op, b32 on_left, b32 is_lhs)
 	case tok_minusminus:
 	case '(':
 	case '[':
-		return on_left ? 35 : 34;
+		return on_left ? 35 : 36;
 
 	case '*':
 	case '/':
 	case '%':
-		return on_left ? 33 : 32;
+		return on_left ? 33 : 34;
 
 	case '+':
 	case '-':
-		return on_left ? 31 : 30;
+		return on_left ? 31 : 32;
 
 	case tok_bits_lshift:
 	case tok_bits_rshift:
-		return on_left ? 29 : 28;
+		return on_left ? 29 : 30;
 
 	case '>':
 	case '<':
 	case tok_logical_gequal:
 	case tok_logical_lequal:
-		return on_left ? 27 : 26;
+		return on_left ? 27 : 28;
 
 	case tok_logical_is:
 	case tok_logical_isnot:
-		return on_left ? 25 : 24;
+		return on_left ? 25 : 26;
 
 	case tok_bits_and:
-		return on_left ? 23 : 22;
+		return on_left ? 23 : 24;
 	case tok_bits_xor:
-		return on_left ? 21 : 20;
+		return on_left ? 21 : 22;
 	case tok_bits_or:
-		return on_left ? 19 : 18;
+		return on_left ? 19 : 20;
 	case tok_logical_and:
-		return on_left ? 17 : 16;
+		return on_left ? 17 : 18;
 	case tok_logical_or:
-		return on_left ? 15 : 14;
+		return on_left ? 15 : 16;
 
 // @TODO: look more into if and how these should be handled here
 	case tok_equals:

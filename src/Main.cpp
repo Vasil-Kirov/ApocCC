@@ -34,11 +34,13 @@
 #include <Bytecode.cpp>
 #include <x64_Gen.cpp>
 
+#if !defined(NOVM)
 #include <LLVM_Helpers.h>
 #include <LLVM_Backend.h>
 
 #include <LLVM_Helpers.cpp>
 #include <LLVM_Backend.cpp>
+#endif
 
 #include <chrono>
 
@@ -170,7 +172,6 @@ int main(int argc, char *argv[])
 	}
 	IR *ir = ast_to_bytecode(f->ast_root);
 	x64_generate_code(ir);
-	LG_DEBUG("done");
 #if 0
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
 	

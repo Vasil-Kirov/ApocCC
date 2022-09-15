@@ -91,7 +91,7 @@ _vstd_FloatToStr(float num, char *arr_to_fill);
 void
 _vstd_Printf(int FormatSize, const char* FormatString, ...);
 
-void
+i32
 _vstd_sPrintf(int FormatSize, char *Buffer, const char* FormatString, ...);
 
 b32
