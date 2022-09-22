@@ -2,6 +2,7 @@
 #ifndef _X64_GEN_H
 #define _X64_GEN_H
 #include <Bytecode.h>
+#include <ObjDumper.h>
 
 enum MOD {
 	MOD_displacement_0   = 0b00,
@@ -18,15 +19,29 @@ enum REX {
 	REX_B    = 0b1000001,
 };
 
+#if 0 
+enum CMP_OP {
+	LOGICAL_AND,
+	LOGICAL_OR,
+	LOGICAL_NOT,
+	LOGICAL_EQUALS,
+	LOGICAL_NEQUALS,
+	LOGICAL_GREATER,
+	LOGICAL_LESS,
+	LOGICAL_GREATEREQ,
+	LOGICAL_LESSEQ,
+}
+#endif
+
 // @NOTE: primary function
-void
-x64_generate_code(IR *ir);
+u8 *
+x64_generate_code(File_Contents *f, IR *ir, Relocation **out_relocations);
 
 void
-x64_gen_ir(IR *ir, u8 **buffer);
+x64_gen_ir(IR *ir, u8 **buffer, Relocation **relocs, Data_Segment *global_ds);
 
 void
-x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer);
+x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation **relocs, Data_Segment *global_ds);
 
 #endif
 

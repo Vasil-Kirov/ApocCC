@@ -194,7 +194,14 @@ add_symbol(File_Contents *f, Symbol symbol)
 										  identifier, prev.file, prev.line, prev.column, previous_definition);
 		}
 	}
-	SDPush(symbol_table, symbol);
+
+	SDPush(((Scope_Info *)((char *)f->scope_stack.d_array_ptr + (f->scope_stack.top * f->scope_stack.type_size)))->symbol_table, symbol);
+	if(symbol.tag == S_FUNCTION)
+	{
+		size_t sym_count = SDCount(symbol_table);
+		auto sym_ptr = &symbol_table[sym_count-1];
+		SDPush(f->functions, sym_ptr);
+	}
 }
 
 void
@@ -212,6 +219,7 @@ analyze(File_Contents *f, Ast_Node *ast_tree)
 	scope_info.start_line = 1;
 	push_scope(f, scope_info);
 	analyze_file_level_statement_list(f, ast_tree);
+	pop_scope(f, *f->prev_token);
 	// @Check: maybe pop_scope()?
 }
 
@@ -388,6 +396,7 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 				raise_semantic_error(f, "Expression for global declaration is not constant",
 						node->assignment.token);
 			interp_add_symbol(node->assignment.lhs->identifier.name, expr);
+
 			return node;
 		} break;
 		case type_run: 
@@ -1335,6 +1344,11 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 		} break;
 		case type_struct_init:
 		{
+			if(previous && (previous->type == type_binary_expr || previous->type == type_unary_expr))
+			{
+				raise_semantic_error(f, "Struct init cannot be used in an binary or unary expression",
+						expression->array_list.token);
+			}
 			return verify_struct_init(f, expression);
 		} break;
 		case type_index:
@@ -1418,6 +1432,11 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 		} break;
 		case type_array_list:
 		{
+			if(previous && (previous->type == type_binary_expr || previous->type == type_unary_expr))
+			{
+				raise_semantic_error(f, "Array list cannot be used in an binary or unary expression",
+						expression->array_list.token);
+			}
 			Type_Info result = {};
 			result.type = T_ARRAY;
 			result.token = expression->array_list.token;
@@ -1439,7 +1458,7 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *prev
 	if(expression->type == type_unary_expr)
 	{
 		Ast_Unary_Expr unary_expr = expression->unary_expr;
-		Type_Info expr_type = get_expression_type(f, unary_expr.expression, unary_expr.op, NULL);
+		Type_Info expr_type = get_expression_type(f, unary_expr.expression, unary_expr.op, expression);
 		expression->unary_expr.expr_type = expr_type;
 		const char *postfix_name = "++";
 		switch((int)unary_expr.op.type)

@@ -1,21 +1,3 @@
-#include "llvm-c/Core.h"
-#include "llvm-c/Types.h"
-#include "llvm/ADT/EpochTracker.h"
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/DebugInfoMetadata.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/GlobalValue.h"
-#include "llvm/IR/GlobalVariable.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Value.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/Instrumentation.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
 #include <LLVM_Helpers.h>
@@ -1475,7 +1457,7 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 
 				auto members = node->struct_init.type.structure.member_types;
 
-				for(size_t i = 0; i < expr_count; ++i)
+				for(i64 i = expr_count - 1; i >= 0; --i)
 				{
 					llvm::Value *expr_val = generate_expression(f, expressions[i], func);
 					expr_val = create_cast(members[i], node->struct_init.expr_types[i], expr_val);

@@ -221,7 +221,8 @@ parse(File_Contents *f)
 	root->type = type_root;
 	// NOTE(Vasko): nothing special about root, it doesn't contain data
 	f->overloads = SDCreate(Ast_Node *);
-	f->defered = SDCreate(Ast_Node *);
+	f->defered   = SDCreate(Ast_Node *);
+	f->functions = SDCreate(Symbol *);
 
 	Token_Iden *info_tok = f->curr_token;
 
@@ -620,7 +621,7 @@ parse_statement(File_Contents *f)
 }
 
 void
-parse_and_scope_unscoped(File_Contents *f, Ast_Node **list, Ast_Node *statement)
+parse_and_scope_unscoped(File_Contents *f, Ast_Node *list, Ast_Node *statement)
 {
 	Token_Iden token;
 	if(statement->type == type_if)
@@ -639,15 +640,15 @@ parse_and_scope_unscoped(File_Contents *f, Ast_Node **list, Ast_Node *statement)
 	Ast_Node *scope_end = alloc_node();
 	scope_end->type = type_scope_end;
 	scope_end->scope_desc.token = token;
-	auto new_list = SDCreate(Ast_Node *);
+	auto new_list = ast_statements();
 	auto body = parse_statement(f);
 	
 	if(statement->type == type_else && body->type == type_if &&
 			f->curr_token->type == '{')
 	{
 		auto scope = parse_statement(f);
-		SDPush(new_list, body);
-		SDPush(new_list, scope);
+		SDPush(new_list->statements.list, body);
+		SDPush(new_list->statements.list, scope);
 	}
 	else if((body->type == type_if || body->type == type_for || body->type == type_else)
 				&& f->curr_token->type != (Token)'{')
@@ -655,17 +656,17 @@ parse_and_scope_unscoped(File_Contents *f, Ast_Node **list, Ast_Node *statement)
 		parse_and_scope_unscoped(f, new_list, body);
 	}
 	else
-		SDPush(new_list, body);
+		SDPush(new_list->statements.list, body);
 
 	if(body->type == type_if && f->curr_token->type == tok_else)
 	{
 		auto else_statement = parse_statement(f);
 		parse_and_scope_unscoped(f, new_list, else_statement);
 	}
-	scope_start->scope_desc.body->statements.list = new_list;
-	SDPush(list, statement);
-	SDPush(list, scope_start);
-	SDPush(new_list, scope_end);
+	scope_start->scope_desc.body = new_list;
+	SDPush(list->statements.list, statement);
+	SDPush(list->statements.list, scope_start);
+	SDPush(new_list->statements.list, scope_end);
 }
 
 Ast_Node *
@@ -713,7 +714,7 @@ parse_statement_list(File_Contents *f, b32 is_func)
 			{
 				if(f->curr_token->type != (Token)'{')
 				{
-					parse_and_scope_unscoped(f, result->statements.list, statement);
+					parse_and_scope_unscoped(f, result, statement);
 				}
 				else
 					SDPush(result->statements.list, statement);
@@ -1429,7 +1430,7 @@ parse_overload(File_Contents *f)
 				vstd_strcat((char *)identifier, "overload");
 				if(overload.op > 32 && 127 > overload.op)
 				{
-					char to_cat[] = {(char)overload.op};
+					char to_cat[] = {(char)overload.op, 0};
 					vstd_strcat((char *)identifier, to_cat);
 				}
 			}

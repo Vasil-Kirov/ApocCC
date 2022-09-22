@@ -1,0 +1,26 @@
+
+global :: 10;
+
+fn $call c_decl the_num() -> i32 {
+
+	result := actually_get_the_num();
+	if result != 10 -> 4;
+	-> result + 4;
+}
+
+fn $call c_decl actually_get_the_num() -> i32 {
+	-> third_fn();
+}
+
+fn $call c_decl third_fn() -> i32 { -> 10; }
+
+fn $call c_decl main() -> i32 {
+	my_struct := My_Struct { 0, the_num() };
+	-> my_struct.b;
+}
+
+struct My_Struct {
+a: i32;
+b: i32;
+}
+

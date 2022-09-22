@@ -158,7 +158,9 @@ platform_output_string(char *String, log_level Level)
 	SetConsoleTextAttribute(STDOUT, Attrib);
 	//OutputDebugStringA(String); 
 	unsigned long written = 0;
-	WriteFile(STDOUT, String, vstd_strlen((char *)String), &written, 0);
+	int len = vstd_strlen((char *)String);
+	if(len != 0)
+		WriteFile(STDOUT, String, len, &written, 0);
 	SetConsoleTextAttribute(STDOUT, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
 }
 

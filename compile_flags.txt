@@ -1,4 +1,5 @@
 -g
+-xc++
 -O2
 -Wall
 -DCM_LINUX

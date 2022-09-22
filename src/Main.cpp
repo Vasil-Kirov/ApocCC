@@ -15,7 +15,7 @@
 #include <DumpInfo.h>
 #include <Bytecode.h>
 #include <x64_Gen.h>
-
+#include <ObjDumper.h>
 
 #include <platform/platform.h>
 
@@ -33,6 +33,7 @@
 #include <DumpInfo.cpp>
 #include <Bytecode.cpp>
 #include <x64_Gen.cpp>
+#include <ObjDumper.cpp>
 
 #if !defined(NOVM)
 #include <LLVM_Helpers.h>
@@ -170,10 +171,14 @@ int main(int argc, char *argv[])
 		LG_INFO("Dumping Symbols:   %f.4s", timers.codegen);
 		return 0;
 	}
-	IR *ir = ast_to_bytecode(f->ast_root);
-	x64_generate_code(ir);
-#if 0
+#if 1
+	Relocation *relocations = NULL;
+	TIME_FUNC(timers, IR *ir = ast_to_bytecode(f, f->ast_root), codegen_clock, codegen);
+	TIME_FUNC(timers, u8 *code = x64_generate_code(f, ir, &relocations), codegen_clock, codegen);
+	TIME_FUNC(timers, dump_obj(f, code, relocations), codegen_clock, codegen);
+#else
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
+#endif
 	
 	u8 *final_linker_command = (u8 *)AllocatePermanentMemory(4096);
 	vstd_strcat((char *)final_linker_command, (char *)f->build_commands.linker_command);
@@ -220,7 +225,6 @@ int main(int argc, char *argv[])
 	LG_INFO("Syncing Files:     %f.4s", timers.syncing);
 	LG_INFO("Code Generation:   %f.4s", timers.codegen);
 	LG_INFO("Total:             %f.4s", timers.total);
-#endif
 	
 	//	@NOTE: wut
 	//	ResetCompileMemory();

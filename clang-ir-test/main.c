@@ -1,10 +1,15 @@
-#include "other.c"
 
-static int my_f_var = 123;
-static void *null = 1234;
+int other_num() { return 5; }
 
-void main()
+int fff_num() { return 6; }
+
+int main()
 {
-	int a = give_num() + (long long)null;
-	a + my_f_var;
+	if(other_num() == 5)
+	{
+		return 0;
+	}
+return 1;
 }
+
+

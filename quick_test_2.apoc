@@ -1,11 +1,5 @@
 
-fn $call c_decl give_num() -> i64 {
-	a := 30;
-	b := 10;
-	c := 3;
-	f := 4;
-	g := 6;
-	result := a + b * c / f - g;
-	-> result;
+fn $call c_decl the_num() -> i32 {
+        result :i32 = 1023;
+	-> result + 1;
 }
-

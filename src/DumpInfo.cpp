@@ -1,4 +1,6 @@
 #include <DumpInfo.h>
+#include <Type.h>
+#include <Parser.h>
 
 #define DUMP(DATA, TYPE) dump_data(&at, (u8 *)&DATA, sizeof(TYPE))
 #define DUMP_STR(STR) to_use_for_str_len = vstd_strlen((char *)STR);\
@@ -42,10 +44,12 @@ dump_type(Type_Info *type, u8 **in_at)
 	u8 *start_at = at;
 	u32 to_use_for_str_len;
 	u8 zero = 0;
-	DUMP(type->type, Type_Type);
+	i32 type_type = type->type;
+	DUMP(type_type, i32);
 	if (is_type_primitive(*type))
 	{
-		DUMP(type->primitive.size, Var_Size);
+		i32 var_size = type->primitive.size;
+		DUMP(var_size, i32);
 	}
 
 
@@ -57,9 +61,9 @@ dump_type(Type_Info *type, u8 **in_at)
 	{
 		DUMP(zero, u8);
 	}
-	while (at - start_at < 256) {
-		DUMP(zero, u8);
-	}
+//	while (at - start_at < 256) {
+	//	DUMP(zero, u8);
+//	}
 	*in_at = at;
 }
 

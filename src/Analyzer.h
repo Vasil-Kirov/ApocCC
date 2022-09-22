@@ -30,13 +30,10 @@ typedef enum
 typedef struct _Symbol
 {
 	Symbol_Type tag;
-	union 
+	struct
 	{
-		struct
-		{
-			int index;
-		} s_member;
-	};
+		int index;
+	} s_member;
 	u8 *identifier;
 	Type_Info type;
 	Ast_Node *node;
@@ -95,6 +92,7 @@ typedef struct _File_Contents
 	Type_Table *type_table;
 	Ast_Node  **overloads;
 	Ast_Node  **defered;
+	Symbol    **functions;
 #if !defined(NOVM)
 	llvm::Function  **overload_gens;
 #endif

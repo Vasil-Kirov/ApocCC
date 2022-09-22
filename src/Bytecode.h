@@ -3,6 +3,7 @@
 #define _BYTECODE_H
 
 #include <Parser.h>
+#include <ObjDumper.h>
 
 typedef enum {
 	reg_a  = 0b000,
@@ -13,16 +14,44 @@ typedef enum {
 	reg_bp = 0b101,
 	reg_si = 0b110,
 	reg_di = 0b111,
+	reg_r8,
+	reg_r9,
+	reg_r10,
+	reg_r11,
+	reg_xmm0,
+	reg_xmm1,
+	reg_xmm2,
+	reg_xmm3,
+	reg_xmm4,
+	reg_xmm5,
+	reg_xmm6,
+	reg_xmm7,
+	reg_xmm8,
+	reg_xmm9,
+	reg_xmm10,
+	reg_xmm11,
+	reg_xmm12,
+	reg_xmm13,
+	reg_xmm14,
+	reg_xmm15,
 	reg_invalid
 } Register;
 
 typedef enum {
 	BC_INVALID,
+	BC_JUMP,
+	BC_COND_JUMP,
 	BC_STORE,
+	BC_PUSH_OFFSET,
+	BC_CALL,
 	BC_MOVE_VALUE_TO_REG,
 	BC_MOVE_FLOAT_TO_REG,
+	BC_MOVE_FUNCTION_TO_REG,
+	BC_OFFSET_POINTER,
 	BC_MOVE_REG_TO_REG,
-	BC_COPY,
+	BC_LOAD_ADDRESS,
+	BC_GLOBAL_ADDRESS,
+	BC_DEREFRENCE,
 	BC_PUSH_REG,
 	BC_POP_REG,
 	BC_LOAD_STACK,
@@ -44,6 +73,11 @@ typedef enum {
 	BC_SLR,
 	BC_SAR,
 	BC_SL,
+	BC_CMP_LOGICAL_AND,
+	BC_CMP_LOGICAL_OR,
+	BC_CMP_LOGICAL_NOT,
+	BC_CMP_I_EQ,
+	BC_CMP_I_NEQ,
 	BC_CMP_I_LESS_THAN,
 	BC_CMP_I_GREATER_THAN,
 	BC_CMP_I_LESS_EQ,
@@ -75,7 +109,7 @@ typedef enum {
 } BC_OP ;
 
 typedef struct {
-	BC_OP op;
+	Type_Info *type;
 	union {
 		struct {
 			i32 left_idx;
@@ -84,7 +118,7 @@ typedef struct {
 		u64 big_idx;
 	};
 	i32 result;
-	Type_Info *type;
+	BC_OP op;
 } Bytecode;
 
 typedef enum {
@@ -101,6 +135,11 @@ typedef struct {
 } Operand;
 
 typedef struct {
+	u8 *key;
+	i32 value;
+} BC_Function_Table;
+
+typedef struct {
 	u64 init_val;
 	u64 size;
 	i32 position;
@@ -109,17 +148,24 @@ typedef struct {
 
 typedef struct {
 	u8 *key;
-	Data_Segment value;
+	i32 value;
 } Data_Segment_Table;
 
-typedef struct _IR {
-	Data_Segment_Table *allocated;
-	Data_Segment_Table *global_allocated_ref;
-	Data_Segment *ds_out;
+typedef struct {
+	u8 *id;
 	Bytecode *bc;
-	i32 reg_count;
-	i32 ds_count;
+	u64 start_address;
 	i32 bc_count;
+	b32 has_terminator;
+} IR_Block;
+
+typedef struct {
+	Data_Segment *allocated;
+	Data_Segment_Table *lookup;
+	IR_Block **blocks;
+	i32 reg_count;
+	i32 bc_count;
+	i32 stack_top;
 } IR;
 
 typedef struct {
@@ -133,7 +179,7 @@ typedef struct {
 } Register_Allocation_Tracker;
 
 IR *
-ast_to_bytecode(Ast_Node *node);
+ast_to_bytecode(File_Contents *f, Ast_Node *node);
 
 void
 ast_to_bc_file_level_list(Ast_Node **list, IR *ir);
@@ -142,25 +188,28 @@ void
 ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func);
 
 void
-register_allocation_first_pass(IR *ir);
+register_allocation_first_pass(IR *ir, IR_Block *block, Virtual_Register_Tracker *allocated);
 
 void
-print_bytecode(IR *ir);
+print_bytecode(IR *ir, IR_Block *block);
+
+IR_Block *
+ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *optional_block, u8 *id, IR *ir, IR_Block *to_go);
+
+void
+assign_to_bc(Ast_Node *node, IR_Block *block, IR *ir);
 
 IR
-ast_to_bc_func_level_list(Ast_Node **list, Data_Segment_Table *global_table);
+ast_to_bc_function(Ast_Node **list, Ast_Node *function);
 
-void
-assign_to_bc(Ast_Node *node, IR *ir);
-
-void
-ast_to_bc_func_level(Ast_Node *node, IR *ir);
+IR_Block *
+ast_to_bc_func_level(Ast_Node *node, IR_Block *current_block, Ast_Node **list, i32 *optional_index, IR *ir, IR_Block *to_go);
 
 i32
 do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir);
 
 i32
-expression_to_bc(Ast_Node *expr, IR *ir);
+expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer);
 
 #endif // _BYTECODE_H
 

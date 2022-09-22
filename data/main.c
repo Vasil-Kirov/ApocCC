@@ -1,12 +1,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
-extern float give_num();
-
+extern int the_num();
 
 int main()
 {
-	float the_num = give_num();
-	printf("%f", the_num);
-	return 0;	
+	int num = the_num();
+	return num;
 }
