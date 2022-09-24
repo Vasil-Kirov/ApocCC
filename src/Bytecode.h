@@ -14,39 +14,51 @@ typedef enum {
 	reg_bp = 0b101,
 	reg_si = 0b110,
 	reg_di = 0b111,
-	reg_r8,
-	reg_r9,
-	reg_r10,
-	reg_r11,
-	reg_xmm0,
-	reg_xmm1,
-	reg_xmm2,
-	reg_xmm3,
-	reg_xmm4,
-	reg_xmm5,
-	reg_xmm6,
-	reg_xmm7,
-	reg_xmm8,
-	reg_xmm9,
-	reg_xmm10,
-	reg_xmm11,
-	reg_xmm12,
-	reg_xmm13,
-	reg_xmm14,
-	reg_xmm15,
+	reg_r8 = 8,
+	reg_r9 = 9,
+	reg_r10 = 10,
+	reg_r11 = 11,
+	reg_r12 = 12,
+	reg_r13 = 13,
+	reg_r14 = 14,
+	reg_r15 = 15,
+	// XMM registers are encoded
+	// with the wrong value and are 
+	// fixed during code generation so that
+	// they can be distinct from other registers
+	reg_xmm0 = 0 +   reg_r15 + 1,
+	reg_xmm1 = 1 +   reg_r15 + 1,
+	reg_xmm2 = 2 +   reg_r15 + 1,
+	reg_xmm3 = 3 +   reg_r15 + 1,
+	reg_xmm4 = 4 +   reg_r15 + 1,
+	reg_xmm5 = 5 +   reg_r15 + 1,
+	reg_xmm6 = 6 +   reg_r15 + 1,
+	reg_xmm7 = 7 +   reg_r15 + 1,
+	reg_xmm8 = 8 +   reg_r15 + 1,
+	reg_xmm9 = 9 +   reg_r15 + 1,
+	reg_xmm10 = 10 + reg_r15 + 1,
+	reg_xmm11 = 11 + reg_r15 + 1,
+	reg_xmm12 = 12 + reg_r15 + 1,
+	reg_xmm13 = 13 + reg_r15 + 1,
+	reg_xmm14 = 14 + reg_r15 + 1,
+	reg_xmm15 = 15 + reg_r15 + 1,
 	reg_invalid
 } Register;
 
 typedef enum {
 	BC_INVALID,
-	BC_JUMP,
-	BC_COND_JUMP,
 	BC_STORE,
 	BC_PUSH_OFFSET,
 	BC_CALL,
 	BC_MOVE_VALUE_TO_REG,
 	BC_MOVE_FLOAT_TO_REG,
 	BC_MOVE_FUNCTION_TO_REG,
+	BC_SUB_VALUE,
+	BC_POP_OFFSET,
+	BC_ADD_VALUE,
+	BC_JUMP,
+	BC_COND_JUMP,
+	BC_LOAD_STRING,
 	BC_OFFSET_POINTER,
 	BC_MOVE_REG_TO_REG,
 	BC_LOAD_ADDRESS,
@@ -56,7 +68,6 @@ typedef enum {
 	BC_POP_REG,
 	BC_LOAD_STACK,
 	BC_LOAD_DATA_SEG,
-	BC_LOAD_MEMORY,
 	BC_F_ADD,
 	BC_ADD,
 	BC_F_SUB,
@@ -70,12 +81,14 @@ typedef enum {
 	BC_I_REM,
 	BC_U_REM,
 	BC_F_REM,
+	BC_NEG,
+	BC_FNEG,
 	BC_SLR,
 	BC_SAR,
 	BC_SL,
 	BC_CMP_LOGICAL_AND,
 	BC_CMP_LOGICAL_OR,
-	BC_CMP_LOGICAL_NOT,
+	BC_LOGICAL_NOT,
 	BC_CMP_I_EQ,
 	BC_CMP_I_NEQ,
 	BC_CMP_I_LESS_THAN,
@@ -86,6 +99,8 @@ typedef enum {
 	BC_CMP_U_GREATER_THAN,
 	BC_CMP_U_LESS_EQ,
 	BC_CMP_U_GREATER_EQ,
+	BC_FCMP_EQ,
+	BC_FCMP_NEQ,
 	BC_FCMP_LESS_THAN,
 	BC_FCMP_GREATER_THAN,
 	BC_FCMP_LESS_EQ,
@@ -169,6 +184,7 @@ typedef struct {
 } IR;
 
 typedef struct {
+	Type_Info *current_type;
 	i32 in_memory;
 	Register in_register;
 } Virtual_Register_Tracker;
@@ -188,7 +204,10 @@ void
 ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func);
 
 void
-register_allocation_first_pass(IR *ir, IR_Block *block, Virtual_Register_Tracker *allocated);
+do_register_allocation(IR *ir, IR_Block *block, Virtual_Register_Tracker *v_regs);
+
+void
+remove_useless_stores(IR *ir);
 
 void
 print_bytecode(IR *ir, IR_Block *block);

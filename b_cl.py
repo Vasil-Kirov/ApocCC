@@ -33,7 +33,7 @@ if 'ir' in sys.argv:
 
 linker_args = ""
 if sys.platform == "win32":
-	linker_args = " /link user32.lib Shell32.lib"
+	linker_args = "/nologo user32.lib Shell32.lib"
 elif sys.platform == "linux":
 	linker_args = llvm_libs
 else:
@@ -50,14 +50,20 @@ os.chdir('bin')
 if include_llvm:
     compiler_args += os.popen('llvm-config.exe --cppflags --cxxflags --libs all').read()
 
-c_command = ['clang-cl', '-oapoc.exe', '../src/Main.cpp']
+compiler_args += ' -c'
+
+c_command = ['clang-cl', '-oapoc.o', '../src/Main.cpp']
 c_command += includes.split(' ')
 c_command += compiler_args.split(' ')
-c_command += linker_args.split(' ')
 
+linker_command = ['lld-link.exe', '/out:apoc.exe', '/DEBUG']
+linker_command += linker_args.split(' ')
+linker_command += ['apoc.o']
 
 c_compile = subprocess.Popen(c_command)
 c_compile.wait()
 
+link = subprocess.Popen(linker_command)
+link.wait()
 
 print(f'Done, execution took {time.time() - start_time} seconds')

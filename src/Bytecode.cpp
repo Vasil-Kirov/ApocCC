@@ -2,8 +2,10 @@
 #include <Type.h>
 #include <platform/platform.h>
 #include <Parser.h>
+#include <vcruntime_string.h>
 
 static Type_Info *type_64;
+static Type_Info *str_type;
 static Data_Segment_Table *global_lookup;
 static BC_Function_Table *func_table;
 
@@ -44,6 +46,7 @@ set_terminator(IR_Block *block)
 IR *
 ast_to_bytecode(File_Contents *f, Ast_Node *node)
 {
+	shdefault(func_table, -1);
 	for(size_t i = 0; i < SDCount(f->functions); ++i)
 	{
 		shput(func_table, f->functions[i]->identifier, i);
@@ -53,6 +56,16 @@ ast_to_bytecode(File_Contents *f, Ast_Node *node)
 	type_64->type = T_INTEGER;
 	type_64->primitive.size = byte8;
 	type_64->identifier = (u8 *)"i64";
+
+	Type_Info *type_u8 = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	type_u8->type = T_INTEGER;
+	type_u8->primitive.size = byte1;
+	type_u8->identifier = (u8 *)"u8";
+
+	str_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	str_type->type = T_POINTER;
+	str_type->pointer.type = type_u8;
+	str_type->identifier = (u8 *)"* u8";
 
 	shdefault(global_lookup, -1);
 
@@ -118,10 +131,18 @@ ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func)
 		} break;
 		case type_func:
 		{
-			if(gen_func && node->function.body) {
-				IR next = ast_to_bc_function(
+			if(gen_func) {
+				IR next;
+				if(node->function.body)
+				{
+					next = ast_to_bc_function(
 						node->function.body->scope_desc.body->statements.list,
 						node);
+				}
+				else
+				{
+					next = {};
+				}
 				SDPush(ir, next);
 			}
 
@@ -214,20 +235,20 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 	{
 		expressions[i] = expression_to_bc(node->func_call.arguments[i], block, ir, node->func_call.expr_types[i].type == T_POINTER);
 	}
-	i32 stack_offset = 0;
+	i32 stack_offset = 16;
 	i32 func = expression_to_bc(node->func_call.operand, block, ir, true);
 	for(i64 i = 0; i < expr_count; ++i)
 	{
 		Register physical_register = reg_invalid;
 		Type_Info *type = &node->func_call.expr_types[i];
-		if(is_integer(*type)) {
-			if(int_register_count != sizeof(int_register_order) / sizeof(Register)) {
-				physical_register = int_register_order[int_register_count++];
-			}
-		}
-		else if(is_float(*type)) {
+		if(is_float(*type)) {
 			if(float_register_count != sizeof(float_register_order) / sizeof(Register)) {
 				physical_register = float_register_order[float_register_count++];
+			}
+		}
+		else {
+			if(int_register_count != sizeof(int_register_order) / sizeof(Register)) {
+				physical_register = int_register_order[int_register_count++];
 			}
 		}
 		if(physical_register != reg_invalid) {
@@ -235,13 +256,12 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 		}
 		else {
 			instruction(stack_offset, expressions[i], -1, BC_PUSH_OFFSET, block, type);
-			auto type_size = get_type_size(*type);
-			stack_offset += type_size;
-			ir->stack_top += type_size;
+			stack_offset += 8;
+			ir->stack_top += 8;
 		}
 	}
 	instruction(func, reg_a, func, BC_MOVE_REG_TO_REG, block, &node->func_call.operand_type);
-	instruction(func, -1, result, BC_CALL, block, node->func_call.operand_type.func.return_type);
+	instruction(func, -1, reg_a, BC_CALL, block, node->func_call.operand_type.func.return_type);
 	instruction(result, reg_a, result, BC_MOVE_REG_TO_REG, block, node->func_call.operand_type.func.return_type);
 	return result;
 }
@@ -296,7 +316,8 @@ load_variable(u8 *id, IR *ir, IR_Block *block, Type_Info *type)
 		{
 			got = shget(func_table, id);
 			Assert(got != -1);
-			instruction(-1, got, result, BC_MOVE_FUNCTION_TO_REG, block, type);
+			instruction(-1, got, reg_a, BC_MOVE_FUNCTION_TO_REG, block, type);
+			instruction(result, reg_a, result, BC_MOVE_REG_TO_REG, block, type);
 			return result;
 		}
 		instruction(-1, got, result, op, block, type);
@@ -331,6 +352,11 @@ load_pointer(u8 *id, IR *ir, IR_Block *block, Type_Info *type)
 			op = BC_MOVE_FUNCTION_TO_REG;
 			got = shget(func_table, id);
 			Assert(got != -1);
+
+			i32 result = allocate_register(ir);
+			instruction(-1, got, reg_a, BC_MOVE_FUNCTION_TO_REG, block, type);
+			instruction(result, reg_a, result, BC_MOVE_REG_TO_REG, block, type);
+			return result;
 		}
 	}
 	i32 result = allocate_register(ir);
@@ -415,8 +441,16 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 			instruction(result, struct_start, result, BC_MOVE_REG_TO_REG, block, type_64);
 			// offset the pointer (it's really just a add instruction)
 			instruction(result, offset_register, result, BC_OFFSET_POINTER, block, &expr->selector.selected_type);
-			// derefrence the resulting pointer to get the member
-			instruction(result, -1, result, BC_DEREFRENCE, block, &expr->selector.selected_type);
+			if(!get_pointer)
+			{
+				// derefrence the resulting pointer to get the member
+				instruction(result, -1, result, BC_DEREFRENCE, block, &expr->selector.selected_type);
+			}
+		} break;
+		case type_const_str:
+		{
+			result = allocate_register(ir);
+			instruction((u64)expr->atom.identifier.name, result, BC_LOAD_STRING, block, str_type);
 		} break;
 		case type_literal:
 		{
@@ -456,6 +490,27 @@ unary_expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 				// overwrite it... probably
 				result = allocate_register(ir); 
 				instruction(expr_reg, -1, result, BC_DEREFRENCE, block, &expr->unary_expr.expr_type);
+			} break;
+			case '-':
+			{
+				i32 expr_reg = expression_to_bc(expr->unary_expr.expression, block, ir, false);
+				if(is_float(expr->unary_expr.expr_type))
+				{
+					result = allocate_register(ir);
+					instruction(expr_reg, -1, result, BC_FNEG, block, &expr->unary_expr.expr_type);
+				}
+				else
+				{
+					result = expr_reg;
+					instruction(expr_reg, -1, expr_reg, BC_NEG, block, &expr->unary_expr.expr_type);
+				}
+			} break;
+			case '!':
+			{
+				i32 expr_reg = expression_to_bc(expr->unary_expr.expression, block, ir, false);
+				Assert(expr->unary_expr.expr_type.type == T_BOOLEAN);
+				result = allocate_register(ir);
+				instruction(expr_reg, -1, result, BC_LOGICAL_NOT, block, &expr->unary_expr.expr_type);
 			} break;
 			default:
 			{
@@ -691,6 +746,12 @@ expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 	return result;
 }
 
+inline int
+round_up_to_multiple(int x, int multiple)
+{
+	return (x + multiple) - (x % multiple);
+}
+
 void
 padd_to_alignment(i32 alignment, IR *ir)
 {
@@ -698,7 +759,7 @@ padd_to_alignment(i32 alignment, IR *ir)
 	if((previous->position + previous->size) % alignment != 0) {
 
 		i32 unaligned_position = previous->position + previous->size;
-		i32 aligned_position = (unaligned_position + alignment) - (unaligned_position % alignment);
+		i32 aligned_position = round_up_to_multiple(unaligned_position, alignment);
 
 		Data_Segment align;
 		align.init_val = 0;
@@ -707,6 +768,26 @@ padd_to_alignment(i32 alignment, IR *ir)
 		align.virtual_register = -1;
 		SDPush(ir->allocated, align);
 	}
+}
+
+void
+do_store_instruction(i32 idx, i32 right, i32 result, IR_Block *block, Type_Info *type)
+{
+	if(type->type == T_STRING)
+		*type = *str_type;
+	instruction(idx, right, result, BC_STORE, block, type);
+}
+
+void
+do_out_store_instruction(i32 idx, i32 right, i32 result, Bytecode *out_bc, size_t *out_count, Type_Info *type, IR *ir)
+{
+	if(type->type == T_STRING)
+		*type = *str_type;
+	out_instruction(idx, right, result, BC_STORE, out_bc, out_count, type);
+
+	i32 position = idx == 0 ? idx : ir->allocated[idx - 1].position + ir->allocated[idx - 1].size;
+	Data_Segment item = {0, (u64)get_type_size(*type), position};
+	SDPush(ir->allocated, item);
 }
 
 i32
@@ -757,7 +838,7 @@ store_expression(Ast_Node *node, IR *ir, IR_Block *block, Type_Info *type, b32 s
 		allocation.size     = size;
 		allocation.virtual_register = expr_register;
 		SDPush(ir->allocated, allocation);
-		instruction(idx, expr_register, expr_register, BC_STORE, block, type);
+		do_store_instruction(idx, expr_register, expr_register, block, type);
 		return SDCount(ir->allocated) - 1;
 	}
 }
@@ -783,7 +864,6 @@ ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *option
 	{
 		block = alloc_block(id, ir);
 	}
-	i32 current_block = SDCount(ir->blocks) - 1;
 	auto statement_count = SDCount(list);
 	if(optional_index)
 	{
@@ -810,6 +890,79 @@ ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *option
 	return ast_to_bc_func_level_list(list, optional_index, optional_block, (u8 *)id, ir, to_go);
 }
 
+void
+get_function_arguments(Ast_Node *function, IR *ir, IR_Block *block)
+{
+	auto args = function->function.arguments;
+	size_t count = SDCount(args);
+
+#if defined(_WIN32)
+	const Register int_register_order[] = {
+		reg_c, reg_d, reg_r8, reg_r9
+	};
+#else
+	const Register int_register_order[] = {
+		reg_di, reg_si, reg_d, reg_c, reg_r8, reg_r9
+	};
+#endif
+	i32 int_register_count = 0;
+	const Register float_register_order[] = {
+		reg_xmm0, reg_xmm1, reg_xmm2, reg_xmm3
+	};
+	i32 float_register_count = 0;
+
+	for(size_t i = 0; i < count; ++i)
+	{
+		auto arg = &args[i]->variable;
+		i32 result = allocate_register(ir);
+		if(is_float(arg->type))
+		{
+			if(float_register_count < sizeof(float_register_order) / sizeof(Register))
+			{
+				instruction(result, float_register_order[float_register_count++], result, BC_MOVE_REG_TO_REG, block, &arg->type);
+			}
+			else
+			{
+				instruction(ir->stack_top, result, BC_POP_OFFSET, block, &arg->type);
+				ir->stack_top += 8;
+			}
+		}
+		else
+		{
+			if(int_register_count < sizeof(int_register_order) / sizeof(Register))
+			{
+				instruction(result, int_register_order[int_register_count++], result, BC_MOVE_REG_TO_REG, block, &arg->type);
+			}
+			else
+			{
+				instruction(ir->stack_top, result, BC_POP_OFFSET, block, &arg->type);
+				ir->stack_top += 8;
+			}
+
+		}
+		size_t idx = 0;
+		size_t size = get_type_size(arg->type);
+		size_t position = 0;
+		if(ir->allocated == NULL || SDCount(ir->allocated) == 0)
+			position = 0;
+		else {
+			size_t segment_size = SDCount(ir->allocated);
+			idx = segment_size;
+			auto last_segment = ir->allocated[segment_size - 1];
+			position = last_segment.position + last_segment.size;
+		}
+		Data_Segment allocation;
+		allocation.init_val = 0;
+		allocation.position = position;
+		allocation.size     = size;
+		allocation.virtual_register = result;
+		SDPush(ir->allocated, allocation);
+		do_store_instruction(idx, result, result, block, &arg->type);
+		shput(ir->lookup, arg->identifier.name, idx);
+	}
+	ir->stack_top = 16;
+}
+
 IR
 ast_to_bc_function(Ast_Node **list, Ast_Node *function)
 {
@@ -818,11 +971,13 @@ ast_to_bc_function(Ast_Node **list, Ast_Node *function)
 	result.allocated = SDCreate(Data_Segment);
 	result.reg_count = reg_invalid + 1; // starting from here so we know that
 					    // anything under is a physical register instead of a virtual one
+	result.stack_top = 16;
 	shdefault(result.lookup, -1);
 
 	IR_Block *entry = alloc_block("entry", &result);
 	instruction(reg_bp, -1, -1, BC_PUSH_REG, entry, type_64);
 	instruction(reg_bp, reg_sp, reg_bp, BC_MOVE_REG_TO_REG, entry, type_64);
+	get_function_arguments(function, &result, entry);
 	ast_to_bc_func_level_list(list, NULL, entry, "entry", &result, NULL);
 
 	u8 func_signature[1024] = {};
@@ -849,7 +1004,7 @@ ast_to_bc_function(Ast_Node **list, Ast_Node *function)
 	}
 	for(size_t i = 0; i < block_count; ++i)
 	{
-		register_allocation_first_pass(&result, result.blocks[i], allocated);
+		do_register_allocation(&result, result.blocks[i], allocated);
 		for(size_t i = 0; i < result.reg_count; ++i)
 			allocated[i].in_register = reg_invalid;
 	}
@@ -861,7 +1016,12 @@ ast_to_bc_function(Ast_Node **list, Ast_Node *function)
 
 	}
 
-#if 0
+	// @NOTE: is this necessary?
+	// it should be pretty cheap since it's 2 tight loops
+	// but it's better to profile it when there are actually programs
+	// to profile it on
+	remove_useless_stores(&result);
+#if 1
 	for(size_t i = 0; i < block_count; ++i)
 	{
 		platform_write_file(result.blocks[i]->id, vstd_strlen((char *)result.blocks[i]->id), "0", false);
@@ -929,6 +1089,10 @@ ast_to_bc_func_level(Ast_Node *node, IR_Block *current_block, Ast_Node **list, i
 	IR_Block *result = NULL;
 	switch((int)node->type)
 	{
+		case type_func_call:
+		{
+			call_function(ir, current_block, node, (Call_Conv)node->func_call.operand_type.func.calling_convention);
+		} break;
 		case type_assignment:
 		{
 			assign_to_bc(node, current_block, ir);
@@ -939,9 +1103,17 @@ ast_to_bc_func_level(Ast_Node *node, IR_Block *current_block, Ast_Node **list, i
 		} break;
 		case type_return:
 		{
-			i32 ret_reg = expression_to_bc(node->ret.expression, current_block, ir, false);
-			instruction(ret_reg, -1, -1, BC_RETURN, current_block, &node->ret.expression_type);
-			set_terminator(current_block);
+			if(!node->ret.expression)
+			{
+				instruction(-1, -1, -1, BC_RETURN, current_block, &node->ret.expression_type);
+				set_terminator(current_block);
+			}
+			else
+			{
+				i32 ret_reg = expression_to_bc(node->ret.expression, current_block, ir, false);
+				instruction(ret_reg, -1, -1, BC_RETURN, current_block, &node->ret.expression_type);
+				set_terminator(current_block);
+			}
 		} break;
 	}
 	return result;
@@ -1118,179 +1290,101 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir)
 }
 #endif
 
-void
-move_virtual_reg_to_physical(i32 virtual_register, Register physical_register, Virtual_Register_Tracker *allocated, Register_Allocation_Tracker *trackers,
-		Bytecode *new_bc, size_t *new_count, IR *ir, Type_Info *type)
+inline b32
+op_has_left_idx(BC_OP op)
 {
-	
-	Register reg = allocated[virtual_register].in_register;
-	if(reg != reg_invalid)
-	{
-		trackers[reg].current_virtual_register = -1;
-	}
-	if(trackers[physical_register].current_virtual_register != -1)
-	{
-		i32 old_virtual_register = trackers[physical_register].current_virtual_register;
-		allocated[old_virtual_register].in_register = reg_invalid;
-		if(allocated[old_virtual_register].in_memory == -1)
-		{
-			Bytecode bc;
-			bc.op = BC_STORE;
-			bc.left_idx = SDCount(ir->allocated);
-			bc.right_idx = physical_register;
-			bc.type = type;
-			bc.result = physical_register;
-			new_bc[*new_count] = bc;
-			*new_count += 1;
-			allocated[old_virtual_register].in_memory = bc.left_idx;
-
-			i32 position = ir->allocated[bc.left_idx - 1].position + ir->allocated[bc.left_idx - 1].size;
-			Data_Segment item = {0, (u64)get_type_size(*type), position};
-			SDPush(ir->allocated, item);
-		}
-	}
-	trackers[physical_register].last_updated++;
-	trackers[physical_register].current_virtual_register = virtual_register;
-	allocated[virtual_register].in_register = physical_register;
+	if(op == BC_STORE)
+		return false;
+	return true;
 }
 
-i32
-perform_physical_register_allocation(Bytecode *new_bc, size_t *new_count, Register_Allocation_Tracker *trackers,
-		Virtual_Register_Tracker *allocated, i32 to_allocate_virtual_register, IR *ir, Type_Info *type,
-		i32 wanted_register)
+inline b32
+op_has_right_idx(BC_OP op)
 {
-	for(i32 i = reg_a; i < reg_b; ++i)
-	{
-		Register reg = (Register)i;
-		if(trackers[reg].current_virtual_register == -1)
-		{
-			if(wanted_register != -1 && wanted_register != reg)
-				continue;
-			trackers[reg].current_virtual_register = to_allocate_virtual_register;
-			allocated[to_allocate_virtual_register].in_register = reg;
-			return reg;
-		}
-	}
-
-	// Find the physical register that hasn't been
-	// update in the longest time
-	Register oldest_update = reg_a;
-	i32 oldest_update_value = trackers[reg_a].last_updated;
-	if(wanted_register == -1)
-	{
-		for(i32 i = reg_a; i < reg_b; ++i)
-		{
-			Register reg = (Register)i;
-			if(trackers[reg].last_updated < oldest_update_value)
-			{
-				oldest_update = reg;
-				oldest_update_value = trackers[reg].last_updated;
-			}
-		}
-	}
-	else oldest_update = (Register)wanted_register;
-	i32 old_v_reg = trackers[oldest_update].current_virtual_register;
-	trackers[oldest_update].current_virtual_register = to_allocate_virtual_register;
-	trackers[oldest_update].last_updated++;
-
-	allocated[old_v_reg].in_register = reg_invalid;
-	if(allocated[old_v_reg].in_memory == -1)
-	{
-		Bytecode bc;
-		bc.op = BC_STORE;
-		bc.left_idx = SDCount(ir->allocated);
-		bc.right_idx = oldest_update;
-		bc.type = type;
-		bc.result = oldest_update;
-		new_bc[*new_count] = bc;
-		*new_count += 1;
-		allocated[old_v_reg].in_memory = bc.left_idx;
-
-		i32 position = ir->allocated[bc.left_idx - 1].position + ir->allocated[bc.left_idx - 1].size;
-		Data_Segment item = {0, (u64)get_type_size(*type), position};
-		SDPush(ir->allocated, item);
-	}
-	//Assert(allocated[to_allocate_virtual_register].in_memory != -1);
-	return oldest_update;
-}
-
-inline void
-check_and_do_register_allocation(i32 *virtual_register, Virtual_Register_Tracker *allocated, Register_Allocation_Tracker *trackers,
-		Bytecode *new_bc, size_t *new_count, IR *ir, b32 is_result, Type_Info *type, i32 wanted_register)
-{
-	if(*virtual_register >= reg_invalid)
-	{
-		if(allocated[*virtual_register].in_register != reg_invalid)
-		{
-			if(wanted_register != -1 && wanted_register != allocated[*virtual_register].in_register)
-			{
-				if(allocated[*virtual_register].in_register != reg_invalid)
-				{
-					trackers[allocated[*virtual_register].in_register].current_virtual_register = -1;
-					allocated[*virtual_register].in_register = reg_invalid;
-				}
-				check_and_do_register_allocation(virtual_register, allocated, trackers, new_bc, new_count, ir, is_result, type, wanted_register);
-			}
-			else
-			{
-				*virtual_register = allocated[*virtual_register].in_register;
-			}
-		}
-		else if(allocated[*virtual_register].in_memory != -1)
-		{
-			i32 saved_register = ir->allocated[allocated[*virtual_register].in_memory].virtual_register;
-			if(allocated[saved_register].in_register != reg_invalid) {
-				*virtual_register = allocated[saved_register].in_register;
-				return;
-			}
-			Bytecode bc;
-			bc.op = BC_LOAD_STACK;
-			bc.left_idx = -1;
-			bc.right_idx = allocated[*virtual_register].in_memory;
-			bc.result = perform_physical_register_allocation(new_bc, new_count, trackers, allocated, *virtual_register, ir, type, wanted_register);
-			bc.type = type;
-			new_bc[*new_count] = bc;
-			*new_count += 1;
-			allocated[*virtual_register].in_register = (Register)bc.result;
-			*virtual_register = bc.result;
-		}
-		else
-		{
-			*virtual_register = perform_physical_register_allocation(new_bc, new_count, trackers, allocated, *virtual_register, ir, type, wanted_register);
-		}
-	}
-	else if(is_result) {
-		i32 actual_v_reg = trackers[*virtual_register].current_virtual_register;
-		if(actual_v_reg == -1)
-			return;
-		if(allocated[actual_v_reg].in_memory == -1)
-		{
-			Bytecode bc;
-			bc.op = BC_STORE;
-			bc.left_idx = SDCount(ir->allocated);
-			bc.right_idx = *virtual_register; // @Note: this register is not actually virtual
-			bc.type = type_64;
-			bc.result = *virtual_register;
-			new_bc[*new_count] = bc;
-			*new_count += 1;
-			allocated[actual_v_reg].in_memory = bc.left_idx;
-
-			i32 position = ir->allocated[bc.left_idx - 1].position + ir->allocated[bc.left_idx - 1].size;
-			Data_Segment item = {0, (u64)get_type_size(*type), position};
-			SDPush(ir->allocated, item);
-		}
-		allocated[actual_v_reg].in_register = reg_invalid;
-	}
+	if(op == BC_LOAD_STACK || op == BC_LOAD_DATA_SEG || op == BC_MOVE_FUNCTION_TO_REG)
+		return false;
+	return true;
 }
 
 void
-register_allocation_first_pass(IR *ir, IR_Block *block, Virtual_Register_Tracker *allocated)
+free_virtual_register(i32 virtual_register, Virtual_Register_Tracker *v_regs, Register_Allocation_Tracker *phy_regs,
+		IR *ir, Bytecode *out_bc, size_t *out_count)
 {
-	Register_Allocation_Tracker trackers[reg_invalid];
+	Register physical_register = v_regs[virtual_register].in_register;
+	if(v_regs[virtual_register].in_memory == -1)
+	{
+		i32 idx = SDCount(ir->allocated);
+		do_out_store_instruction(idx, physical_register, physical_register, out_bc, out_count,
+				v_regs[virtual_register].current_type, ir);
+		v_regs[virtual_register].in_memory = idx;
+	}
+	v_regs[virtual_register].in_register = reg_invalid;
+	phy_regs[physical_register].current_virtual_register = -1;
+}
+
+Register
+free_up_register_for(i32 virtual_register, Virtual_Register_Tracker *v_regs, Register_Allocation_Tracker *phy_regs,
+		IR *ir, Bytecode *out_bc, size_t *out_count, Type_Info *type)
+{
+	if(v_regs[virtual_register].in_register != reg_invalid)
+		return v_regs[virtual_register].in_register;
+
+	Register out;
+	Register first;
+	Register last;
+	if(is_float(*type))
+	{
+		first = reg_xmm0;
+		last = reg_xmm6;
+	}
+	else
+	{
+		first = reg_a;
+		last = reg_b;
+	}
+	out = first;
+	for(size_t i = first; i < last; ++i)
+	{
+		Register item = (Register)i;
+		if(phy_regs[item].current_virtual_register == -1)
+		{
+			out = item;
+			break;
+		}
+		if(phy_regs[item].last_updated < phy_regs[out].last_updated)
+		{
+			out = item;
+		}
+	}
+
+	phy_regs[out].last_updated++;
+
+	if(v_regs[virtual_register].in_memory != -1)
+	{
+		out_instruction(-1, v_regs[virtual_register].in_memory, out, BC_LOAD_STACK, out_bc, out_count, type);
+	}
+
+	// Free both the virtual register about to be put into the physical one
+	// and the one that was previously connected
+	if(v_regs[virtual_register].in_register != reg_invalid)
+		free_virtual_register(virtual_register, v_regs, phy_regs, ir, out_bc, out_count);
+	if(phy_regs[out].current_virtual_register != -1)
+		free_virtual_register(phy_regs[out].current_virtual_register, v_regs, phy_regs, ir, out_bc, out_count);
+
+	phy_regs[out].current_virtual_register = virtual_register;
+	v_regs[virtual_register].in_register = out;
+	v_regs[virtual_register].current_type = type;
+	return out;
+}
+
+void
+do_register_allocation(IR *ir, IR_Block *block, Virtual_Register_Tracker *v_regs)
+{
+	Register_Allocation_Tracker phy_regs[reg_invalid];
 	for(size_t i = 0; i < reg_invalid; ++i)
 	{
-		trackers[i].current_virtual_register = -1;
-		trackers[i].last_updated = 0;
+		phy_regs[i].current_virtual_register = -1;
+		phy_regs[i].last_updated = 0;
 	}
 
 	size_t bc_count = block->bc_count;
@@ -1302,94 +1396,166 @@ register_allocation_first_pass(IR *ir, IR_Block *block, Virtual_Register_Tracker
 		// Copy the stack manipulation instructions
 		new_bc[new_count++] = block->bc[i++];
 		new_bc[new_count++] = block->bc[i++];
-
-		if(ir->stack_top != 0) {
-			// Subtract the necessary amount of space
-			// so when we push on the stack we don't overwrite the 
-			// memory stored with stack_pointer - offset
-			out_instruction(ir->stack_top, reg_a, BC_MOVE_VALUE_TO_REG, new_bc, &new_count, type_64);
-			out_instruction(reg_sp, reg_a, reg_sp, BC_SUB, new_bc, &new_count, type_64);
-		}
 	}
-	
+
 	for(; i < bc_count; ++i)
 	{
 		Bytecode bc = block->bc[i];
-		if(bc.op == BC_LOAD_STACK)
+		if(bc.op == BC_STORE)
 		{
-			i32 virtual_register = -1;
-			for(size_t i = reg_a; i < reg_b; ++i)
-			{
-				i32 current_register = trackers[i].current_virtual_register;
-				if(current_register != -1 && allocated[current_register].in_memory == bc.right_idx && allocated[current_register].in_register != reg_invalid)
-				{
-					virtual_register = trackers[i].current_virtual_register;
-					break;
-				}
-			}
-			if(virtual_register != -1)
-			{
-				// instruction eliminated
-				allocated[bc.result] = allocated[virtual_register];
-				//allocated[virtual_register].in_register = reg_invalid;
-				trackers[allocated[bc.result].in_register].current_virtual_register = bc.result;
-			}
+			v_regs[bc.right_idx].in_memory = bc.left_idx;
+			v_regs[bc.right_idx].current_type = bc.type;
 		}
-		else if(bc.op != BC_MOVE_VALUE_TO_REG && bc.op != BC_MOVE_FLOAT_TO_REG && bc.op != BC_MOVE_FUNCTION_TO_REG && bc.op != BC_COND_JUMP && bc.op != BC_JUMP)
+		if(bc.op < BC_MOVE_VALUE_TO_REG || bc.op > BC_LOAD_STRING) // doesn't use big_idx register
 		{
-			if(bc.op == BC_STORE)
+			if(bc.left_idx != -1 && op_has_left_idx(bc.op) && bc.left_idx > reg_invalid)
 			{
-				allocated[bc.right_idx].in_memory = bc.left_idx;
+				bc.left_idx = free_up_register_for(bc.left_idx, v_regs, phy_regs, ir, new_bc, &new_count, bc.type);
 			}
-			else if(bc.left_idx != -1)
+			if(bc.right_idx != -1 && op_has_right_idx(bc.op) && bc.right_idx > reg_invalid)
 			{
-				check_and_do_register_allocation(&bc.left_idx, allocated, trackers, new_bc, &new_count, ir, false, bc.type, -1);
-			}
-			if(bc.right_idx != -1 && bc.op != BC_LOAD_STACK && bc.op != BC_LOAD_DATA_SEG && bc.op != BC_MOVE_FUNCTION_TO_REG)
-			{
-				check_and_do_register_allocation(&bc.right_idx, allocated, trackers, new_bc, &new_count, ir, false, bc.type, -1);
+				bc.right_idx = free_up_register_for(bc.right_idx, v_regs, phy_regs, ir, new_bc, &new_count, bc.type);
 			}
 		}
 		if(bc.result != -1)
 		{
-			if(bc.op == BC_MOVE_REG_TO_REG)
+			if(bc.result < reg_invalid)
 			{
-				move_virtual_reg_to_physical(bc.result, (Register)bc.left_idx, allocated, trackers, new_bc, &new_count, ir, bc.type);
-				bc.result = bc.left_idx;
+				// if we have a move to the same register
+				// we don't want to spill to the stack
+				// the instruction itself would be handled by the code generation
+				// but it will result in a spill
+				if(bc.op == BC_MOVE_REG_TO_REG && bc.left_idx == bc.right_idx)
+					continue;
+
+				i32 virtual_register = phy_regs[bc.result].current_virtual_register;
+				if(virtual_register != -1)
+					free_virtual_register(virtual_register, v_regs, phy_regs, ir, new_bc, &new_count);
 			}
 			else
 			{
-				u32 was = bc.result;
-				if(bc.op == BC_LOAD_STACK)
-					bc.result = ir->allocated[bc.right_idx].virtual_register;
-				check_and_do_register_allocation(&bc.result, allocated, trackers, new_bc, &new_count, ir, true, bc.type, -1);
+				bc.result = free_up_register_for(bc.result, v_regs, phy_regs, ir, new_bc, &new_count, bc.type);
+			}
+		}
+		if(bc.op == BC_CALL)
+		{
+			// Clear up any links to volitile registers
 
-				allocated[was].in_register = (Register)bc.result;
-				trackers[bc.result].current_virtual_register = was;
-				trackers[bc.result].last_updated++;
+			// @NOTE: DO NOT CLEAR RAX THE FUNCTION IS IN THERE
+			for(size_t i = 1; i < reg_b; ++i)
+			{
+				Register item = (Register)i;
+				if(phy_regs[item].current_virtual_register != -1)
+				{
+					i32 v_reg = phy_regs[item].current_virtual_register;
+					free_virtual_register(v_reg, v_regs, phy_regs, ir, new_bc, &new_count);
+				}
+			}
+			for(size_t i = reg_xmm0; i < reg_xmm6; ++i)
+			{
+				Register item = (Register)i;
+				if(phy_regs[item].current_virtual_register != -1)
+				{
+					i32 v_reg = phy_regs[item].current_virtual_register;
+					free_virtual_register(v_reg, v_regs, phy_regs, ir, new_bc, &new_count);
+				}
 			}
 		}
 		new_bc[new_count++] = bc;
 	}
 
-#if 0
-	// @TODO: this is a hack
-	// @TODO: this is a hack
-	// @TODO: this is a hack
-	for(i32 i = 0; i < new_count; ++i)
+	if(vstd_strcmp((char *)block->id, (char *)"entry")) {
+		if(SDCount(ir->allocated) != 0) {
+			// Subtract the necessary amount of space
+			// so when we push on the stack we don't overwrite the 
+			// memory stored with stack_pointer - offset
+			int last_idx = SDCount(ir->allocated) - 1;
+			int unaligned = ir->allocated[last_idx].position + ir->allocated[last_idx].size;
+			int to_sub = round_up_to_multiple(unaligned, 16);
+
+			// We have to shove them inside the
+			// already created bytecode
+			Bytecode bc_sub;
+			bc_sub.op = BC_SUB_VALUE;
+			bc_sub.big_idx = to_sub;
+			bc_sub.result = reg_sp;
+			bc_sub.type = type_64;
+			
+			Bytecode bc_add;
+			bc_add.op = BC_ADD_VALUE;
+			bc_add.big_idx = to_sub;
+			bc_add.result = reg_sp;
+			bc_add.type = type_64;
+
+
+			// we skip the first 2 instructions
+			// since they are the stack pushing
+			// and moving of rbp
+			void *move_dst = new_bc + 3;
+			void *move_src = new_bc + 2;
+			memmove(move_dst, move_src, (new_count - 2) * sizeof(Bytecode));
+			new_bc[2] = bc_sub;
+			new_count += 1;
+
+			Bytecode ret = new_bc[new_count - 1];
+			new_bc[new_count - 1] = bc_add;
+			new_bc[new_count++] = ret;
+
+		}
+	}
+	block->bc = new_bc;
+	block->bc_count = new_count;
+}
+
+void
+remove_useless_stores(IR *ir)
+{
+	// @TODO: maybe make it so we fix the stack after
+	// because even though we eliminate the store ops
+	// the following stores will still write at a position
+	// further down the stack like the ops were there
+
+
+	auto block_count = SDCount(ir->blocks);
+	i32 loaded[SDCount(ir->allocated)];
+	i32 loaded_count = 0;
+	for(size_t block_idx = 0; block_idx < block_count; ++block_idx)
 	{
-		if(new_bc[i].op == BC_LOAD_STACK)
+		auto block = ir->blocks[block_idx];
+		auto bc_count = block->bc_count;
+		auto bc = block->bc;
+
+		for(size_t i = 0; i < bc_count; ++i)
 		{
-			if(i + 1 < new_count && new_bc[i + 1].op == BC_LOAD_STACK)
+			if(bc[i].op == BC_LOAD_STACK)
 			{
-				if(new_bc[i].right_idx == new_bc[i+1].right_idx)
-					new_bc[i].op = BC_NO_OP;
+				loaded[loaded_count++] = bc[i].right_idx;
 			}
 		}
 	}
-#endif
-	block->bc = new_bc;
-	block->bc_count = new_count;
+	for(size_t block_idx = 0; block_idx < block_count; ++block_idx)
+	{
+		auto block = ir->blocks[block_idx];
+		auto bc_count = block->bc_count;
+		auto bc = block->bc;
+
+		for(size_t i = 0; i < bc_count; ++i)
+		{
+			if(bc[i].op == BC_STORE)
+			{
+				i32 memory_index = bc[i].left_idx;
+				for(size_t j = 0; j < loaded_count; ++j)
+				{
+					if(loaded[j] == memory_index)
+					{
+						goto STORE_ELIMINATION_END;
+					}
+				}
+				bc[i].op = BC_NO_OP;
+			}
+STORE_ELIMINATION_END:;
+		}
+	}
 }
 
 const char *
@@ -1414,6 +1580,38 @@ register_to_name(i32 reg_in)
 		return "reg_si";
 		case reg_di:
 		return "reg_di";
+		case reg_xmm0:
+		return "xmm0";
+		case reg_xmm1:
+		return "xmm1";
+		case reg_xmm2:
+		return "xmm2";
+		case reg_xmm3:
+		return "xmm3";
+		case reg_xmm4:
+		return "xmm4";
+		case reg_xmm5:
+		return "xmm5";
+		case reg_xmm6:
+		return "xmm6";
+		case reg_xmm7:
+		return "xmm7";
+		case reg_xmm8:
+		return "xmm8";
+		case reg_xmm9:
+		return "xmm9";
+		case reg_xmm10:
+		return "xmm10";
+		case reg_xmm11:
+		return "xmm11";
+		case reg_xmm12:
+		return "xmm12";
+		case reg_xmm13:
+		return "xmm13";
+		case reg_xmm14:
+		return "xmm14";
+		case reg_xmm15:
+		return "xmm15";
 		case reg_invalid:
 		Assert(false);
 		default:
@@ -1437,6 +1635,18 @@ print_bytecode(IR *ir, IR_Block *block)
 		Bytecode bc = block->bc[i];
 		switch(bc.op)
 		{
+			case BC_ADD_VALUE:
+			{
+				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t ADD %d\n", register_to_name(bc.result), bc.big_idx);
+			} break;
+			case BC_SUB_VALUE:
+			{
+				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t SUB %d\n", register_to_name(bc.result), bc.big_idx);
+			} break;
+			case BC_LOAD_STRING:
+			{
+				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t LOAD %s\n", register_to_name(bc.result), (u8 *)bc.big_idx);
+			} break;
 			case BC_CMP_I_NEQ:
 			{
 				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t %s != %s\n", register_to_name(bc.result), register_to_name(bc.left_idx), register_to_name(bc.right_idx));
@@ -1453,7 +1663,7 @@ print_bytecode(IR *ir, IR_Block *block)
 			{
 				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t %s || %s\n", register_to_name(bc.result), register_to_name(bc.left_idx), register_to_name(bc.right_idx));
 			} break;
-			case BC_CMP_LOGICAL_NOT:
+			case BC_LOGICAL_NOT:
 			{
 				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t ! %s\n", register_to_name(bc.result), register_to_name(bc.left_idx));
 			} break;
@@ -1530,9 +1740,11 @@ print_bytecode(IR *ir, IR_Block *block)
 				auto ds = ir->allocated[bc.right_idx];
 				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t LOAD GLOBAL [%X]\n", register_to_name(bc.result), ds.position);
 			} break;
-			case BC_LOAD_MEMORY:
+			case BC_FNEG:
+			case BC_NEG:
 			{
-				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t DEREFRENCE %s\n", register_to_name(bc.result), register_to_name(bc.right_idx));
+				// result and left_idx should be the same register
+				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t NEG %s\n", register_to_name(bc.result), register_to_name(bc.left_idx));
 			} break;
 			case BC_ADD:
 			case BC_F_ADD:

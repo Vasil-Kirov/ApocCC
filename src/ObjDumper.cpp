@@ -3,31 +3,32 @@
 #include <Analyzer.h>
 #include <time.h>
 #include <platform/platform.h>
+#include <vcruntime_string.h>
 
 #define DUMP_T(BUFFER, DATA, TYPE) *(TYPE *)BUFFER = DATA;
 #define ADVANCE(BUFFER, TYPE) BUFFER.buffer += sizeof(TYPE); BUFFER.count += sizeof(TYPE);
 
-const int IMAGE_SCN_CNT_CODE             = 0x00000020;
-const int IMAGE_SCN_MEM_EXECUTE          = 0x20000000;
-const int IMAGE_SCN_MEM_READ             = 0x40000000;
-const int IMAGE_SCN_MEM_WRITE            = 0x80000000;
-const int IMAGE_SCN_MEM_NOT_CACHED       = 0x04000000;
-const int IMAGE_SCN_LNK_NRELOC_OVFL      = 0x01000000;
-const int IMAGE_SCN_MEM_DISCARDABLE      = 0x02000000;
-const int IMAGE_SCN_MEM_NOT_PAGED        = 0x08000000;
-const int IMAGE_SCN_GPREL                = 0x00008000;
+// Taking these 2 definitions from the tilde-backend library
+// https://github.com/RealNeGate/tilde-backend/blob/master/src/tb/objects/coff.h
+// <3
 
-const int IMAGE_REL_AMD64_ADDR64 = 0x0001;
+// IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_MEM_READ | IMAGE_SCN_ALIGN_16BYTES
+#define COFF_CHARACTERISTICS_TEXT 0x60500020u
+
+// IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ
+#define COFF_CHARACTERISTICS_RODATA 0x40000040u
+
+const int IMAGE_SCN_LNK_NRELOC_OVFL = 0x01000000;
 
 const int IMAGE_FILE_MACHINE_AMD64       = 0x8664;
 const int IMAGE_SYM_CLASS_EXTERNAL       = 2;
-const int IMAGE_SYM_CLASS_FUNCTION       = 101;
 const int IMAGE_FILE_LARGE_ADDRESS_AWARE = 0x0020;
 
 void
-dump_obj(File_Contents *f, u8 *code, Relocation *relocations)
+dump_obj(File_Contents *f, u8 *code, Relocation *relocations, Symbol_Descriptor *symbols)
 {
 	size_t code_size = SDCount(code);
+	size_t symbol_count = SDCount(symbols);
 	File_Buffer file_buffer;
 	file_buffer.buffer = (u8 *)AllocateCompileMemory(code_size * 8);
 	file_buffer.count = 0;
@@ -42,23 +43,49 @@ dump_obj(File_Contents *f, u8 *code, Relocation *relocations)
 	code_section.size = code_size;
 	size_t relocation_count = SDCount(relocations);
 
-	code_section.characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_EXECUTE |
-		IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE |
-		IMAGE_SCN_MEM_NOT_CACHED | IMAGE_SCN_MEM_NOT_PAGED |
-		IMAGE_SCN_MEM_DISCARDABLE | IMAGE_SCN_GPREL;
+	code_section.characteristics = COFF_CHARACTERISTICS_TEXT;
 	if(relocation_count > 0xFFFF) {
 		code_section.characteristics |= IMAGE_SCN_LNK_NRELOC_OVFL;
 	}
 	ADVANCE(file_buffer, Obj_Section);
+
+	Obj_Section ro_section = {".rdata"};
+	ro_section.characteristics = COFF_CHARACTERISTICS_RODATA;
+	ADVANCE(file_buffer, Obj_Section);
+
+	ro_section.data_offset = file_buffer.count;
+	i32 last_ro = -1;
+	for(size_t i = 0; i < symbol_count; ++i)
+	{
+		if(symbols[i].section == SEC_RO_DATA)
+		{
+			last_ro = i;
+			if(symbols[i].type == OBJ_STRING)
+				memcpy(file_buffer.buffer, (u8 *)symbols[i].value, symbols[i].size);
+			else
+				memcpy(file_buffer.buffer, &symbols[i].value, symbols[i].size);
+			file_buffer.buffer += symbols[i].size;
+			file_buffer.count += symbols[i].size;
+		}
+	}
+	if(last_ro == -1)
+	{
+		ro_section.size = 0;
+	}
+	else
+	{
+		ro_section.size = symbols[last_ro].position + symbols[last_ro].size;
+	}
+
+
 	code_section.data_offset = file_buffer.count;
 	dump_code(&file_buffer, code, code_size);
 	file_buffer.buffer += code_size;
 	file_buffer.count  += code_size;
 
-	size_t func_count = SDCount(f->functions);
 	header.machine            = IMAGE_FILE_MACHINE_AMD64;
-	header.number_of_symbols  = func_count;
-	header.number_of_sections = 1;
+	header.number_of_symbols  = symbol_count;
+	header.number_of_sections = 2;
 	header.time_stamp         = time(NULL);
 	header.characteristics    = IMAGE_FILE_LARGE_ADDRESS_AWARE;
 	code_section.relocation_offset = file_buffer.buffer - buffer_start;
@@ -77,29 +104,19 @@ dump_obj(File_Contents *f, u8 *code, Relocation *relocations)
 	}
 	for(size_t i = 0; i < relocation_count; ++i)
 	{
-		relocations[i].type = IMAGE_REL_AMD64_ADDR64;
 		dump_relocation(&file_buffer, &relocations[i]);
 	}
 
 	header.symbol_offset = file_buffer.buffer - buffer_start;
-	for(size_t i = 0; i < func_count; ++i)
+	for(size_t i = 0; i < symbol_count; ++i)
 	{
 		Obj_Symbol symbol;
-		put_symbol_name(f->functions[i]->identifier, &symbol.name, &string_table);
+		put_symbol_name(symbols[i].name, &symbol.name, &string_table);
 		symbol.number_of_aux_symbols = 0;
-		symbol.section_number = 1;
-		symbol.type = 0x20;
+		symbol.section_number = symbols[i].section;
+		symbol.type = symbols[i].type == OBJ_FUNCTION ? 0x20 : 0;
 		symbol.storage_class = IMAGE_SYM_CLASS_EXTERNAL;
-		// @FIXIT HACK
-		// @FIXIT HACK
-		// @FIXIT HACK
-		// @FIXIT HACK
-		// @FIXIT HACK
-		// @FIXIT HACK
-		// @FIXIT HACK
-		// @FIXIT HACK
-		// @FIXIT HACK
-		symbol.value = f->functions[i]->s_member.index;
+		symbol.value = symbols[i].position;
 		dump_symbol(&file_buffer, &symbol);
 	}
 	dump_string_table(&file_buffer, &string_table);
@@ -108,6 +125,7 @@ dump_obj(File_Contents *f, u8 *code, Relocation *relocations)
 	dump_header(buffer_start, header);
 	buffer_start += sizeof(Obj_Header);
 	dump_section_header(&buffer_start, &code_section);
+	dump_section_header(&buffer_start, &ro_section);
 
 	char* obj_file = change_file_extension(
 		platform_path_to_file_name((char*)f->path), (char*)"o");

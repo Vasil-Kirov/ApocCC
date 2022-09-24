@@ -11,6 +11,7 @@
 ./src
 --include-directory
 ./include
+-Wno-pragma-pack
 -Wno-deprecated-non-prototype
 --include-directory
 E:/GitClone/llvm-project/llvm/build/include

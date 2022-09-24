@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
 	Relocation *relocations = NULL;
 	TIME_FUNC(timers, IR *ir = ast_to_bytecode(f, f->ast_root), codegen_clock, codegen);
 	TIME_FUNC(timers, u8 *code = x64_generate_code(f, ir, &relocations), codegen_clock, codegen);
-	TIME_FUNC(timers, dump_obj(f, code, relocations), codegen_clock, codegen);
+	TIME_FUNC(timers, dump_obj(f, code, relocations, obj_symbols), codegen_clock, codegen);
 #else
 	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
 #endif
@@ -185,24 +185,26 @@ int main(int argc, char *argv[])
 	vstd_strcat((char *)final_linker_command, (char *)" ");
 	vstd_strcat((char *)final_linker_command, f->obj_name);
 
-	if(f->build_commands.target != TG_WASM)
+	if(f->build_commands.linker == LINK_EXE)
 	{
-#if defined(_WIN32)
-	if(f->build_commands.debug_info)
-		vstd_strcat((char *)final_linker_command, (char *)" /DEBUG ");
+		if(f->build_commands.debug_info)
+			vstd_strcat((char *)final_linker_command, (char *)" /DEBUG ");
 
-	vstd_strcat((char *)final_linker_command, (char *)" /ENTRY:mainCRTStartup ");
-	vstd_strcat((char *)final_linker_command, (char *)"/defaultlib:libcmt ");	
-	vstd_strcat((char *)final_linker_command, (char *)"/OUT:");
-#elif defined (CM_LINUX)
-	vstd_strcat((char *)final_linker_command, (char *)" -o");
-#else
-#error Linker for this platform is not defined
-#endif
+		vstd_strcat((char *)final_linker_command, (char *)" /ENTRY:mainCRTStartup ");
+		vstd_strcat((char *)final_linker_command, (char *)"/defaultlib:libcmt ");	
+		vstd_strcat((char *)final_linker_command, (char *)"/OUT:");
+	}
+	else if(f->build_commands.linker == LINK_LD)
+	{
+		vstd_strcat((char *)final_linker_command, (char *)" -o");
+	}
+	else if(f->build_commands.linker == LINK_WASM_LD)
+	{
+		vstd_strcat((char *)final_linker_command, (char *)" -o");
 	}
 	else
 	{
-		vstd_strcat((char *)final_linker_command, (char *)" -o");
+		LG_FATAL("----- COMPILER BUG -----\nUnkown linker after arguments parsing");
 	}
 
 	vstd_strcat((char *)final_linker_command, (char *)f->build_commands.output_file);

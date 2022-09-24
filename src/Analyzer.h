@@ -69,6 +69,13 @@ typedef struct
 	u64 value;
 } Define_Table;
 
+typedef enum
+{
+	LINK_EXE,
+	LINK_LD,
+	LINK_WASM_LD,
+} Linker;
+
 typedef struct
 {
 	u8 *output_file;
@@ -79,6 +86,7 @@ typedef struct
 	b32 dump_symbols;
 	Optimization_Level optimization;
 	Target_Arch target;
+	Linker linker;
 } Build_Commands;
 
 // @NOTE: this is poorly named, should probably be changed to something like `compile_state`

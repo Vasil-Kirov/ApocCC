@@ -1510,10 +1510,10 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *prev
 			{
 				if(!is_integer(expr_type) && !is_float(expr_type))
 				{
-					raise_formated_semantic_error(f, unary_expr.op, "Cannot use - operator on an %s", 
+					raise_formated_semantic_error(f, unary_expr.op, "Cannot use - on operator of type %s", 
 							var_type_to_name(expr_type));
 				}
-				if(expr_type.primitive.size >= ubyte1 && expr_type.primitive.size <= ubyte8)
+				if(is_integer(expr_type) && !is_signed(expr_type))
 				{
 					raise_semantic_error(f, "Cannot use - operator on an unsigned integer", unary_expr.op);
 				}

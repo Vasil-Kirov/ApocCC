@@ -23,6 +23,13 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	build_commands.call_linker = true;
 	build_commands.linker_command = NULL;
 	build_commands.output_file = NULL;
+#if defined(_WIN32)
+	build_commands.linker = LINK_EXE;
+#elif defined(CM_LINUX)
+	build_commands.linker = LINK_LD;
+#else
+#error Unknown platform
+#endif
 	shdefault(build_commands.defines, 0);
 
 	std::string tmp_output_file;
@@ -56,7 +63,10 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 				if(target == "x64")
 					build_commands.target = TG_X64;
 				else if(target == "wasm")
+				{
 					build_commands.target = TG_WASM;
+					build_commands.linker = LINK_WASM_LD;
+				}
 				else
 					raise_build_error("Unsupported target %s", target.c_str());
 			}
@@ -106,6 +116,26 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 			}
 			else if(arg == "--linker")
 			{
+				auto linker = args[++i];
+				if(linker == "LINK" || linker == "LINK.EXE" || linker == "link" || linker == "link.exe")
+				{
+					build_commands.linker = LINK_EXE;
+				}
+				else if(linker == "LD" || linker == "ld")
+				{
+					build_commands.linker = LINK_LD;
+				}
+				else if(linker == "WASM-LD" || linker == "wasm-ld")
+				{
+					build_commands.linker = LINK_WASM_LD;
+				}
+				else
+				{
+					raise_build_error("Unkown linker %s.\nOptions:\n\tLINK.EXE\n\tLD\n\tWASM-LD", linker.c_str());
+				}
+			}
+			else if(arg == "--link")
+			{
 				while(++i < ARR_SIZE(args))
 				{
 					linker_append += " ";
@@ -139,18 +169,14 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 		}
 	}
 
-	if(build_commands.target != TG_WASM)
-	{
-#if defined(_WIN32)
-	linker_command += "LINK -nologo ";
-#elif defined (CM_LINUX)
-	linker_command += "ld ";
-#else
-#error Linker for this platform is not defined
-#endif
-	}
-	else
+	if(build_commands.linker == LINK_EXE)
+		linker_command += "LINK -nologo ";
+	else if(build_commands.linker == LINK_LD)
+		linker_command += "ld ";
+	else if(build_commands.linker == LINK_WASM_LD)
 		linker_command += "wasm-ld ";
+	else
+		LG_FATAL("----- COMPILER BUG -----\nUnkown linker");
 
 	linker_command += linker_append;
 

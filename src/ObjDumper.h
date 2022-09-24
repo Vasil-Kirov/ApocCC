@@ -2,6 +2,7 @@
 #if !defined(_OBJ_DUMPER_H)
 #define _OBJ_DUMPER_H
 #include <Basic.h>
+#include <Analyzer.h>
 
 #pragma pack(push, 1)
 struct Obj_Header {
@@ -56,13 +57,34 @@ struct String_Table {
 };
 #pragma pack(pop)
 
+enum Object_Section {
+	SEC_UNDEFINED,
+	SEC_TEXT,
+	SEC_RO_DATA
+};
+
+enum Object_Symbol_Type {
+	OBJ_FUNCTION = 0x20,
+	OBJ_STRING,
+	OBJ_FLOAT
+};
+
+struct Symbol_Descriptor {
+	u8 *name;
+	u64 value;
+	int size;
+	int position;
+	Object_Section section;
+	Object_Symbol_Type type;
+};
+
 struct File_Buffer {
 	u8 *buffer;
 	i32 count;
 };
 
 void
-dump_obj(u8 *code);
+dump_obj(File_Contents *f, u8 *code, Relocation *relocations, Symbol_Descriptor *symbols);
 
 void
 dump_code(File_Buffer *file_buffer, u8 *code, size_t size);

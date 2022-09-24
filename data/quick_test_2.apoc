@@ -1,26 +1,22 @@
 
-global :: 10;
+fn $call c_decl printf(str: *u8, ...) -> i32;
 
-fn $call c_decl the_num() -> i32 {
 
-	result := actually_get_the_num();
-	if result != 10 -> 4;
-	-> result + 4;
-}
-
-fn $call c_decl actually_get_the_num() -> i32 {
-	-> third_fn();
-}
-
-fn $call c_decl third_fn() -> i32 { -> 10; }
-
+/*
 fn $call c_decl main() -> i32 {
-	my_struct := My_Struct { 0, the_num() };
-	-> my_struct.b;
+
+a_str := String { "some_data", 0 };
+      print_passed(123);
+      -> 0;
+}
+*/
+
+fn $call c_decl print_passed(num: i32) {
+      printf("%d\n", num);
 }
 
-struct My_Struct {
-a: i32;
-b: i32;
+struct String {
+data:* u8;
+len: i32;
 }
 
