@@ -295,17 +295,17 @@ is_standard_type(Type_Info *type)
 	{
 		*type = *x64_str_type;
 	}
-	if(type->type == T_POINTER)
-	{
-		type->primitive.size = byte8;
-		return true;
-	}
 	if(type->type == T_BOOLEAN)
 	{
 		type->primitive.size = byte1;
 		return true;
 	}
-	if(type->type == T_INTEGER || type->type == T_UNTYPED_INTEGER || type->type == T_FUNC)
+	if(type->type == T_ARRAY)
+	{
+		// @TODO: hack
+		type->type = T_POINTER;
+	}
+	if(type->type == T_INTEGER || type->type == T_UNTYPED_INTEGER || type->type == T_FUNC || type->type == T_ARRAY || type->type == T_POINTER)
 		return true;
 	return false;
 }
@@ -700,6 +700,7 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 {
 	switch(bc.op)
 	{
+		case BC_STORE_NON_REMOVABLE:
 		case BC_STORE:
 		{
 			Data_Segment seg = ir->allocated[bc.left_idx];
@@ -978,12 +979,21 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 			push_byte(buffer, postfix);
 			push_displacement(mod, displacement, buffer);
 		} break;
+		case BC_STORE_REG:
+		{
+			MOD mod = MOD_displacement_0;
+			prefix64(buffer);
+			push_byte(buffer, 0x89); // MOV_RM_R
+			// WHY ARE THEY THE OTHER WAY AROUND WHYYYY
+			u8 postfix = encode_postfix(mod, bc.right_idx, bc.left_idx);
+			push_byte(buffer, postfix);
+		} break;
 		case BC_DEREFRENCE:
 		{
 			MOD mod = MOD_displacement_0;
 			prefix64(buffer);
-			push_byte(buffer, 0x8b); // MOV_RM_R
-			u8 postfix = encode_postfix(mod, bc.left_idx, bc.result);
+			push_byte(buffer, 0x8b); // MOV_R_RM
+			u8 postfix = encode_postfix(mod, bc.result, bc.left_idx);
 			push_byte(buffer, postfix);
 		} break;
 		case BC_CALL:

@@ -12,6 +12,10 @@ endif
 
 " Syntax definitions {{{1
 " Basic keywords {{{2
+
+set cino=L2
+
+
 syn keyword   apocConditional match if else
 syn keyword   apocRepeat for
 syn keyword   apocStructure struct enum nextgroup=apocIdentifier skipwhite skipempty

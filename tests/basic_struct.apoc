@@ -1,0 +1,12 @@
+// 25
+
+fn main() -> i32 {
+	my_struct := Test_Struct { 10, 15 };
+	-> my_struct.num_1 + my_struct.num_2;
+}
+
+struct Test_Struct {
+      num_1: i32;
+      num_2: i32;
+}
+

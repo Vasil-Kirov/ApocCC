@@ -2,7 +2,7 @@
 SetLocal EnableDelayedExpansion
 
 SET Files=
-FOR /R %%f in (*.cpp *.h) do (
+FOR /R %%f in (*.cpp *.h *.apoc) do (
 	SET Files=!Files! %%f
 )
 

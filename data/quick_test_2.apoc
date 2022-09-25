@@ -6,13 +6,22 @@ fn $call c_decl printf(str: *u8, ...) -> i32;
 fn $call c_decl main() -> i32 {
 
 a_str := String { "some_data", 0 };
-      print_passed(123);
+      print_passed_apoc(123);
       -> 0;
 }
 */
 
-fn $call c_decl print_passed(num: i32) {
-      printf("%d\n", num);
+// 25
+
+fn print_passed() -> i32 {
+	a: i32 = 10;
+	ptr := @a;
+	-> ptr[0];
+}
+
+struct Test_Struct {
+      num_1: i32;
+      num_2: i32;
 }
 
 struct String {

@@ -48,6 +48,8 @@ typedef enum {
 typedef enum {
 	BC_INVALID,
 	BC_STORE,
+	BC_STORE_NON_REMOVABLE,
+	BC_STORE_REG,
 	BC_PUSH_OFFSET,
 	BC_CALL,
 	BC_MOVE_VALUE_TO_REG,
@@ -181,6 +183,7 @@ typedef struct {
 	i32 reg_count;
 	i32 bc_count;
 	i32 stack_top;
+	i32 apoc_ptr_ret;
 } IR;
 
 typedef struct {
@@ -199,6 +202,12 @@ ast_to_bytecode(File_Contents *f, Ast_Node *node);
 
 void
 ast_to_bc_file_level_list(Ast_Node **list, IR *ir);
+
+i32
+allocate_stack_space(IR *ir, size_t size);
+
+void
+do_store_instruction(i32 idx, i32 right, i32 result, IR_Block *block, Type_Info *type, b32 is_removable);
 
 void
 ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func);
