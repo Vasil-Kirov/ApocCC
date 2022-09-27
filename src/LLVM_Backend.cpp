@@ -1422,8 +1422,7 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				};
 				auto element_ptr = backend.builder->CreateGEP(array_type, 
 						array_loc, idx_list, "array_elem");
-				llvm_store(node->array_list.type.array.type, element_ptr, zero, &backend);
-				//backend.builder->CreateStore(values[i], element_ptr);
+				llvm_store(node->array_list.type.array.type, element_ptr, values[i], &backend);
 			}
 			auto arr_size = node->array_list.type.array.elem_count;
 

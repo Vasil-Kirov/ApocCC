@@ -258,6 +258,7 @@ typedef struct
 {
 	Token_Iden token;
 	Ast_Node **list;
+	Type_Info *expr_types;
 	Type_Info type;
 } Ast_Array_List;
 

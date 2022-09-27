@@ -1,0 +1,15 @@
+// 25
+
+
+fn main() -> i32 {
+      my_struct := Test_Struct { 10, 15 };
+      struct_ptr := @my_struct;
+      -> struct_ptr.num_1 + struct_ptr.num_2;
+}
+
+
+struct Test_Struct {
+      num_1: i32;
+      num_2: i32;
+}
+

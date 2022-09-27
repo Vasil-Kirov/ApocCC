@@ -12,6 +12,7 @@ os.system('cls')
 
 include_llvm = True
 compiler_args = ""
+use_msvc_link = False
 
 if 'release' in sys.argv:
 	print('--- RELEASE ---')
@@ -23,6 +24,7 @@ else:
 if 'bounds' in sys.argv:
 	print('--- BOUNDS ---')
 	compiler_args += ' -fsanitize=address'
+	use_msvc_link = True
 
 if 'novm' in sys.argv:
     include_llvm = False
@@ -48,7 +50,8 @@ compiler_args += ' -Wno-old-style-cast'
 os.chdir('bin')
 
 if include_llvm:
-    compiler_args += os.popen('llvm-config.exe --cppflags --cxxflags --libs all').read()
+    compiler_args += ' ' + os.popen('llvm-config.exe --cppflags --cxxflags').read()
+    linker_args   += ' ' + os.popen('llvm-config.exe --libs all').read()
 
 compiler_args += ' -c'
 
@@ -56,7 +59,12 @@ c_command = ['clang-cl', '-oapoc.o', '../src/Main.cpp']
 c_command += includes.split(' ')
 c_command += compiler_args.split(' ')
 
-linker_command = ['lld-link.exe', '/out:apoc.exe', '/DEBUG']
+linker_command = []
+if use_msvc_link:
+	linker_command += ['link.exe']
+else:
+	linker_command += ['lld-link.exe']
+linker_command += ['/out:apoc.exe', '/DEBUG']
 linker_command += linker_args.split(' ')
 linker_command += ['apoc.o']
 

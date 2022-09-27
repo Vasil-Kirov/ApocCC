@@ -176,7 +176,7 @@ b32
 is_signed(Type_Info type)
 {
 	Assert(is_type_primitive(type));
-	return type.primitive.size >= byte1 && byte8 >= type.primitive.size;
+	return type.type == T_UNTYPED_INTEGER || (type.primitive.size >= byte1 && byte8 >= type.primitive.size);
 }
 
 b32

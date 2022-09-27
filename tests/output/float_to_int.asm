@@ -5,15 +5,15 @@
 	.endef
 	.globl	@feat.00
 .set @feat.00, 0
-	.file	"quick_test_2.apoc"
-	.def	print_passed;
+	.file	"float_to_int.apoc"
+	.def	main;
 	.scl	2;
 	.type	32;
 	.endef
-	.globl	print_passed
+	.globl	main
 	.p2align	4, 0x90
-print_passed:
-.seh_proc print_passed
+main:
+.seh_proc main
 	subq	$16, %rsp
 	.seh_stackalloc 16
 	.seh_endprologue

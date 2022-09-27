@@ -122,9 +122,46 @@ platform_create_thread(void *Func, void *Args)
 }
 
 void
-platform_wait_for_thread(Platform_Thread Thread)
+platform_join_threads(u32 count, Platform_Thread *threads)
 {
-	WaitForSingleObject(Thread, INFINITE);
+	WaitForMultipleObjects(count, threads, TRUE, INFINITE);
+}
+
+void
+platform_wait_for_object(Platform_Object Object)
+{
+	WaitForSingleObject(Object, INFINITE);
+}
+
+Platform_Object
+platform_create_semaphore(int InitialCount, int ThreadCount)
+{
+	return CreateSemaphoreA(NULL, InitialCount, ThreadCount, NULL);
+}
+
+void
+platform_alert_semaphore(Platform_Object semaphore)
+{
+	ReleaseSemaphore(semaphore, 1, NULL);
+}
+
+Platform_Object
+platform_create_mutex()
+{
+	return CreateMutexA(NULL, FALSE, NULL);
+}
+
+void
+platform_lock_mutex(Platform_Object mutex)
+{
+	auto result = WaitForSingleObject(mutex, INFINITE);
+	Assert(result != WAIT_ABANDONED);
+}
+
+void
+platform_unlock_mutex(Platform_Object mutex)
+{
+	ReleaseMutex(mutex);
 }
 
 b32
@@ -142,7 +179,7 @@ platform_output_string(char *String, log_level Level)
 	//		4 = r
 	//		6 = r | g
 	//		8 = intense
-    u8 Colors[] = {13, 4, 6, FOREGROUND_GREEN | FOREGROUND_INTENSITY, 
+	u8 Colors[] = {13, 4, 6, FOREGROUND_GREEN | FOREGROUND_INTENSITY, 
 	FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE};
 	HANDLE STDOUT;
 	if (Level > LOG_ERROR)

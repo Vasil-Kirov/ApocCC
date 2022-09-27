@@ -1,0 +1,11 @@
+// 100
+
+
+fn main() -> i32 {
+	my_int: i32= 10;
+	ptr := @my_int;
+	ptr_ptr := @ptr;
+	**ptr_ptr = 100;
+	-> my_int;
+}
+

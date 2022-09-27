@@ -1226,13 +1226,12 @@ is_bits_op(Token op)
 		op == tok_bits_and;
 }
 
-Type_Info
+Type_Info *
 verify_array_list(File_Contents *f, Ast_Node *node)
 {
 	Assert(node->type == type_array_list);
 	size_t list_count = SDCount(node->array_list.list);
-	Type_Info expr_types[list_count];
-	memset(expr_types, 0, sizeof(Type_Info) * list_count);
+	Type_Info *expr_types = (Type_Info *)AllocateCompileMemory(list_count * sizeof(Type_Info));
 	Ast_Array_List list = node->array_list;
 	for(size_t i = 0; i < list_count; ++i)
 	{
@@ -1256,7 +1255,7 @@ verify_array_list(File_Contents *f, Ast_Node *node)
 	}
 
 	// @NOTE: idk lol
-	return expr_types[0];
+	return expr_types;
 }
 
 Type_Info
@@ -1443,8 +1442,8 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 			result.array.elem_count = SDCount(expression->array_list.list);
 			result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 			result.identifier = (u8 *)"array_list";
-			Type_Info array_type = verify_array_list(f, expression);
-			memcpy(result.array.type, &array_type, sizeof(Type_Info));
+			expression->array_list.expr_types = verify_array_list(f, expression);
+			memcpy(result.array.type, &expression->array_list.expr_types[0], sizeof(Type_Info));
 			expression->array_list.type = result;
 			return result;
 		}

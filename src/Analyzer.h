@@ -76,6 +76,12 @@ typedef enum
 	LINK_WASM_LD,
 } Linker;
 
+typedef enum
+{
+	LLVM_Backend,
+	Fast_Backend
+} Compiler_Backend;
+
 typedef struct
 {
 	u8 *output_file;
@@ -87,6 +93,7 @@ typedef struct
 	Optimization_Level optimization;
 	Target_Arch target;
 	Linker linker;
+	Compiler_Backend backend;
 } Build_Commands;
 
 // @NOTE: this is poorly named, should probably be changed to something like `compile_state`

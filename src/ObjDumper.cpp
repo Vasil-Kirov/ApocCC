@@ -4,6 +4,7 @@
 #include <time.h>
 #include <platform/platform.h>
 #include <vcruntime_string.h>
+#include <x64_Gen.h>
 
 #define DUMP_T(BUFFER, DATA, TYPE) *(TYPE *)BUFFER = DATA;
 #define ADVANCE(BUFFER, TYPE) BUFFER.buffer += sizeof(TYPE); BUFFER.count += sizeof(TYPE);
@@ -25,9 +26,9 @@ const int IMAGE_SYM_CLASS_EXTERNAL       = 2;
 const int IMAGE_FILE_LARGE_ADDRESS_AWARE = 0x0020;
 
 void
-dump_obj(File_Contents *f, u8 *code, Relocation *relocations, Symbol_Descriptor *symbols)
+dump_obj(File_Contents *f, Code_Buffer code, Relocation *relocations, u32 relocation_count, Symbol_Descriptor *symbols)
 {
-	size_t code_size = SDCount(code);
+	size_t code_size = code.count;
 	size_t symbol_count = SDCount(symbols);
 	File_Buffer file_buffer;
 	file_buffer.buffer = (u8 *)AllocateCompileMemory(code_size * 8);
@@ -41,7 +42,6 @@ dump_obj(File_Contents *f, u8 *code, Relocation *relocations, Symbol_Descriptor 
 	Obj_Header header = {};
 	Obj_Section code_section = {".text"};
 	code_section.size = code_size;
-	size_t relocation_count = SDCount(relocations);
 
 	code_section.characteristics = COFF_CHARACTERISTICS_TEXT;
 	if(relocation_count > 0xFFFF) {
@@ -71,6 +71,7 @@ dump_obj(File_Contents *f, u8 *code, Relocation *relocations, Symbol_Descriptor 
 	if(last_ro == -1)
 	{
 		ro_section.size = 0;
+		ro_section.data_offset = 0;
 	}
 	else
 	{
@@ -79,9 +80,7 @@ dump_obj(File_Contents *f, u8 *code, Relocation *relocations, Symbol_Descriptor 
 
 
 	code_section.data_offset = file_buffer.count;
-	dump_code(&file_buffer, code, code_size);
-	file_buffer.buffer += code_size;
-	file_buffer.count  += code_size;
+	dump_code(&file_buffer, code.buffer, code_size);
 
 	header.machine            = IMAGE_FILE_MACHINE_AMD64;
 	header.number_of_symbols  = symbol_count;
@@ -152,7 +151,7 @@ void
 dump_coff_string_table(File_Buffer *file_buffer, String_Table *table)
 {
 	size_t str_count = SDCount(table->strings);
-	*(u32 *)file_buffer->buffer = table->size + 4;
+	*(u32 *)file_buffer->buffer = table->size;
 	ADVANCE((*file_buffer), u32);
 	for(size_t i = 0; i < str_count; ++i)
 	{
@@ -198,6 +197,7 @@ void
 dump_code(File_Buffer *file_buffer, u8 *code, size_t size)
 {
 	memcpy(file_buffer->buffer, code, size);
-	file_buffer->count += size;
+	file_buffer->buffer += size;
+	file_buffer->count  += size;
 }
 

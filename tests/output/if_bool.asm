@@ -5,21 +5,28 @@
 	.endef
 	.globl	@feat.00
 .set @feat.00, 0
-	.file	"quick_test_2.apoc"
-	.def	print_passed;
+	.file	"if_bool.apoc"
+	.def	main;
 	.scl	2;
 	.type	32;
 	.endef
-	.globl	print_passed
+	.globl	main
 	.p2align	4, 0x90
-print_passed:
-.seh_proc print_passed
+main:
+.seh_proc main
 	subq	$16, %rsp
 	.seh_stackalloc 16
 	.seh_endprologue
 	movq	%rcx, 8(%rsp)
-	movl	$1121088963, 4(%rsp)
-	movl	$105, %eax
+	movb	$1, 7(%rsp)
+	xorl	%eax, %eax
+	testb	%al, %al
+	jne	.LBB0_3
+	movl	$1, %eax
+	jmp	.LBB0_2
+.LBB0_3:
+	xorl	%eax, %eax
+.LBB0_2:
 	addq	$16, %rsp
 	retq
 	.seh_endproc
@@ -38,4 +45,3 @@ global_var.1:
 global_var.2:
 	.quad	0
 
-	.globl	_fltused

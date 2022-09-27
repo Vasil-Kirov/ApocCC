@@ -83,8 +83,10 @@ struct File_Buffer {
 	i32 count;
 };
 
+typedef struct _Code_Buffer Code_Buffer;
+
 void
-dump_obj(File_Contents *f, u8 *code, Relocation *relocations, Symbol_Descriptor *symbols);
+dump_obj(File_Contents *f, Code_Buffer code, Relocation *relocations, u32 relocation_count, Symbol_Descriptor *symbols);
 
 void
 dump_code(File_Buffer *file_buffer, u8 *code, size_t size);

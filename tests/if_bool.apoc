@@ -1,0 +1,8 @@
+// 1
+
+fn main() -> i32 {
+      my_bool := #bool 1;
+      if my_bool -> 1;
+      -> 0;
+}
+

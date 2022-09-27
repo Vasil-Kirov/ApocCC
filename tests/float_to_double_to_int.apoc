@@ -1,0 +1,9 @@
+// 17
+
+
+fn main() -> i32 {
+	my_float :f32= 17.123;
+	my_double := #f64 my_float;
+	-> #i32 my_double;
+}
+

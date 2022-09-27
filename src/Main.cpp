@@ -16,6 +16,7 @@
 #include <Bytecode.h>
 #include <x64_Gen.h>
 #include <ObjDumper.h>
+#include <Threading.h>
 
 #include <platform/platform.h>
 
@@ -34,6 +35,7 @@
 #include <Bytecode.cpp>
 #include <x64_Gen.cpp>
 #include <ObjDumper.cpp>
+#include <Threading.cpp>
 
 #if !defined(NOVM)
 #include <LLVM_Helpers.h>
@@ -132,6 +134,7 @@ int main(int argc, char *argv[])
 	initialize_logger();
 	platform_initialize();
 	initialize_interpreter();
+	initialize_thread_pool();
 
 	if(argc < 2)
 	{
@@ -171,14 +174,24 @@ int main(int argc, char *argv[])
 		LG_INFO("Dumping Symbols:   %f.4s", timers.codegen);
 		return 0;
 	}
-#if 1
-	Relocation *relocations = NULL;
-	TIME_FUNC(timers, IR *ir = ast_to_bytecode(f, f->ast_root), codegen_clock, codegen);
-	TIME_FUNC(timers, u8 *code = x64_generate_code(f, ir, &relocations), codegen_clock, codegen);
-	TIME_FUNC(timers, dump_obj(f, code, relocations, obj_symbols), codegen_clock, codegen);
-#else
-	TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
+	if(f->build_commands.backend == Fast_Backend)
+	{
+		Relocation *relocations = NULL;
+		u32 relocation_count = 0;
+		TIME_FUNC(timers, IR *ir = ast_to_bytecode(f, f->ast_root), codegen_clock, codegen);
+		TIME_FUNC(timers, Code_Buffer code = x64_generate_code(f, ir, &relocations, &relocation_count), codegen_clock, codegen);
+		TIME_FUNC(timers, dump_obj(f, code, relocations, relocation_count, obj_symbols), codegen_clock, codegen);
+	}
+#if !defined(NOVM)
+	else if(f->build_commands.backend == LLVM_Backend)
+	{
+		TIME_FUNC(timers, llvm_backend_generate(f, f->ast_root, files), codegen_clock, codegen);
+	}
 #endif
+	else
+	{
+		LG_FATAL("----- COMPILER BUG -----\nBackend is not specified %d", f->build_commands.backend);
+	}
 	
 	u8 *final_linker_command = (u8 *)AllocatePermanentMemory(4096);
 	vstd_strcat((char *)final_linker_command, (char *)f->build_commands.linker_command);

@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <immintrin.h>
 
 #ifndef STB_DS_IMPLEMENTATION
 #define STB_DS_IMPLEMENTATION

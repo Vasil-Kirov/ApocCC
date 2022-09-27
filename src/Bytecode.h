@@ -183,7 +183,6 @@ typedef struct {
 	i32 reg_count;
 	i32 bc_count;
 	i32 stack_top;
-	i32 apoc_ptr_ret;
 } IR;
 
 typedef struct {
@@ -234,7 +233,7 @@ IR_Block *
 ast_to_bc_func_level(Ast_Node *node, IR_Block *current_block, Ast_Node **list, i32 *optional_index, IR *ir, IR_Block *to_go);
 
 i32
-do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir);
+do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir, IR_Block *block);
 
 i32
 expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer);

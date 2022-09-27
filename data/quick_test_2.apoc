@@ -11,14 +11,17 @@ a_str := String { "some_data", 0 };
 }
 */
 
-// 25
-
 fn print_passed() -> i32 {
-	a: i32 = 10;
-	ptr := @a;
-	-> ptr[0];
+	-> increment_number(20);
 }
 
+fn increment_number(num: i32) -> i32 {
+	-> increment_number_again(num) + 1;
+}
+
+fn increment_number_again(num: i32) -> i32 {
+	-> num + 1;
+}
 struct Test_Struct {
       num_1: i32;
       num_2: i32;

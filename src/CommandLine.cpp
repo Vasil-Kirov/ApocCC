@@ -3,6 +3,7 @@
 #include <iterator>
 #include <map>
 #include <stdlib/std.h>
+#include <platform/platform.h>
 
 void
 raise_build_error(const char *error_msg, ...)
@@ -23,6 +24,11 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	build_commands.call_linker = true;
 	build_commands.linker_command = NULL;
 	build_commands.output_file = NULL;
+#if !defined(NOVM)
+	build_commands.backend = LLVM_Backend;
+#else
+	build_commands.backend = Fast_Backend;
+#endif
 #if defined(_WIN32)
 	build_commands.linker = LINK_EXE;
 #elif defined(CM_LINUX)
@@ -37,7 +43,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	std::string linker_append;
 	std::string args[c_argc - 1];
 	
-	for (size_t i  = 1; i < c_argc; ++i)
+	for (size_t i = 1; i < c_argc; ++i)
 	{
 		args[i - 1] = std::string(c_argv[i]);
 	}
@@ -131,7 +137,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 				}
 				else
 				{
-					raise_build_error("Unkown linker %s.\nOptions:\n\tLINK.EXE\n\tLD\n\tWASM-LD", linker.c_str());
+					raise_build_error("Unknown linker %s.\nOptions:\n\tLINK.EXE\n\tLD\n\tWASM-LD", linker.c_str());
 				}
 			}
 			else if(arg == "--link")
@@ -158,6 +164,18 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 			{
 				build_commands.call_linker = false;
 			}
+			else if(arg == "--backend")
+			{
+				auto backend = args[++i];
+				if(backend == "llvm" || backend == "LLVM")
+					build_commands.backend = LLVM_Backend;
+				else if(backend == "fast" || backend == "custom" || backend == "Custom" || backend == "Fast")
+					build_commands.backend = Fast_Backend;
+				else
+				{
+					raise_build_error("Unknown backend %s.\nOptions:\n\tLLVM\n\tFast", backend.c_str());
+				}
+			}
 			else
 			{
 				raise_build_error("Invalid command line option %s", arg.c_str());
@@ -167,6 +185,14 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 		{
 			(*files).push_back(arg);
 		}
+	}
+
+	if(build_commands.backend == LLVM_Backend)
+	{
+		char module_path[260] = {};
+		platform_get_absolute_path(module_path);
+		vstd_strcat(module_path, "Standard/Basic.apoc");
+		files->push_back(module_path);
 	}
 
 	if(build_commands.linker == LINK_EXE)

@@ -1,12 +1,7 @@
 #include <x64_Gen.h>
 #include <platform/platform.h>
 #include <Type.h>
-
-struct Fix_Addresses
-{
-	u64 to_fill;
-	IR_Block *block;
-};
+#include <Threading.h>
 
 //const int IMAGE_REL_AMD64_ADDR64 = 0x0001;
 const int IMAGE_REL_AMD64_REL32  = 0x0004;
@@ -15,7 +10,6 @@ static u8 *buffer_start;
 static Type_Info *x64_type_64;
 static Type_Info *bool_type;
 static Type_Info *x64_str_type;
-static Fix_Addresses *to_fix;
 static Symbol_Descriptor *obj_symbols;
 
 i32
@@ -38,7 +32,9 @@ calculate_jump_offset(i32 from, i32 to)
 inline void
 push_symbol(Symbol_Descriptor to_push)
 {
+	lock_mutex();
 	SDPush(obj_symbols, to_push);
+	unlock_mutex();
 }
 
 i32
@@ -72,6 +68,44 @@ get_and_maybe_push_string(u8 *str)
 	new_str_symbol.type = OBJ_STRING;
 	new_str_symbol.value = (u64)str;
 	push_symbol(new_str_symbol);
+	return sym_count;
+}
+
+i32
+push_int(u64 _integer, Var_Size size)
+{
+	static int integer_count = 0;
+
+	int last_ro = -1;
+	size_t sym_count = SDCount(obj_symbols);
+	for(size_t i = 0; i < sym_count; ++i)
+	{
+		if(obj_symbols[i].section == SEC_RO_DATA)
+		{
+			if(obj_symbols[i].type == OBJ_FLOAT && obj_symbols[i].value == _integer)
+				return i;
+			last_ro = i;
+		}
+	}
+
+	Symbol_Descriptor new_int_symbol = {};
+	u8 *symbol_name = (u8 *)AllocatePermanentMemory(16);
+	vstd_sprintf((char *)symbol_name, "__integer!@%d", integer_count++);
+	new_int_symbol.size = size;
+
+	if(last_ro != -1)
+	{
+		new_int_symbol.position = obj_symbols[last_ro].position + obj_symbols[last_ro].size;
+	}
+	else
+	{
+		new_int_symbol.position = 0;
+	}
+	new_int_symbol.name = symbol_name;
+	new_int_symbol.section = SEC_RO_DATA;
+	new_int_symbol.value = _integer;
+	new_int_symbol.type = OBJ_FLOAT;
+	push_symbol(new_int_symbol);
 	return sym_count;
 }
 
@@ -122,10 +156,12 @@ push_float(u64 _float, Var_Size size)
 	return sym_count;
 }
 
-u8 *
-x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations)
+Code_Buffer
+x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_relocation_count)
 {
 	obj_symbols = SDCreate(Symbol_Descriptor);
+
+	// Set up some simple types to use whe needed
 	x64_type_64 = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 	x64_type_64->type = T_INTEGER;
 	x64_type_64->primitive.size = byte8;
@@ -146,45 +182,126 @@ x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations)
 	x64_str_type->pointer.type = type_u8;
 	x64_str_type->identifier = (u8 *)"* u8";
 
-	to_fix = SDCreate(Fix_Addresses);
-	Relocation *relocs = SDCreate(Relocation);
-	u8 *buffer = SDCreate(u8);
-	buffer_start = buffer;
 	size_t count = SDCount(ir);
-	for(size_t i = 0; i < count; ++i)
+	auto relative_relocations = (Relative_Relocation_Array *)AllocateCompileMemory(count * sizeof(Relative_Relocation_Array));
+	auto fixables = (Fixable_Array *)AllocateCompileMemory(count * sizeof(Fixable_Array));
+	auto code_buffers = (Code_Buffer *)AllocateCompileMemory(count * sizeof(Code_Buffer));
+	for(size_t i = 1; i < count; ++i)
 	{
-		if(i != 0)
+		// @NOTE: we store the index as the value and fix it later
+		// to the address
+		Symbol_Descriptor func_sym = {};
+		func_sym.name = f->functions[i - 1]->identifier;
+		func_sym.value = i;
+		func_sym.type = OBJ_FUNCTION;
+		func_sym.position = func_sym.value;
+
+		if(f->functions[i - 1]->node->function.body)
 		{
-			Symbol_Descriptor func_sym = {};
-			func_sym.name = f->functions[i - 1]->identifier;
-			func_sym.value = SDCount(buffer);
-			func_sym.type = OBJ_FUNCTION;
-			func_sym.position = func_sym.value;
-
-			if(f->functions[i - 1]->node->function.body)
-			{
-				func_sym.section = SEC_TEXT;
-			}
-			else
-			{
-				func_sym.section = SEC_UNDEFINED;
-			}
-			push_symbol(func_sym);
+			func_sym.section = SEC_TEXT;
 		}
-		x64_gen_ir(&ir[i], &buffer, &relocs, ir[0].allocated);
-	}
-	*relocations = relocs;
+		else
+		{
+			func_sym.section = SEC_UNDEFINED;
+		}
+		push_symbol(func_sym);
 
-	size_t fix_count = SDCount(to_fix);
-	for(size_t i = 0; i < fix_count; ++i)
-	{
-		*(i32 *)(&buffer[to_fix[i].to_fill]) = calculate_jump_offset(to_fix[i].to_fill + 4, to_fix[i].block->start_address) + 1;
+		Relative_Relocation_Array reloc_array;
+		reloc_array.relocs = (Relative_Relocation *)AllocateCompileMemory(ir[i].bc_count * sizeof(Relative_Relocation));
+		reloc_array.count = 0;
+		relative_relocations[i] = reloc_array;
+
+		Fixable_Array fixable_arr;
+		fixable_arr.fixables = (Fixable *)AllocateCompileMemory(ir[i].bc_count * sizeof(Fixable));
+		fixable_arr.count = 0;
+		fixables[i] = fixable_arr;
+
+		Code_Buffer code_buffer;
+		code_buffer.buffer = (u8 *)AllocateCompileMemory(ir[i].bc_count * 12); // @NOTE: is this enough ? is it too much?
+		code_buffer.count = 0;
+		code_buffers[i] = code_buffer;
+
+		Generate_Code_Args *args = (Generate_Code_Args *)AllocatePermanentMemory(sizeof(Generate_Code_Args));
+		args->ir          = &ir[i];
+		args->buffer      = &code_buffers[i];
+		args->relocs      = &relative_relocations[i];
+		args->fixable_arr = &fixables[i];
+		args->global_ds = ir[0].allocated;
+		args->buffer_index = i;
+		post_job_listing(JOB_GENERATE_CODE, (void *)x64_gen_ir, args);
 	}
-	return buffer;
+
+	wait_for_threads();
+
+	u32 total_code_size = 0;
+	for(int i = 0; i < count; ++i)
+	{
+		total_code_size += code_buffers[i].count;
+	}
+
+	u32 buffer_offsets[count];
+	Code_Buffer program_code;
+	program_code.buffer = (u8 *)AllocateCompileMemory(total_code_size);
+	program_code.count = 0;
+	for(int i = 0; i < count; ++i)
+	{
+		buffer_offsets[i] = program_code.count;
+		memcpy(program_code.buffer + program_code.count, code_buffers[i].buffer, code_buffers[i].count);
+		program_code.count += code_buffers[i].count;
+	}
+
+
+	size_t total_relocation_count = 0;
+	for(int i = 0; i < count; ++i)
+	{
+		int relocation_count = relative_relocations[i].count;
+		auto relocations = relative_relocations[i].relocs;
+		total_relocation_count += relocation_count;
+		for(int j = 0; j < relocation_count; ++j)
+		{
+			relocations[j].actual_relocation.offset += buffer_offsets[relocations[j].buffer_index];
+		}
+	}
+	*out_relocation_count = total_relocation_count;
+
+	Relocation *absolute_relocations = (Relocation *)AllocateCompileMemory(total_relocation_count * sizeof(Relocation));
+	for(int i = 0; i < count; ++i)
+	{
+		int relocation_count = relative_relocations[i].count;
+		auto relocations = relative_relocations[i].relocs;
+		for(int j = 0; j < relocation_count; ++j)
+		{
+			absolute_relocations[--total_relocation_count] = relocations[j].actual_relocation;
+		}
+	}
+
+	*relocations = absolute_relocations;
+
+	auto sym_count = SDCount(obj_symbols);
+	for(int i = 0; i < sym_count; ++i)
+	{
+		if(obj_symbols[i].type == OBJ_FUNCTION)
+		{
+			obj_symbols[i].position = buffer_offsets[obj_symbols[i].value];
+		}
+	}
+
+	for(int i = 0; i < count; ++i)
+	{
+		auto fix_array = fixables[i].fixables;
+		i32 fixable_count = fixables[i].count;
+		for(int j = 0; j < fixable_count; ++j)
+		{
+			u32 absolute_destination = buffer_offsets[fix_array[j].buffer_index] + fix_array[j].block->start_address;
+			u32 absolute_address = buffer_offsets[fix_array[j].buffer_index] + fix_array[j].offset;
+			((u32 *)program_code.buffer)[absolute_address] = absolute_destination;
+		}
+	}
+	return program_code;
 }
 
 void
-x64_gen_ir(IR *ir, u8 **buffer, Relocation **relocs, Data_Segment *global_ds)
+x64_gen_ir(IR *ir, Code_Buffer *buffer, Relative_Relocation_Array *relocs, Data_Segment *global_ds, int buffer_idx, Fixable_Array *fixables)
 {
 	if(!ir->blocks)
 		return;
@@ -192,28 +309,28 @@ x64_gen_ir(IR *ir, u8 **buffer, Relocation **relocs, Data_Segment *global_ds)
 	for(size_t block_idx = 0; block_idx < block_count; ++block_idx)
 	{
 		auto block = ir->blocks[block_idx];
-		block->start_address = SDCount(*buffer);
+		block->start_address = buffer->count;
 		for(size_t bytecode_idx = 0; bytecode_idx < block->bc_count; ++bytecode_idx)
 		{
-			x64_gen_from_bytecode(ir, block->bc[bytecode_idx], buffer, SDCount(*buffer), relocs, global_ds);
+			x64_gen_from_bytecode(ir, block->bc[bytecode_idx], buffer, relocs, global_ds, buffer_idx, fixables);
 		}
 	}
 }
 
 inline void
-push_i8(u8 **buffer, i8 byte)
+push_i8(Code_Buffer *buffer, i8 byte)
 {
-	SDPush(*buffer, byte);
+	buffer->buffer[buffer->count++] = byte;
 }
 
 inline void
-push_byte(u8 **buffer, u8 byte)
+push_byte(Code_Buffer *buffer, u8 byte)
 {
-	SDPush(*buffer, byte);
+	buffer->buffer[buffer->count++] = byte;
 }
 
 inline void
-push_i32(u8 **buffer, i32 bytes)
+push_i32(Code_Buffer *buffer, i32 bytes)
 {
 	i8 *bytes_ptr = (i8 *)&bytes;
 	for(size_t i = 0; i < 4; ++i)
@@ -221,7 +338,7 @@ push_i32(u8 **buffer, i32 bytes)
 }
 
 void
-push_any(u8 **buffer, void *any, Type_Info *type)
+push_any(Code_Buffer *buffer, void *any, Type_Info *type)
 {
 	Assert(type->type == T_INTEGER || type->type == T_UNTYPED_INTEGER);
 	switch(type->primitive.size)
@@ -254,7 +371,7 @@ push_any(u8 **buffer, void *any, Type_Info *type)
 }
 
 inline void
-prefix64(u8 **buffer)
+prefix64(Code_Buffer *buffer)
 {
 	push_byte(buffer, 0x48);
 }
@@ -266,7 +383,7 @@ encode_postfix(MOD mod, u8 rm1, u8 rm2)
 }
 
 void
-push_displacement(MOD mod, i32 displacement, u8 **buffer)
+push_displacement(MOD mod, i32 displacement, Code_Buffer *buffer)
 {
 	if(mod & MOD_displacement_i8)
 		push_i8(buffer, displacement);
@@ -275,7 +392,7 @@ push_displacement(MOD mod, i32 displacement, u8 **buffer)
 }
 
 inline void
-push_generic_mov(MOD mod, u8 mov_opcode, i32 left_rm, i32 right_rm, i32 displacement, u8 **buffer)
+push_generic_mov(MOD mod, u8 mov_opcode, i32 left_rm, i32 right_rm, i32 displacement, Code_Buffer *buffer)
 {
 	push_byte(buffer, mov_opcode);
 	u8 mod_reg_rm;
@@ -311,7 +428,7 @@ is_standard_type(Type_Info *type)
 }
 
 u8
-get_rm_r_mov(u8 **buffer, Type_Info *type)
+get_rm_r_mov(Code_Buffer *buffer, Type_Info *type)
 {
 	u8 mov_opcode;
 	if(is_standard_type(type))
@@ -375,7 +492,7 @@ fix_registers(Register &left, Register &right)
 }
 
 void
-prefix_type(u8 **buffer, Type_Info *type, u8 current_prefix)
+prefix_type(Code_Buffer *buffer, Type_Info *type, u8 current_prefix)
 {
 	if(is_standard_type(type))
 	{
@@ -410,7 +527,7 @@ prefix_type(u8 **buffer, Type_Info *type, u8 current_prefix)
 }
 
 u8
-get_r_i_mov(u8 **buffer, Type_Info *type)
+get_r_i_mov(Code_Buffer *buffer, Type_Info *type)
 {
 	u8 mov_opcode;
 	if(type->type == T_INTEGER)
@@ -446,7 +563,7 @@ get_r_i_mov(u8 **buffer, Type_Info *type)
 }
 
 u8
-get_r_rm_mov(u8 **buffer, Type_Info *type)
+get_r_rm_mov(Code_Buffer *buffer, Type_Info *type)
 {
 	u8 mov_opcode;
 	if(is_standard_type(type))
@@ -483,7 +600,7 @@ get_r_rm_mov(u8 **buffer, Type_Info *type)
 }
 
 void
-push_compare_valuei8(u8 **buffer, Bytecode *bc, Register reg, u8 value)
+push_compare_valuei8(Code_Buffer *buffer, Bytecode *bc, Register reg, u8 value)
 {
 	push_byte(buffer, 0x80);
 	u8 postfix = encode_postfix(MOD_register, 7, reg);
@@ -492,7 +609,7 @@ push_compare_valuei8(u8 **buffer, Bytecode *bc, Register reg, u8 value)
 }
 
 void
-push_compare(u8 **buffer, Bytecode *bc, Register left, Register right)
+push_compare(Code_Buffer *buffer, Bytecode *bc, Register left, Register right)
 {
 	u8 opcode;
 	prefix_type(buffer, bc->type, fix_registers(left, right));
@@ -511,7 +628,7 @@ push_compare(u8 **buffer, Bytecode *bc, Register left, Register right)
 }
 
 inline void
-encode_int_op(u8 opcode, Bytecode *bc, u8 **buffer, IR *ir)
+encode_int_op(u8 opcode, Bytecode *bc, Code_Buffer *buffer, IR *ir)
 {
 	u8 prefix = 0;
 	if(bc->type->primitive.size == ubyte8 || bc->type->primitive.size == byte8)
@@ -568,7 +685,7 @@ float_fix_registers(Register &left, Register &right)
 }
 
 void
-prefix_float_op(u8 **buffer, Type_Info *type)
+prefix_float_op(Code_Buffer *buffer, Type_Info *type)
 {
 	if(type->primitive.size == real32)
 	{
@@ -583,7 +700,13 @@ prefix_float_op(u8 **buffer, Type_Info *type)
 }
 
 void
-move_float_to_register(u8 **buffer, Register reg, u64 value, Type_Info *type, Relocation **relocs)
+push_relocation(Relocation reloc, Relative_Relocation_Array *reloc_array, int buffer_index)
+{
+	reloc_array->relocs[reloc_array->count++] = { reloc, buffer_index };
+}
+
+void
+move_float_to_register(Code_Buffer *buffer, Register reg, u64 value, Type_Info *type, Relative_Relocation_Array *relocs, int buffer_index)
 {
 	Assert(is_float(*type));
 	prefix_float_op(buffer, type);
@@ -600,13 +723,13 @@ move_float_to_register(u8 **buffer, Register reg, u64 value, Type_Info *type, Re
 	Relocation relocation = {};
 	relocation.type = IMAGE_REL_AMD64_REL32;
 	relocation.symbol_index = push_float(value, type->primitive.size);
-	relocation.offset = SDCount(*buffer);
-	SDPush(*relocs, relocation);
+	relocation.offset = buffer->count;
+	push_relocation(relocation, relocs, buffer_index);
 	push_i32(buffer, 0);
 }
 
 void 
-move_value_to_register(Register reg, u64 value, Type_Info *type, u8 **buffer)
+move_value_to_register(Register reg, u64 value, Type_Info *type, Code_Buffer *buffer)
 {
 	prefix_type(buffer, type, fix_register(reg));
 	u8 mov_opcode = get_r_i_mov(buffer, type);
@@ -616,13 +739,13 @@ move_value_to_register(Register reg, u64 value, Type_Info *type, u8 **buffer)
 }
 
 inline void
-set_2byte_opcode(u8 **buffer)
+set_2byte_opcode(Code_Buffer *buffer)
 {
 	push_byte(buffer, 0x0F);
 }
 
 void
-push_cmp_op(u8 **buffer, Bytecode *bc, u8 op)
+push_cmp_op(Code_Buffer *buffer, Bytecode *bc, u8 op)
 {
 	push_compare(buffer, bc, (Register)bc->left_idx, (Register)bc->right_idx);
 	set_2byte_opcode(buffer);
@@ -631,7 +754,7 @@ push_cmp_op(u8 **buffer, Bytecode *bc, u8 op)
 }
 
 void
-push_fcmp(u8 **buffer, Bytecode *bc, Register left, Register right)
+push_fcmp(Code_Buffer *buffer, Bytecode *bc, Register left, Register right)
 {
 	if(bc->type->primitive.size == real64)
 		push_byte(buffer, 0x66);
@@ -644,7 +767,7 @@ push_fcmp(u8 **buffer, Bytecode *bc, Register left, Register right)
 }
 
 void
-push_fcmp_op(u8 **buffer, Bytecode *bc, u8 op)
+push_fcmp_op(Code_Buffer *buffer, Bytecode *bc, u8 op)
 {
 	push_fcmp(buffer, bc, (Register)bc->left_idx, (Register)bc->right_idx);
 	set_2byte_opcode(buffer);
@@ -653,7 +776,7 @@ push_fcmp_op(u8 **buffer, Bytecode *bc, u8 op)
 }
 
 void
-store_float(u8 **buffer, Bytecode *bc, i32 displacement, MOD mod, Register reg)
+store_float(Code_Buffer *buffer, Bytecode *bc, i32 displacement, MOD mod, Register reg)
 {
 	reg = get_float_register_encoding(reg);
 	push_byte(buffer, 0xF3);
@@ -669,7 +792,7 @@ store_float(u8 **buffer, Bytecode *bc, i32 displacement, MOD mod, Register reg)
 }
 
 void
-float_move_reg_to_reg(u8 **buffer, Register left, Register right, Type_Info *type)
+float_move_reg_to_reg(Code_Buffer *buffer, Register left, Register right, Type_Info *type)
 {
 	prefix_float_op(buffer, type);
 	u8 prefix = float_fix_registers(left, right);
@@ -681,7 +804,7 @@ float_move_reg_to_reg(u8 **buffer, Register left, Register right, Type_Info *typ
 }
 
 void
-encode_float_op(u8 **buffer, Register left, Register right, Type_Info *type, u8 opcode)
+encode_float_op(Code_Buffer *buffer, Register left, Register right, Type_Info *type, u8 opcode)
 {
 	prefix_float_op(buffer, type);
 	u8 prefix = float_fix_registers(left, right);
@@ -692,11 +815,22 @@ encode_float_op(u8 **buffer, Register left, Register right, Type_Info *type, u8 
 	push_byte(buffer, encode_postfix(MOD_register, left, right));
 }
 
+void
+move_reg_to_reg(Code_Buffer *buffer, Register left, Register right, Type_Info *type)
+{
+
+	MOD mod = MOD_register;
+
+	prefix_type(buffer, type, fix_registers(left, right));
+
+	u8 mov_opcode = get_r_rm_mov(buffer, type);
+	push_generic_mov(mod, mov_opcode, left, right, 0, buffer);
+}
 
 #define F_OP(OPCODE) encode_float_op(buffer, (Register)bc.left_idx, (Register)bc.right_idx, bc.type, OPCODE);
 
 void
-x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation **relocs, Data_Segment *global_ds)
+x64_gen_from_bytecode(IR *ir, Bytecode bc, Code_Buffer *buffer, Relative_Relocation_Array *relocs, Data_Segment *global_ds, int buffer_index, Fixable_Array *fixable_array)
 {
 	switch(bc.op)
 	{
@@ -741,7 +875,7 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 		} break;
 		case BC_MOVE_FLOAT_TO_REG:
 		{
-			move_float_to_register(buffer, (Register)bc.result, bc.big_idx, bc.type, relocs);
+			move_float_to_register(buffer, (Register)bc.result, bc.big_idx, bc.type, relocs, buffer_index);
 		} break;
 		case BC_MOVE_VALUE_TO_REG:
 		{
@@ -755,10 +889,10 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 			Relocation relocation = {};
 			relocation.type = IMAGE_REL_AMD64_REL32;
 			relocation.symbol_index = bc.right_idx;
-			relocation.offset = SDCount(*buffer);
+			relocation.offset = buffer->count;
 			push_i32(buffer, 0);
 
-			SDPush(*relocs, relocation);
+			push_relocation(relocation, relocs, buffer_index);
 		} break;
 		case BC_LOAD_DATA_SEG:
 		case BC_LOAD_STACK:
@@ -791,14 +925,10 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 			{
 				if(bc.left_idx == bc.right_idx)
 					break;
-				MOD mod = MOD_register;
 
 				Register left = (Register)bc.left_idx;
 				Register right = (Register)bc.right_idx;
-				prefix_type(buffer, bc.type, fix_registers(left, right));
-
-				u8 mov_opcode = get_r_rm_mov(buffer, bc.type);
-				push_generic_mov(mod, mov_opcode, left, right, 0, buffer);
+				move_reg_to_reg(buffer, left, right, bc.type);
 			}
 		} break;
 		case BC_PUSH_REG:
@@ -811,8 +941,21 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 		} break;
 		case BC_RETURN:
 		{
+
+			// We add back the rsp
+			// that we have subtracted
+			Register operand = reg_sp;
+			prefix_type(buffer, x64_type_64, fix_register(operand));
+			u8 opcode = 0x81;
+			push_byte(buffer, opcode);
+
+			// /0 instruction
+			push_byte(buffer, encode_postfix(MOD_register, 0, operand));
+			push_i32(buffer, ir->stack_top);
+
 			if(bc.left_idx == -1)
 			{
+
 				// POP rbp
 				push_byte(buffer, 0x58 + reg_bp);
 				// RET
@@ -954,10 +1097,10 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 			Relocation relocation = {};
 			relocation.type = IMAGE_REL_AMD64_REL32;
 			relocation.symbol_index = get_and_maybe_push_string((u8 *)bc.big_idx);
-			relocation.offset = SDCount(*buffer);
+			relocation.offset = buffer->count;
 			push_i32(buffer, 0);
 
-			SDPush(*relocs, relocation);
+			push_relocation(relocation, relocs, buffer_index);
 		} break;
 		case BC_OFFSET_POINTER:
 		{
@@ -1007,69 +1150,77 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 		case BC_JUMP:
 		{
 			push_byte(buffer, 0xe9);
-			Fix_Addresses fix_task = {SDCount(*buffer), (IR_Block *)bc.big_idx}; 
+			Fixable fixable;
+			fixable.buffer_index = buffer_index;
+			fixable.type = FIX_JMP_TO_BLOCK;
+			fixable.offset = buffer->count;
+			fixable.block = (IR_Block *)bc.big_idx;
+			fixable_array->fixables[fixable_array->count++] = fixable;
 			push_i32(buffer, 0);
-			SDPush(to_fix, fix_task);
 		} break;
 		case BC_COND_JUMP:
 		{
 			push_compare_valuei8(buffer, &bc, (Register)bc.result, 0);
 			set_2byte_opcode(buffer);
 			push_byte(buffer, 0x85); // jne
-			Fix_Addresses fix_task = {SDCount(*buffer), (IR_Block *)bc.big_idx}; 
+			Fixable fixable;
+			fixable.buffer_index = buffer_index;
+			fixable.type = FIX_JMP_TO_BLOCK;
+			fixable.offset = buffer->count;
+			fixable.block = (IR_Block *)bc.big_idx;
+			fixable_array->fixables[fixable_array->count++] = fixable;
 			push_i32(buffer, 0);
-			SDPush(to_fix, fix_task);
 		} break;
 		case BC_CMP_LOGICAL_AND:
 		{
 			// compare left
 			push_compare_valuei8(buffer, &bc, (Register)bc.left_idx, 0);
 			push_byte(buffer, 0x75); // jne
-			i32 true_insert = SDCount(*buffer);
+			i32 true_insert = buffer->count;
 			push_byte(buffer, 0); // insert zero and replace it later
 			// jumps to the second condition if left_idx is not 0
 			// otherwise it falls down to false
 
 			// when result is false
-			i32 false_position = SDCount(*buffer);
+			i32 false_position = buffer->count;
 			move_value_to_register((Register)bc.result, 0, bool_type, buffer);
 			// jump to the end
 			push_byte(buffer, 0xEB); // jmp
-			i32 insert_end_false = SDCount(*buffer); // jump to the end is put here after everything
+			i32 insert_end_false = buffer->count; // jump to the end is put here after everything
 			push_byte(buffer, 0);
 
 			// when result is true
-			i32 true_position = SDCount(*buffer);
+			i32 true_position = buffer->count;
 			move_value_to_register((Register)bc.result, 1, bool_type, buffer);
 			// jump to the end
 			push_byte(buffer, 0xEB); // jmp
-			i32 insert_end_true = SDCount(*buffer); // jump to the end is put here after everything
+			i32 insert_end_true = buffer->count; // jump to the end is put here after everything
 			push_byte(buffer, 0);
 
-			(*buffer)[true_insert] = calculate_jump_offset(true_insert, SDCount(buffer));
+			buffer->buffer[true_insert] = calculate_jump_offset(true_insert, buffer->count);
 			push_compare_valuei8(buffer, &bc, (Register)bc.right_idx, 0);
 			push_byte(buffer, 0x75); // jne
-			push_byte(buffer, calculate_jump_offset(SDCount(buffer), true_position));
+			push_byte(buffer, calculate_jump_offset(buffer->count, true_position));
 			push_byte(buffer, 0xEB); // jmp
-			push_byte(buffer, calculate_jump_offset(SDCount(buffer), false_position));
+			push_byte(buffer, calculate_jump_offset(buffer->count, false_position));
 
 			// END
-			(*buffer)[insert_end_false] = calculate_jump_offset(insert_end_false, SDCount(*buffer) - 1);
-			(*buffer)[insert_end_true]  = calculate_jump_offset(insert_end_true,  SDCount(*buffer) - 1);
+			buffer->buffer[insert_end_false] = calculate_jump_offset(insert_end_false, buffer->count - 1);
+			buffer->buffer[insert_end_true]  = calculate_jump_offset(insert_end_true,  buffer->count - 1);
 		} break;
 		case BC_CMP_LOGICAL_OR:
 		{
 			// compare left
 			push_compare_valuei8(buffer, &bc, (Register)bc.left_idx, 0);
 			push_byte(buffer, 0x75); // jne
-			i32 true_insert = SDCount(*buffer);
+			i32 true_insert = buffer->count;
 			push_byte(buffer, 0); // insert zero and replace it later
 			// jumps to true if left_idx is not 0
 			// otherwise it falls down to the second condition
 
 			push_compare_valuei8(buffer, &bc, (Register)bc.right_idx, 0);
 			push_byte(buffer, 0x75); // jne
-			i32 true_insert_right = SDCount(*buffer);
+			i32 true_insert_right = buffer->count;
 			push_byte(buffer, 0);
 			// same as above except it falls down to false
 
@@ -1077,16 +1228,16 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 			move_value_to_register((Register)bc.result, 0, bool_type, buffer);
 			// jump to the end
 			push_byte(buffer, 0xEB); // jmp
-			i32 insert_end_false = SDCount(*buffer); // jump to the end is put here after everything
+			i32 insert_end_false = buffer->count; // jump to the end is put here after everything
 			push_byte(buffer, 0);
 
 			// when result is true
-			(*buffer)[true_insert] = calculate_jump_offset(true_insert, SDCount(buffer));
-			(*buffer)[true_insert_right] = calculate_jump_offset(true_insert, SDCount(buffer));
+			buffer->buffer[true_insert] = calculate_jump_offset(true_insert, buffer->count);
+			buffer->buffer[true_insert_right] = calculate_jump_offset(true_insert, buffer->count);
 			move_value_to_register((Register)bc.result, 1, bool_type, buffer);
 
 			// END
-			(*buffer)[insert_end_false] = calculate_jump_offset(insert_end_false, SDCount(*buffer) - 1);
+			buffer->buffer[insert_end_false] = calculate_jump_offset(insert_end_false, buffer->count - 1);
 		} break;
 		case BC_CMP_I_EQ:
 		{
@@ -1204,11 +1355,190 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, u8 **buffer, i32 offset, Relocation *
 				float the_val = -1.0;
 				relocation.symbol_index = push_float(*(u32 *)&the_val, bc.type->primitive.size);
 			}
-			relocation.offset = SDCount(*buffer);
-			SDPush(*relocs, relocation);
+			relocation.offset = buffer->count;
+			push_relocation(relocation, relocs, buffer_index);
 			push_i32(buffer, 0);
 		} break;
+		// In the right register
+		// we store the offset between
+		// to type and from type
+		// because we can't store a whole
+		// pointer in it and we don't have
+		// anywhere else to put it
+		// the type field holds the destination type
+		// right = src_ty - dst_ty
+		// right + dst_ty = src_ty
+		case BC_CAST_ZEXT:
+		{
+			Type_Info *src_type = (Type_Info *)((u8 *)bc.type + bc.right_idx);
+			Type_Info *dst_type = bc.type;
+			Register left = (Register)bc.left_idx;
+			Register result = (Register)bc.result;
+			move_reg_to_reg(buffer, left, left, src_type);
+			move_reg_to_reg(buffer, result, left, dst_type);
+		} break;
+		case BC_CAST_SEXT:
+		{
+			Type_Info *src_type = (Type_Info *)((u8 *)bc.type + bc.right_idx);
+			Type_Info *dst_type = bc.type;
+			Register left = (Register)bc.left_idx;
+			Register result = (Register)bc.result;
+			auto src_size = get_type_size(*src_type);
+			prefix_type(buffer, dst_type, fix_registers(left, result));
+			if(src_size == 1 || src_size == 2)
+			{
+				set_2byte_opcode(buffer);
+				push_byte(buffer, 0xBE);
+			}
+			else
+			{
+				push_byte(buffer, 0x63);
+			}
+			push_byte(buffer, encode_postfix(MOD_register, result, left));
+		} break;
+		case BC_CAST_TRUNC:
+		{
+			Register left = (Register)bc.left_idx;
+			Register result = (Register)bc.result;
+			move_reg_to_reg(buffer, result, left, bc.type);
+		} break;
+		case BC_CAST_D_TO_I:
+		case BC_CAST_F_TO_I:
+		{
+			Register left = (Register)bc.left_idx;
+			Register right = (Register)bc.result;
+			// @NOTE: we assume it's not using anything above xmm7
+			Assert(left  < reg_xmm8);
+			Assert(right < reg_xmm8);
+			left  = get_float_register_encoding(left);
+			right = get_float_register_encoding(right);
 
+			auto result_size = get_type_size(*bc.type);
+			Type_Info *src_type = (Type_Info *)((u8 *)bc.type + bc.right_idx);
+			if(is_signed(*bc.type) || result_size < 8)
+			{
+				// convert to signed (we don't need unsigned specific stuff)
+				prefix_float_op(buffer, src_type);
+				set_2byte_opcode(buffer);
+				push_byte(buffer, 0x2C);
+				push_byte(buffer, encode_postfix(MOD_register, right, left));
+			}
+			else
+			{
+				// compare the float to some value to see
+				// if we can just use the convert to signed function
+				set_2byte_opcode(buffer);
+				push_byte(buffer, 0x2F);
+				push_byte(buffer, encode_postfix(MOD_displacement_0, left, 0b101));
+
+				// Relocate magic number here for comparison
+				Relocation relocation = {};
+				relocation.type = IMAGE_REL_AMD64_REL32;
+				if(bc.op == BC_CAST_F_TO_I)
+					relocation.symbol_index = push_float(0x5F000000, real32);
+				else
+					relocation.symbol_index = push_float(0x43e0000000000000, real64);
+				relocation.offset = buffer->count;
+				push_relocation(relocation, relocs, buffer_index);
+				push_i32(buffer, 0);
+
+				// jump if not bellow
+				push_byte(buffer, 0x73);
+				i32 insert_complicated_version = buffer->count;
+				push_byte(buffer, 0);
+
+				// convert to signed (we don't need unsigned specific stuff)
+				prefix_float_op(buffer, src_type);
+				set_2byte_opcode(buffer);
+				push_byte(buffer, 0x2C);
+				push_byte(buffer, encode_postfix(MOD_register, right, left));
+				push_byte(buffer, 0xEB);
+				i32 insert_end = buffer->count;
+				push_byte(buffer, 0);
+
+				buffer->buffer[insert_complicated_version] = calculate_jump_offset(insert_complicated_version, buffer->count);
+				// Otherwise we subtract the magic number
+				prefix_float_op(buffer, src_type);
+				set_2byte_opcode(buffer);
+				push_byte(buffer, 0x5C);
+				encode_postfix(MOD_displacement_0, left, 0b101);
+				// Different relocation but has the same params
+				// so we reuse the variable
+				relocation.offset = buffer->count;
+				push_relocation(relocation, relocs, buffer_index);
+				push_i32(buffer, 0);
+				// convert to signed
+				prefix_float_op(buffer, src_type);
+				set_2byte_opcode(buffer);
+				push_byte(buffer, 0x2C);
+				push_byte(buffer, encode_postfix(MOD_register, right, left));
+
+				// Flip the signed bit with XOR
+				prefix_type(buffer, bc.type, fix_register(right));
+				push_byte(buffer, 0x33);
+				push_byte(buffer, encode_postfix(MOD_displacement_0, right, 0b101));
+				Relocation int_bit_flip_reloc = {};
+				int_bit_flip_reloc.type = IMAGE_REL_AMD64_REL32;
+				int_bit_flip_reloc.symbol_index = push_int(0x8000000000000000, byte8);
+				int_bit_flip_reloc.offset = buffer->count;
+				push_relocation(int_bit_flip_reloc, relocs, buffer_index);
+				push_i32(buffer, 0);
+
+				buffer->buffer[insert_end] = calculate_jump_offset(insert_end, buffer->count);
+			}
+		} break;
+		case BC_CAST_F_TRUNC:
+		{
+			Register src = (Register)bc.left_idx;
+			Register dst = (Register)bc.result;
+			Register dst_copy = dst;
+			// clear the destination
+			push_byte(buffer, 0x66);
+			u8 prefix = float_fix_register(dst);
+			if(prefix != 0)
+				push_byte(buffer, prefix);
+			dst = get_float_register_encoding(dst);
+			set_2byte_opcode(buffer);
+			// XOR
+			push_byte(buffer, 0xEF);
+			push_byte(buffer, encode_postfix(MOD_register, dst, dst));
+			// convert
+			push_byte(buffer, 0xF2);
+			prefix = float_fix_registers(dst_copy, src);
+			if(prefix != 0)
+				push_byte(buffer, prefix);
+			src = get_float_register_encoding(src);
+			set_2byte_opcode(buffer);
+			push_byte(buffer, 0x5A);
+			push_byte(buffer, encode_postfix(MOD_register, dst, src));
+		} break;
+		case BC_CAST_F_EXT:
+		{
+			// Same as f trunc except for the convert prefix
+			// is this bad?
+			Register src = (Register)bc.left_idx;
+			Register dst = (Register)bc.result;
+			Register dst_copy = dst;
+			// clear the destination
+			push_byte(buffer, 0x66);
+			u8 prefix = float_fix_register(dst);
+			if(prefix != 0)
+				push_byte(buffer, prefix);
+			dst = get_float_register_encoding(dst);
+			set_2byte_opcode(buffer);
+			// XOR
+			push_byte(buffer, 0xEF);
+			push_byte(buffer, encode_postfix(MOD_register, dst, dst));
+			// convert
+			push_byte(buffer, 0xF3);
+			prefix = float_fix_registers(dst_copy, src);
+			if(prefix != 0)
+				push_byte(buffer, prefix);
+			src = get_float_register_encoding(src);
+			set_2byte_opcode(buffer);
+			push_byte(buffer, 0x5A);
+			push_byte(buffer, encode_postfix(MOD_register, dst, src));
+		} break;
 		case BC_NO_OP:
 		{}break;
 		default:

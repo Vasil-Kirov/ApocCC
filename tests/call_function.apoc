@@ -1,0 +1,9 @@
+// 256
+
+
+fn main() -> i32 {
+	-> give_number();
+}
+
+fn give_number() -> i32 { -> 256; }
+

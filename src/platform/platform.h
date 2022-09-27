@@ -15,9 +15,9 @@ typedef struct _platform_config
 	const char *Name;
 } Platform_Config;
 
-// TODO(Vasko): Implement threading
 typedef void *Platform_Thread;
 typedef void *Platform_State;
+typedef void *Platform_Object;
 
 typedef struct _file_info
 {
@@ -34,15 +34,41 @@ typedef struct _Quad
 	u16 Height;
 } Quad;
 
+#if defined(_WIN32)
+#define platform_interlocked_increment(num) _InterlockedIncrement(num)
+#define platform_interlocked_decrement(num) _InterlockedDecrement(num)
+#define platform_write_barrirer _WriteBarrier(); _mm_sfence()
+#else
+#error DEFINE INTERLOCKED INCREMENT
+#endif
+
 // Function should take 1 argument of type void pointer
 Platform_Thread
 platform_create_thread(void *Func, void *Args);
 
+void
+platform_join_threads(u32 count, Platform_Thread *threads);
+
+void
+platform_alert_semaphore(Platform_Object semaphore);
+
 void *
 platform_allocate_executable_memory(u64 size);
 
+Platform_Object
+platform_create_mutex();
+
 void
-platform_wait_for_thread(Platform_Thread Thread);
+platform_lock_mutex(Platform_Object mutex);
+
+void
+platform_unlock_mutex(Platform_Object mutex);
+
+void
+platform_wait_for_object(Platform_Object object);
+
+Platform_Object
+platform_create_semaphore(int InitialCount, int ThreadCount);
 
 b32
 platform_is_thread_over(Platform_Thread Thread);

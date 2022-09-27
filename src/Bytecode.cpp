@@ -529,11 +529,15 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 		{
 			result = allocate_register(ir);
 			b32 derefrence_pointer = true;
+			Type_Info *struct_type = &expr->selector.operand_type;
 			if(expr->selector.operand_type.type != T_POINTER) {
 				derefrence_pointer = false;
 			}
+			else {
+				struct_type = struct_type->pointer.type;
+			}
 			i32 struct_start = expression_to_bc(expr->selector.operand, block, ir, !derefrence_pointer);
-			i64 offset = struct_get_offset_to_element_in_bytes(&expr->selector.operand_type, expr->selector.selected_index);
+			i64 offset = struct_get_offset_to_element_in_bytes(struct_type, expr->selector.selected_index);
 			i32 offset_register = allocate_register(ir);
 
 			// put the offset into a register
@@ -632,11 +636,10 @@ unary_expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 	}
 	else if(expr->type == type_cast)
 	{
-		Assert(false);
-#if 0
 		i32 to_cast = expression_to_bc(expr->cast.expression, block, ir, get_pointer);
-		result = do_cast(to_cast, &expr->cast.expr_type, &expr->cast.type, ir);
-#endif
+		result = do_cast(to_cast, &expr->cast.expr_type, &expr->cast.type, ir, block);
+		if(result == -1)
+			result = to_cast;
 	}
 	else
 		result = atom_expr_to_bc(expr, block, ir, get_pointer);
@@ -936,49 +939,57 @@ allocate_stack_space(IR *ir, size_t size)
 }
 
 i32
-store_expression(Ast_Node *node, IR *ir, IR_Block *block, Type_Info *type, b32 should_align, b32 is_removable)
+store_expression(Ast_Node *node, IR *ir, IR_Block *block, Type_Info *expr_type, Type_Info *store_type, b32 should_align, b32 is_removable)
 {
 	if(should_align) {
-		i32 alignment = get_type_alignment(*type);
+		i32 alignment = get_type_alignment(*store_type);
 		padd_to_alignment(alignment, ir);
 	}
 
 	if(node->type == type_struct_init)
 	{
-		Assert(type->type == T_STRUCT);
+		Assert(store_type->type == T_STRUCT);
 
 		auto expressions = node->struct_init.expressions;
-		auto types = node->struct_init.type.structure.member_types;
+		auto member_types = node->struct_init.type.structure.member_types;
+		auto expr_types = node->struct_init.expr_types;
 		size_t count = SDCount(expressions);
 		// Store them in reverse because we use a negative offset
 		// on the stack, so we store -3, -2, -1, instead of -1, -2, -3
 		// so it's correctly continuous in memory
 		for(i64 i = count - 1; i >= 0; --i) {
-			store_expression(expressions[i], ir, block, &types[i], !type->structure.is_packed, false);
+			store_expression(expressions[i], ir, block, &expr_types[i], &member_types[i], !store_type->structure.is_packed, false);
 		}
 		return SDCount(ir->allocated) - 1;
 	}
 	else if(node->type == type_array_list)
 	{
+		Assert(store_type->type == T_ARRAY);
+
 		auto expressions = node->array_list.list;
-		auto type = &node->array_list.type;
+		auto expr_types = node->array_list.expr_types;
 		size_t count = SDCount(expressions);
 		// Store them in reverse because we use a negative offset
 		// on the stack, so we store -3, -2, -1, instead of -1, -2, -3
 		// so it's correctly continuous in memory
 		for(i64 i = count - 1; i >= 0; --i) {
-			store_expression(expressions[i], ir, block, type->array.type, false, false);
+			store_expression(expressions[i], ir, block, &expr_types[i], store_type->array.type, false, false);
 		}
 		return SDCount(ir->allocated) - 1;
 	}
 	else
 	{
-		Assert(type->type != T_ARRAY && type->type != T_STRUCT);
+		Assert(expr_type->type != T_ARRAY && expr_type->type != T_STRUCT);
 
 		i32 expr_register = expression_to_bc(node, block, ir, false);
-		i32 idx = allocate_stack_space(ir, get_type_size(*type));
-		ir->allocated[idx].virtual_register = expr_register;
-		do_store_instruction(idx, expr_register, expr_register, block, type, is_removable);
+		i32 casted = do_cast(expr_register, expr_type, store_type, ir, block);
+		if(casted == -1)
+			casted = expr_register;
+
+		i32 idx = allocate_stack_space(ir, get_type_size(*store_type));
+		ir->allocated[idx].virtual_register = casted;
+		do_store_instruction(idx, casted, casted, block, store_type, is_removable);
+
 		return idx;
 	}
 }
@@ -987,7 +998,7 @@ void
 assign_to_bc(Ast_Node *node, IR_Block *block, IR *ir)
 {
 	if(node->assignment.is_declaration) {
-		i32 result = store_expression(node->assignment.rhs, ir, block, &node->assignment.decl_type, true, true);
+		i32 result = store_expression(node->assignment.rhs, ir, block, &node->assignment.rhs_type, &node->assignment.decl_type, true, true);
 		shput(ir->lookup, node->assignment.token.identifier, result);
 	}
 	else {
@@ -1111,7 +1122,7 @@ ast_to_bc_function(Ast_Node **list, Ast_Node *function)
 	result.allocated = SDCreate(Data_Segment);
 	result.reg_count = reg_invalid + 1; // starting from here so we know that
 					    // anything under is a physical register instead of a virtual one
-	result.apoc_ptr_ret = -1;
+	result.bc_count = 0;
 	result.stack_top = 16;
 	shdefault(result.lookup, -1);
 
@@ -1260,9 +1271,8 @@ ast_to_bc_func_level(Ast_Node *node, IR_Block *current_block, Ast_Node **list, i
 	return result;
 }
 
-#if 0
 i32
-do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir)
+do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir, IR_Block *block)
 {
 	if(from->type == T_UNTYPED_INTEGER)
 	{
@@ -1276,9 +1286,21 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir)
 		from->primitive.size = real64;
 		from->identifier = (u8 *)"f64";
 	}
+	if(to->type == T_UNTYPED_INTEGER)
+	{
+		to->type = T_INTEGER;
+		to->primitive.size = byte8;
+		to->identifier = (u8 *)"i64";
+	}
+	else if(to->type == T_UNTYPED_FLOAT)
+	{
+		to->type = T_FLOAT;
+		to->primitive.size = real64;
+		to->identifier = (u8 *)"f64";
+	}
 	Type_Type from_type = from->type;
 	Type_Type to_type = to->type;
-	Bytecode bc;
+	BC_OP op;
 	switch(from_type)
 	{
 		case T_INTEGER:
@@ -1293,39 +1315,50 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir)
 						{
 							if(from->primitive.size < to->primitive.size)
 							{
-								bc.op = BC_CAST_SEXT;
+								op = BC_CAST_SEXT;
 							}
 							else if(from->primitive.size > to->primitive.size)
 							{
-								bc.op = BC_CAST_TRUNC;
+								op = BC_CAST_TRUNC;
 							}
 							else
 							{
-								bc.op = BC_NO_OP;
+								op = BC_NO_OP;
 							}
 						}
 						else
 						{
 							if(from->primitive.size < to->primitive.size)
 							{
-								bc.op = BC_CAST_SEXT;
+								op = BC_CAST_SEXT;
 							}
 							else if(from->primitive.size > to->primitive.size)
 							{
-								bc.op = BC_CAST_TRUNC;
+								op = BC_CAST_TRUNC;
 							}
 							else
 							{
-								bc.op = BC_NO_OP;
+								op = BC_NO_OP;
 							}
 						}
 					} break;
 					case T_FLOAT:
 					{
 						if(to->primitive.size == real64)
-							bc.op = BC_CAST_I_TO_D;
+							op = BC_CAST_I_TO_D;
 						else
-							bc.op = BC_CAST_I_TO_F;
+							op = BC_CAST_I_TO_F;
+					} break;
+					case T_POINTER:
+					{
+						op = BC_NO_OP;
+					} break;
+					case T_BOOLEAN:
+					{
+						if(from->primitive.size == byte1 || from->primitive.size == ubyte1)
+							op = BC_NO_OP;
+						else
+							op = BC_CAST_TRUNC;
 					} break;
 					default:
 					{
@@ -1335,6 +1368,7 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir)
 			}
 			else
 			{
+				// Unsgiend to x
 				switch(to_type)
 				{
 					case T_INTEGER:
@@ -1343,43 +1377,50 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir)
 						{
 							if(from->primitive.size < to->primitive.size)
 							{
-								bc.op = BC_CAST_ZEXT;
+								op = BC_CAST_ZEXT;
 							}
 							else if(from->primitive.size > to->primitive.size)
 							{
-								bc.op = BC_CAST_TRUNC;
+								op = BC_CAST_TRUNC;
 							}
 							else
 							{
-								bc.op = BC_NO_OP;
+								op = BC_NO_OP;
 							}
 						}
 						else
 						{
 							if(from->primitive.size < to->primitive.size)
 							{
-								bc.op = BC_CAST_SEXT;
+								op = BC_CAST_ZEXT;
 							}
 							else if(from->primitive.size > to->primitive.size)
 							{
-								bc.op = BC_CAST_TRUNC;
+								op = BC_CAST_TRUNC;
 							}
 							else
 							{
-								bc.op = BC_NO_OP;
+								op = BC_NO_OP;
 							}
 						}
 					} break;
 					case T_FLOAT:
 					{
 						if(to->primitive.size == real64)
-							bc.op = BC_CAST_U_TO_D;
+							op = BC_CAST_U_TO_D;
 						else
-							bc.op = BC_CAST_U_TO_F;
+							op = BC_CAST_U_TO_F;
 					} break;
 					case T_POINTER:
 					{
-						bc.op = BC_NO_OP;
+						op = BC_NO_OP;
+					} break;
+					case T_BOOLEAN:
+					{
+						if(from->primitive.size == byte1 || from->primitive.size == ubyte1)
+							op = BC_NO_OP;
+						else
+							op = BC_CAST_TRUNC;
 					} break;
 					default:
 					{
@@ -1395,41 +1436,84 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir)
 				case T_INTEGER:
 				{
 					if(from->primitive.size == real32)
-						bc.op = BC_CAST_F_TO_I;
+						op = BC_CAST_F_TO_I;
 					else
-						bc.op = BC_CAST_D_TO_I;
+						op = BC_CAST_D_TO_I;
 				} break;
 				case T_FLOAT:
 				{
 					if(from->primitive.size < to->primitive.size)
-						bc.op = BC_CAST_F_EXT;
+						op = BC_CAST_F_EXT;
 					else if(from->primitive.size > to->primitive.size)
-						bc.op = BC_CAST_F_TRUNC;
+						op = BC_CAST_F_TRUNC;
 					else
-						bc.op = BC_NO_OP;
+						op = BC_NO_OP;
 				} break;
 			}
 		} break;
 		case T_BOOLEAN:
 		{
-			Assert(false);
+			switch (to_type)
+			{
+				case T_INTEGER:
+				{
+					if(is_signed(*to))
+					{
+						if(to->primitive.size == byte1 || to->primitive.size == ubyte1)
+							op = BC_NO_OP;
+						else
+							op = BC_CAST_SEXT;
+					}
+					else
+					{
+						if(to->primitive.size == byte1 || to->primitive.size == ubyte1)
+							op = BC_NO_OP;
+						else
+							op = BC_CAST_ZEXT;
+					}
+				} break;
+				case T_FLOAT:
+				{
+					if(to->primitive.size == real64)
+						op = BC_CAST_D_TO_I;
+					else
+						op = BC_CAST_F_TO_I;
+				} break;
+				case T_BOOLEAN:
+				{
+					op = BC_NO_OP;
+				} break;
+				default:
+				{
+					Assert(false);
+				} break;
+			}
 		} break;
 		case T_POINTER:
 		{
-			Assert(false);
+			switch(to_type)
+			{
+				case T_POINTER:
+				{
+					op = BC_NO_OP;
+				} break;
+				default:
+				{
+					Assert(false);
+				} break;
+			}
 		} break;
 		default:
 		{
 			Assert(false);
 		} break;
 	}
-	bc.left_idx = get_type_size(*to);
-	bc.right_idx= source;
-	bc.result = allocate_register(ir);
-	SDPush(ir->bc, bc);
-	return bc.result;
+	if(op == BC_NO_OP)
+		return -1;
+	i32 result = allocate_register(ir);
+	instruction(source, (u32)((u8 *)from - (u8 *)to), result, op, block, to); 
+	return result;
 }
-#endif
 
 inline b32
 op_has_left_idx(BC_OP op)
@@ -1442,7 +1526,7 @@ op_has_left_idx(BC_OP op)
 inline b32
 op_has_right_idx(BC_OP op)
 {
-	if(op == BC_LOAD_STACK || op == BC_LOAD_DATA_SEG || op == BC_MOVE_FUNCTION_TO_REG)
+	if(op == BC_LOAD_STACK || op == BC_LOAD_DATA_SEG || op == BC_MOVE_FUNCTION_TO_REG || (op >= BC_CAST_SEXT && op <= BC_CAST_F_EXT))
 		return false;
 	return true;
 }
@@ -1552,6 +1636,11 @@ do_register_allocation(IR *ir, IR_Block *block, Virtual_Register_Tracker *v_regs
 			if(bc.left_idx != -1 && op_has_left_idx(bc.op) && bc.left_idx > reg_invalid)
 			{
 				bc.left_idx = free_up_register_for(bc.left_idx, v_regs, phy_regs, ir, new_bc, &new_count, bc.type);
+				if(bc.op == BC_CAST_ZEXT)
+				{
+					free_virtual_register(phy_regs[bc.left_idx].current_virtual_register, v_regs,
+							phy_regs, ir, new_bc, &new_count);
+				}
 			}
 			if(bc.right_idx != -1 && op_has_right_idx(bc.op) && bc.right_idx > reg_invalid)
 			{
@@ -1639,12 +1728,6 @@ do_register_allocation(IR *ir, IR_Block *block, Virtual_Register_Tracker *v_regs
 			bc_sub.result = reg_sp;
 			bc_sub.type = type_64;
 			
-			Bytecode bc_add;
-			bc_add.op = BC_ADD_VALUE;
-			bc_add.big_idx = to_sub;
-			bc_add.result = reg_sp;
-			bc_add.type = type_64;
-
 
 			// we skip the first 2 instructions
 			// since they are the stack pushing
@@ -1654,15 +1737,12 @@ do_register_allocation(IR *ir, IR_Block *block, Virtual_Register_Tracker *v_regs
 			memmove(move_dst, move_src, (new_count - 2) * sizeof(Bytecode));
 			new_bc[2] = bc_sub;
 			new_count += 1;
-
-			Bytecode ret = new_bc[new_count - 1];
-			new_bc[new_count - 1] = bc_add;
-			new_bc[new_count++] = ret;
-
+			ir->stack_top = to_sub;
 		}
 	}
 	block->bc = new_bc;
 	block->bc_count = new_count;
+	ir->bc_count += new_count;
 }
 
 void
@@ -1793,6 +1873,10 @@ print_bytecode(IR *ir, IR_Block *block)
 		Bytecode bc = block->bc[i];
 		switch(bc.op)
 		{
+			case BC_POP_OFFSET:
+			{
+				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t POP [%x]\n", register_to_name(bc.result), bc.big_idx);
+			} break;
 			case BC_ADD_VALUE:
 			{
 				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t ADD %d\n", register_to_name(bc.result), bc.big_idx);

@@ -1,0 +1,8 @@
+// 0xFFFFFFFF
+
+
+fn main() -> i32 {
+      signed_int :i32= -1;
+      unsigned_int := #u32 signed_int;
+      -> #i32 unsigned_int;
+}
