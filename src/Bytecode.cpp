@@ -249,13 +249,17 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 		ret_ptr = true;
 	}
 
+	auto expr_types = (Type_Info **)AllocateCompileMemory(sizeof(void *) * (expr_count + (is_apoc ? 1 : 0)));
 	i32 ret_address = -1;
 	if(is_apoc)
 	{
-		i32 context_ptr = bc_create_context(ir);
+		i32 context_idx = bc_create_context(ir);
 		Type_Info *ptr_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 		ptr_type->type = T_POINTER;
 		ptr_type->pointer.type = type_64;
+
+		i32 context_ptr = allocate_register(ir);
+		instruction(-1, context_idx, context_ptr, BC_LOAD_ADDRESS, block, ptr_type);
 		if(ret_ptr)
 		{
 
@@ -263,20 +267,24 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 			ret_address = allocate_register(ir);
 			ir->allocated[ret_idx].virtual_register = ret_address;
 			instruction(-1, ret_idx, ret_address, BC_LOAD_ADDRESS, block, ptr_type);
-			do_store_instruction(context_ptr, ret_address, ret_address, block, ptr_type, false);
+			do_store_instruction(context_idx, ret_address, ret_address, block, ptr_type, false);
 		}
 		
-		expressions[0] = ret_address;
+		expressions[0] = context_ptr;
+		expr_types[0] = ptr_type;
 		for(i64 i = 0; i < expr_count; ++i)
 		{
 			expressions[i + 1] = expression_to_bc(node->func_call.arguments[i], block, ir, false);
+			expr_types[i + 1] = &node->func_call.expr_types[i];
 		}
+		expr_count++;
 	}
 	else
 	{
 		for(i64 i = 0; i < expr_count; ++i)
 		{
 			expressions[i] = expression_to_bc(node->func_call.arguments[i], block, ir, false);
+			expr_types[i] = &node->func_call.expr_types[i];
 		}
 	}
 	i32 stack_offset = 16;
@@ -284,7 +292,7 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 	for(i64 i = 0; i < expr_count; ++i)
 	{
 		Register physical_register = reg_invalid;
-		Type_Info *type = &node->func_call.expr_types[i];
+		Type_Info *type = expr_types[i];
 		if(is_float(*type)) {
 			if(float_register_count != sizeof(float_register_order) / sizeof(Register)) {
 				physical_register = float_register_order[float_register_count++];
@@ -296,7 +304,8 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 			}
 		}
 		if(physical_register != reg_invalid) {
-			instruction(physical_register, expressions[i], physical_register, BC_MOVE_REG_TO_REG, block, type);
+			i32 dummy_register = allocate_register(ir);
+			instruction(physical_register, expressions[i], dummy_register, BC_MOVE_REG_TO_REG, block, type);
 		}
 		else {
 			instruction(stack_offset, expressions[i], -1, BC_PUSH_OFFSET, block, type);
@@ -304,18 +313,19 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 			ir->stack_top += 8;
 		}
 	}
-		instruction(func, reg_a, func, BC_MOVE_REG_TO_REG, block, &node->func_call.operand_type);
-		instruction(func, -1, reg_a, BC_CALL, block, node->func_call.operand_type.func.return_type);
+	i32 reg_a_func_register = allocate_register(ir);
+	instruction(reg_a, func, reg_a_func_register, BC_MOVE_REG_TO_REG, block, &node->func_call.operand_type);
+	instruction(reg_a_func_register, -1, reg_a, BC_CALL, block, node->func_call.operand_type.func.return_type);
 
-		if(ret_address != -1)
-		{
-			*node->func_call.operand_type.func.return_type = ret_type;
-			instruction(ret_address, -1, result, BC_DEREFRENCE, block, node->func_call.operand_type.func.return_type);
-		}
-		else
-		{
-			instruction(result, reg_a, result, BC_MOVE_REG_TO_REG, block, node->func_call.operand_type.func.return_type);
-		}
+	if(ret_address != -1)
+	{
+		*node->func_call.operand_type.func.return_type = ret_type;
+		instruction(ret_address, -1, result, BC_DEREFRENCE, block, node->func_call.operand_type.func.return_type);
+	}
+	else
+	{
+		instruction(result, reg_a, result, BC_MOVE_REG_TO_REG, block, node->func_call.operand_type.func.return_type);
+	}
 	return result;
 }
 
