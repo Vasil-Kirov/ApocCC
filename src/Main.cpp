@@ -127,6 +127,7 @@ TIMERS.STORE_KIND += timers.diff_track.count()
 
 int main(int argc, char *argv[])
 {
+
 	Timers timers = {};
 	timers.total_clock = std::chrono::high_resolution_clock::now();
 

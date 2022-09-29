@@ -100,6 +100,7 @@ typedef struct _Type_Info
 	b32 is_const;
 } Type_Info;
 
+
 Type_Info
 union_get_biggest_type(Type_Info type);
 
@@ -108,6 +109,9 @@ get_type_alignment(Type_Info type);
 
 int
 get_struct_alignment(Type_Info struct_type);
+
+b32
+is_standard_size(Type_Info *type);
 
 b32
 is_or_is_pointing_to(Type_Info type, Type_Type check);

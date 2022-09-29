@@ -6,7 +6,6 @@
 //const int IMAGE_REL_AMD64_ADDR64 = 0x0001;
 const int IMAGE_REL_AMD64_REL32  = 0x0004;
 
-static u8 *buffer_start;
 static Type_Info *x64_type_64;
 static Type_Info *bool_type;
 static Type_Info *x64_str_type;
@@ -156,6 +155,16 @@ push_float(u64 _float, Var_Size size)
 	return sym_count;
 }
 
+void
+push_intrinsic_function_symbols()
+{
+	Symbol_Descriptor memcpy_sym = {};
+	memcpy_sym.name = (u8 *)"memcpy";
+	memcpy_sym.section = SEC_UNDEFINED;
+	memcpy_sym.type = OBJ_FUNCTION;
+	push_symbol(memcpy_sym);
+}
+
 Code_Buffer
 x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_relocation_count)
 {
@@ -183,6 +192,7 @@ x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_r
 	x64_str_type->identifier = (u8 *)"* u8";
 
 	size_t count = SDCount(ir);
+	size_t func_count = SDCount(f->functions);
 	auto relative_relocations = (Relative_Relocation_Array *)AllocateCompileMemory(count * sizeof(Relative_Relocation_Array));
 	auto fixables = (Fixable_Array *)AllocateCompileMemory(count * sizeof(Fixable_Array));
 	auto code_buffers = (Code_Buffer *)AllocateCompileMemory(count * sizeof(Code_Buffer));
@@ -190,13 +200,24 @@ x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_r
 	{
 		// @NOTE: we store the index as the value and fix it later
 		// to the address
+		b32 has_body = false;
 		Symbol_Descriptor func_sym = {};
-		func_sym.name = f->functions[i - 1]->identifier;
+		if(i > func_count)
+		{
+			func_sym.name = f->overloads[i - 1 - func_count]->overload.function->function.identifier.name;
+			Assert(f->overloads[i - 1 - func_count]->overload.function->function.body);
+			has_body = true;
+		}
+		else
+		{
+			func_sym.name = f->functions[i - 1]->identifier;
+			has_body = f->functions[i - 1]->node->function.body != NULL;
+		}
 		func_sym.value = i;
 		func_sym.type = OBJ_FUNCTION;
 		func_sym.position = func_sym.value;
 
-		if(f->functions[i - 1]->node->function.body)
+		if(has_body)
 		{
 			func_sym.section = SEC_TEXT;
 		}
@@ -231,6 +252,7 @@ x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_r
 		post_job_listing(JOB_GENERATE_CODE, (void *)x64_gen_ir, args);
 	}
 
+	push_intrinsic_function_symbols();
 	wait_for_threads();
 
 	u32 total_code_size = 0;
@@ -1144,7 +1166,7 @@ x64_gen_from_bytecode(IR *ir, Bytecode bc, Code_Buffer *buffer, Relative_Relocat
 			push_byte(buffer, 0xFF);
 
 			MOD mod = MOD_register;
-			u8 postfix = encode_postfix(mod, 2, bc.left_idx);
+			u8 postfix = encode_postfix(mod, 2, reg_a);
 			push_byte(buffer, postfix);
 		} break;
 		case BC_JUMP:

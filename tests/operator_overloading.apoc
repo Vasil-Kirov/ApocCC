@@ -1,17 +1,6 @@
+// 41
 
-//fn $call c_decl printf(str: *u8, ...) -> i32;
-
-
-/*
-fn $call c_decl main() -> i32 {
-
-a_str := String { "some_data", 0 };
-      print_passed_apoc(123);
-      -> 0;
-}
-*/
-
-fn print_passed() -> i32 {
+fn main() -> i32 {
 	my_struct_1 := Test_Struct_1 { 3 };
 	my_struct_2 := Test_Struct_2 { 38 };
 	-> my_struct_1 + my_struct_2;
@@ -27,10 +16,5 @@ struct Test_Struct_1 {
 
 struct Test_Struct_2 {
       my_num: i32;
-}
-
-struct String {
-      data:* u8;
-      len: i32;
 }
 

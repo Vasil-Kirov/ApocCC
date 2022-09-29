@@ -1,5 +1,6 @@
 #include <stdlib/std.h>
 #include <immintrin.h>
+#include <pmmintrin.h>
 #include <stdarg.h>
 #include <platform/platform.h>
 #include <Builtin.h>

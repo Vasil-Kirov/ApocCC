@@ -51,13 +51,13 @@ typedef enum {
 	BC_STORE_NON_REMOVABLE,
 	BC_STORE_REG,
 	BC_PUSH_OFFSET,
-	BC_CALL,
 	BC_MOVE_VALUE_TO_REG,
 	BC_MOVE_FLOAT_TO_REG,
 	BC_MOVE_FUNCTION_TO_REG,
 	BC_SUB_VALUE,
 	BC_POP_OFFSET,
 	BC_ADD_VALUE,
+	BC_CALL,
 	BC_JUMP,
 	BC_COND_JUMP,
 	BC_LOAD_STRING,
@@ -138,18 +138,12 @@ typedef struct {
 	BC_OP op;
 } Bytecode;
 
-typedef enum {
-	OP_REGISTER,
-	OP_VALUE
-} Operand_Type;
-
 typedef struct {
-	Operand_Type type;
-	union {
-		u64 value;
-		Register reg;
-	};
-} Operand;
+	i32 *expressions;
+	Type_Info **expr_types;
+	i32 expr_count;
+	i32 func_register;
+} BC_Func_Call;
 
 typedef struct {
 	u8 *key;
@@ -201,6 +195,9 @@ ast_to_bytecode(File_Contents *f, Ast_Node *node);
 
 void
 ast_to_bc_file_level_list(Ast_Node **list, IR *ir);
+
+i32
+load_pointer(u8 *id, IR *ir, IR_Block *block, Type_Info *type);
 
 i32
 allocate_stack_space(IR *ir, size_t size);

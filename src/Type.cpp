@@ -173,6 +173,15 @@ get_type_size(Type_Info type)
 }
 
 b32
+is_standard_size(Type_Info *type)
+{
+	int size = get_type_size(*type);
+	if(size == 1 || size == 2 || size == 4 || size == 8)
+		return true;
+	return false;
+}
+
+b32
 is_signed(Type_Info type)
 {
 	Assert(is_type_primitive(type));

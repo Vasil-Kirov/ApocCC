@@ -220,7 +220,6 @@ analyze(File_Contents *f, Ast_Node *ast_tree)
 	push_scope(f, scope_info);
 	analyze_file_level_statement_list(f, ast_tree);
 	pop_scope(f, *f->prev_token);
-	// @Check: maybe pop_scope()?
 }
 
 void
@@ -252,14 +251,15 @@ overload_fix_types(File_Contents *f, Ast_Node *overload)
 	
 	for(size_t i = 0; i < arg_count; ++i)
 	{
-		Ast_Variable arg = func->function.arguments[i]->variable;
-		if(arg.type.type == T_DETECT)
+		Ast_Variable *arg = &func->function.arguments[i]->variable;
+		if(arg->type.type == T_DETECT)
 		{
-			SDPush(func_param_types, arg.type);
+			SDPush(func_param_types, arg->type);
 		}
 		else
 		{
-			auto fixed_type = fix_type(f, arg.type);
+			auto fixed_type = fix_type(f, arg->type);
+			arg->type = fixed_type;
 			SDPush(func_param_types, fixed_type);
 		}
 	}
@@ -273,16 +273,27 @@ verify_overload(File_Contents *f, Ast_Node *overload)
 	size_t arg_count = SDCount(func->function.arguments);
 	for (size_t i = 0; i < arg_count; i++)
 	{
-		Ast_Variable arg = func->function.arguments[i]->variable;
+		Ast_Variable *arg = &func->function.arguments[i]->variable;
 		// @NOTE: add argument to symbol table
+		if((arg->type.type == T_STRUCT || arg->type.type == T_ARRAY) && !is_standard_size(&arg->type))
+		{
+			Type_Info *arg_type_save = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			memcpy(arg_type_save, &arg->type, sizeof(Type_Info));
+			Type_Info arg_ptr_to_type;
+			arg_ptr_to_type.type = T_POINTER;
+			arg_ptr_to_type.pointer.type = arg_type_save;
+			arg_ptr_to_type.identifier = NULL;
+			arg_ptr_to_type.identifier = var_type_to_name(arg_ptr_to_type, false);
+			arg->type = arg_ptr_to_type;
+		}
 		Symbol arg_symbol = {S_FUNC_ARG};
 
 		arg_symbol.token = func->function.identifier.token;
 		arg_symbol.node = func->function.arguments[i];
 
-		Assert(arg.type.type != T_DETECT);
-		arg_symbol.identifier = arg.identifier.name;
-		arg_symbol.type = fix_type(f, arg.type);
+		Assert(arg->type.type != T_DETECT);
+		arg_symbol.identifier = arg->identifier.name;
+		arg_symbol.type = fix_type(f, arg->type);
 		arg_symbol.node->variable.type = arg_symbol.type;
 		SDPush(f->to_add_next_scope, arg_symbol);
 	}
@@ -677,7 +688,7 @@ verify_func(File_Contents *f, Ast_Node *node)
 	
 	for (size_t i = 0; i < arg_count; i++)
 	{
-		Ast_Variable arg = node->function.arguments[i]->variable;
+		Ast_Variable *arg = &node->function.arguments[i]->variable;
 		if(has_body)
 		{
 			// @NOTE: add argument to symbol table
@@ -686,25 +697,36 @@ verify_func(File_Contents *f, Ast_Node *node)
 			arg_symbol.token = node->function.identifier.token;
 			arg_symbol.node = node->function.arguments[i];
 		
-			if(arg.type.type == T_DETECT)
+			if(arg->type.type == T_DETECT)
 			{
 				node->function.flags |= FF_HAS_VAR_ARGS;
 				arg_symbol.identifier = (u8 *)"...";
 			}
 			else
 			{
-				arg_symbol.identifier = arg.identifier.name;
-				arg_symbol.type = fix_type(f, arg.type);
+				arg_symbol.identifier = arg->identifier.name;
+				arg_symbol.type = fix_type(f, arg->type);
 				arg_symbol.node->variable.type = arg_symbol.type;
 				if(has_body)
 					SDPush(f->to_add_next_scope, arg_symbol);
 			}
 		}
-		else if(arg.type.type != T_DETECT)
+		else if(arg->type.type != T_DETECT)
 		{
-			node->function.arguments[i]->variable.type = fix_type(f, arg.type);
+			node->function.arguments[i]->variable.type = fix_type(f, arg->type);
+		if((arg->type.type == T_STRUCT || arg->type.type == T_ARRAY) && !is_standard_size(&arg->type))
+		{
+			Type_Info *arg_type_save = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			memcpy(arg_type_save, &arg->type, sizeof(Type_Info));
+			Type_Info arg_ptr_to_type;
+			arg_ptr_to_type.type = T_POINTER;
+			arg_ptr_to_type.pointer.type = arg_type_save;
+			arg_ptr_to_type.identifier = NULL;
+			arg_ptr_to_type.identifier = var_type_to_name(arg_ptr_to_type, false);
+			arg->type = arg_ptr_to_type;
 		}
-		if(arg.type.type == T_DETECT &&
+		}
+		if(arg->type.type == T_DETECT &&
 		   i != arg_count - 1)
 		{
 			raise_semantic_error(f,"Variable length declarator must " 
@@ -1601,10 +1623,10 @@ get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, 
 			*index = i;
 			if(overloads[i]->overload.overloaded == O_INDEX)
 			{
-				u8 *left_id = overloads[i]->overload.function->function.arguments[0]->variable.type.identifier;
-				Type_Info right_type = overloads[i]->overload.function->function.arguments[1]->variable.type;
+				u8 *left_id = overloads[i]->overload.function->function.type.func.param_types[0].identifier;
+				Type_Info *right_type = &overloads[i]->overload.function->function.type.func.param_types[1];
 				if(vstd_strcmp((char *)left->identifier, (char *)left_id) &&
-						check_type_compatibility(right_type, *right))
+						check_type_compatibility(*right_type, *right))
 				{
 					return overloads[i];
 				}
@@ -1624,12 +1646,12 @@ get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, 
 			if(overloads[i]->overload.op == used_op &&
 					SDCount(overloads[i]->overload.function->function.arguments) == arg_count)
 			{
-				auto args      = overloads[i]->overload.function->function.arguments;
-				auto left_arg  = args[0]->variable;
-				auto right_arg = args[1]->variable;
-				if(vstd_strcmp((char *)left_ptr.identifier, (char *)left_arg.type.identifier))
+				auto args      = overloads[i]->overload.function->function.type.func.param_types;
+				auto left_arg  = &args[0];
+				auto right_arg = &args[1];
+				if(vstd_strcmp((char *)left_ptr.identifier, (char *)left_arg->identifier))
 				{
-					if(check_type_compatibility(right_arg.type, *right))
+					if(check_type_compatibility(*right_arg, *right))
 						return overloads[i];
 				}
 			}
@@ -1650,16 +1672,16 @@ get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, 
 			if(overloads[i]->overload.op == used_op &&
 					SDCount(overloads[i]->overload.function->function.arguments) == arg_count)
 			{
-				auto args      = overloads[i]->overload.function->function.arguments;
-				auto left_arg  = args[0]->variable;
-				auto right_arg = args[1]->variable;
+				auto args      = overloads[i]->overload.function->function.type.func.param_types;
+				auto left_arg  = &args[0];
+				auto right_arg = &args[1];
 				if(vstd_strcmp((char *)left->identifier,
-							(char *)left_arg.type.identifier))
+							(char *)left_arg->identifier))
 				{
 					if(arg_count == 1)
 						return overloads[i];
 					else
-						if(check_type_compatibility(right_arg.type,
+						if(check_type_compatibility(*right_arg,
 									*right))
 							return overloads[i];
 				}

@@ -1,3 +1,4 @@
+#include "llvm/IR/Function.h"
 #include <LLVM_Backend.h>
 #include <platform/platform.h>
 #include <LLVM_Helpers.h>
@@ -819,6 +820,16 @@ get_callee_maybe_overloaded(llvm::Value *operand, Ast_Node *call_node)
 }
 
 llvm::Value *
+copy_argument(llvm::Value *arg, Function *func, Type_Info type)
+{
+	auto result = allocate_variable(func, (u8 *)"arg_copy", type, &backend);
+	auto alignment = Align(get_type_alignment(type));
+	auto size = ConstantInt::get(*backend.context, APInt(32, get_type_size(type)));
+	backend.builder->CreateMemCpy(result, alignment, arg, alignment, size);
+	return result;
+}
+
+llvm::Value *
 generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 {
 	Assert(call_node->func_call.operand_type.type == T_FUNC);
@@ -905,6 +916,10 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		}
 		if(!found_var_args)
 			j++;
+		if((expr_types[i].type == T_STRUCT || expr_types[i].type == T_ARRAY) && !is_standard_size(&expr_types[i]))
+		{
+			arg_exprs[i] = copy_argument(arg_exprs[i], func, expr_types[i]);
+		}
 	}
 	if(ret_ptr)
 	{
