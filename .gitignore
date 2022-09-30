@@ -2,6 +2,12 @@
 *.d
 *.cmake
 
+# Assembly Outputed files
+.s
+
+# LLVM IR
+.ll
+
 .vs
 bin\.vs
 
