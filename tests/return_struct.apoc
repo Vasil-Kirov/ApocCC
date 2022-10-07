@@ -1,0 +1,24 @@
+// 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8
+
+
+fn main() -> i32 {
+	got := give_struct();
+	-> got.num1 + got.num2 + got.num3 + got.num4 + got.num5 + got.num6 + got.num7 + got.num8;
+}
+
+fn give_struct() -> Test_Struct {
+	result := Test_Struct { 1, 2, 3, 4, 5, 6, 7, 8 };
+	-> result;
+}
+
+struct Test_Struct {
+	num1: i32;
+	num2: i32;
+	num3: i32;
+	num4: i32;
+	num5: i32;
+	num6: i32;
+	num7: i32;
+	num8: i32;
+}
+

@@ -79,10 +79,10 @@ wait_for_threads()
 }
 
 void
-lock_mutex() { platform_lock_mutex(thread_mutex); };
+lock_mutex() { if(thread_mutex) platform_lock_mutex(thread_mutex); };
 
 void
-unlock_mutex() { platform_unlock_mutex(thread_mutex); };
+unlock_mutex() { if(thread_mutex) platform_unlock_mutex(thread_mutex); };
 
 void
 initialize_thread_pool()

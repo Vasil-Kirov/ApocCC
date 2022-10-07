@@ -1,0 +1,21 @@
+// 3
+
+
+fn main() -> i32 {
+	my_struct_1 := Big_Struct { {1, 2, 3, 4}, 4 };
+	my_struct_2 := Big_Struct { {2, 3, 4, 5}, 4 };
+	-> my_struct_1 + my_struct_2;
+}
+
+
+overload+(a: Big_Struct, b: Big_Struct) -> i32
+{
+	-> a.data[0] + b.data[0];
+}
+
+
+struct Big_Struct {
+      data: [128]i32;
+      len: i32;
+}
+

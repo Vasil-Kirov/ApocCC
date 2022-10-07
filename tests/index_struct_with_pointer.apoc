@@ -1,0 +1,20 @@
+// 22
+
+
+fn main() -> i32 {
+	arr := Array_Struct { 0, 0 };
+	arr.data = malloc(10);
+	arr.data[arr.len] = 23;
+	arr.len += 1;
+	-> #i32 arr.data[arr.len - 1] - arr.len;
+}
+
+
+struct Array_Struct
+{
+	data: *u8;
+	len: i32;
+}
+
+fn $call c_decl malloc(size: u64) -> *void;
+

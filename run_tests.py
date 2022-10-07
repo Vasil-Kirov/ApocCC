@@ -21,7 +21,7 @@ files = get_absolute_paths('..')
 
 os.system('')
 
-for idx in range(0, 2):
+for idx in range(0, 1):
     backend = '';
     if idx == 0:
         backend = 'LLVM'
@@ -60,6 +60,8 @@ for idx in range(0, 2):
                 print(f'{Fore.RED}[✗]FAIL {Style.RESET_ALL}{file} CRASHED')
                 continue
 
+        if not os.path.exists('a.exe'):
+            print(f'{Fore.RED}[✗]FAIL {Style.RESET_ALL}{file} NO OUTPUT FILE\n');
 
         command_line = ['a.exe']
         process = subprocess.Popen(command_line, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -69,6 +71,8 @@ for idx in range(0, 2):
             print(f'{Fore.GREEN}[✓]OK {Style.RESET_ALL}{file} Time: {end_time - start_time:.2f}')
         else:
             print(f'{Fore.RED}[✗]FAIL {Style.RESET_ALL}{file}\nOutput: {output}\nExpected: {expected_output} Time: {end_time - start_time:.2f}')
+
+        os.remove('a.exe')
 
 
 

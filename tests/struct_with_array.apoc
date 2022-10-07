@@ -1,0 +1,16 @@
+// 44
+
+
+fn main() -> i32 {
+	arr := Array_Struct { { 12, 13, 14 }, 3 };
+	arr.data[arr.len - 1] = arr.data[arr.len - 1] + 74;
+	-> #i32 (arr.data[arr.len - 1] / 2);
+}
+
+
+struct Array_Struct
+{
+	data: [1024]u8;
+	len: i32;
+}
+

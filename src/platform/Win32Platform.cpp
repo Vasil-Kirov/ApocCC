@@ -321,9 +321,10 @@ platform_path_to_file_name(char *path)
 	char *file_name = (char *)AllocatePermanentMemory(64);
 	size_t path_len = vstd_strlen(path);
 	char *scanner = path + path_len;
+	char *end = scanner;
 	while(*scanner != '\\' && *scanner != '/')
 		scanner--;
-	memcpy(file_name, scanner + 1, ((scanner - path) - 1));
+	memcpy(file_name, scanner + 1, end - scanner);
 	return file_name;
 }
 wchar_t *

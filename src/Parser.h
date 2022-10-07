@@ -82,14 +82,14 @@ typedef struct
 typedef struct
 {
 	Ast_Node *to_run;
-	Token_Iden token;
+	Token_Iden *token;
 	Interp_Val ran_val;
 } Ast_Run;
 
 typedef struct _Symbol Symbol;
 typedef struct _Ast_Identifier
 {
-	Token_Iden token;
+	Token_Iden *token;
 	u8 *name;
 	Symbol *symbol_spot;
 } Ast_Identifier;
@@ -162,7 +162,7 @@ typedef enum
 
 typedef struct
 {
-	Type_Info type;
+	Type_Info *type;
 	Ast_Identifier identifier;
 	Ast_Node **arguments; // Simple DArray
 	Ast_Node *body;
@@ -173,7 +173,7 @@ typedef struct
 
 typedef struct
 {
-	Token_Iden op;
+	Token_Iden *op;
 	Ast_Node *expression;
 	Type_Info expr_type;
 } Ast_Unary_Expr;
@@ -211,7 +211,7 @@ typedef struct _Ast_Call
 	Type_Info *expr_types;
 	Type_Info *arg_types;
 	Type_Info operand_type;
-	Token_Iden token;
+	Token_Iden *token;
 } Ast_Call;
 
 typedef enum
@@ -228,7 +228,7 @@ typedef struct
 	Overloaded overloaded;
 	Token op;
 	Ast_Node *function;
-	Token_Iden token;
+	Token_Iden *token;
 	i32 index;    // when a call happense the analyzer puts the index of this overload here
 } Ast_Overload;
 
@@ -266,7 +266,7 @@ typedef struct
 {
 	Ast_Node *operand;
 	Ast_Node *expression;
-	Token_Iden token;
+	Token_Iden *token;
 	Type_Info idx_type;
 	Type_Info operand_type;
 } Ast_Indexing;
@@ -274,12 +274,12 @@ typedef struct
 typedef struct
 {
 	Ast_Node *operand;
-	Token_Iden token;
+	Token_Iden *token;
 } Ast_Postfix;
 
 typedef struct
 {
-	Token_Iden token;
+	Token_Iden *token;
 	Ast_Node *body;
 } Scope_Desc;
 
@@ -288,12 +288,12 @@ typedef struct
 	Ast_Node *expr1;
 	Ast_Node *expr2;
 	Ast_Node *expr3;
-	Token_Iden token;
+	Token_Iden *token;
 } Ast_For;
 
 typedef struct
 {
-	Token_Iden token;
+	Token_Iden *token;
 	Type_Info type;
 	Ast_Node *expression;
 	Type_Info expr_type;
@@ -304,7 +304,7 @@ typedef struct
 	unsigned int selected_index; // @NOTE: only available after analysis
 	Ast_Node *operand;
 	Ast_Node *identifier;
-	Token_Iden dot_token;
+	Token_Iden *dot_token;
 	Type_Info operand_type; // @NOTE: only available after analysis
 	Type_Info selected_type;
 } Ast_Selector;
@@ -312,20 +312,20 @@ typedef struct
 typedef struct
 {
 	Ast_Node *expr;
-	Token_Iden token;
+	Token_Iden *token;
 } Ast_Condition;
 	
 typedef struct
 {
 	Ast_Node *operand;
-	Token_Iden token;
+	Token_Iden *token;
 	Type_Info operand_type; // @NOTE: only available after analysis
 } Ast_Size;
 
 typedef struct
 {
 	Type_Info type;
-	Token_Iden token;
+	Token_Iden *token;
 	Ast_Identifier id;
 	Ast_Node **members; // @NOTE: rhs turns to type_interp_val after analysis
 } Ast_Enum;
@@ -381,7 +381,7 @@ u8 *
 get_func_name(Ast_Node *func);
 
 Ast_Identifier
-pure_identifier(Token_Iden token);
+pure_identifier(Token_Iden *token);
 
 Ast_Node *
 ast_union(File_Contents *f);
@@ -437,7 +437,7 @@ Type_Info
 parse_type(File_Contents *f);
 
 b32
-type_is_invalid(Type_Info type);
+type_is_invalid(Type_Info *type);
 
 Ast_Node *
 parse(File_Contents *f);

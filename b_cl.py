@@ -26,6 +26,9 @@ if 'bounds' in sys.argv:
 	compiler_args += ' -fsanitize=address'
 	use_msvc_link = True
 
+if 'link.exe' in sys.argv:
+    use_msvc_link = True
+
 if 'novm' in sys.argv:
     include_llvm = False
     compiler_args += ' -DNOVM'

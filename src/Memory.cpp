@@ -1,5 +1,6 @@
 #include <Memory.h>
 #include <platform/platform.h>
+#include <Threading.h>
 
 typedef struct _ap_memory
 {
@@ -17,8 +18,8 @@ typedef struct _ap_memory
 static ap_memory MemoryAllocators[2];
 
 
-#define PERM_SIZE GB(4)
-#define COMP_SIZE GB(8)
+#define PERM_SIZE GB(16)
+#define COMP_SIZE GB(256)
 
 #define COMP_CHUNK MB(512)
 #define PERM_CHUNK MB(256)
@@ -48,6 +49,8 @@ initialize_memory()
 void *
 AllocateMemory(u64 Size, i8 Index)
 {
+	lock_mutex();
+
 	void *Result = MemoryAllocators[Index].Current;
 	MemoryAllocators[Index].Current = (char *)MemoryAllocators[Index].Current + Size;
 	while((char *)MemoryAllocators[Index].Current > (char *)MemoryAllocators[Index].End)
@@ -61,6 +64,8 @@ AllocateMemory(u64 Size, i8 Index)
 		MemoryAllocators[Index].ChunkIndex++;
 		MemoryAllocators[Index].End = (u8 *)MemoryAllocators[Index].End + MemoryAllocators[Index].ChunkSize;
 	}
+
+	unlock_mutex();
 	memset(Result, 0, Size);
 	return Result;
 }

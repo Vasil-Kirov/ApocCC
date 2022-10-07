@@ -1,0 +1,20 @@
+// 93
+
+fn final_function() -> f32 { -> 92.23; }
+
+fn main() -> i32 {
+	result := not_main();
+	-> #i32 result;
+}
+
+
+fn not_main() -> f32 {
+      this_f :f32= 1.23;
+      other_function(@this_f);
+      -> this_f;
+}
+
+fn other_function(the_num:* f32) {
+	*the_num += final_function();
+}
+

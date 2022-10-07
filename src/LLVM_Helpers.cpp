@@ -184,7 +184,9 @@ write_string(u8 *str, llvm::Function *func, Backend_State *backend)
 	Type_Info u8_t = {};
 	u8_t.type = T_INTEGER;
 	u8_t.primitive.size = ubyte1;
+
 	Type_Info str_array = {};
+	str_array.type = T_STRING;
 	str_array.array.type = &u8_t;
 	// @TODO: null character?
 	str_array.array.elem_count = len + 1;
@@ -216,19 +218,23 @@ write_struct_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State *backen
 	auto member_names = backend->builder->CreateStructGEP(llvm_type, ptr, 5);
 	auto member_types = backend->builder->CreateStructGEP(llvm_type, ptr, 6);
 	auto zero = ConstantInt::get(*backend->context, llvm::APInt(64, 0, true));
+
+	LG_DEBUG("opaque? %d", member_names->getType()->isOpaquePointerTy());
 	for(size_t i = 0; i < to_write.structure.member_count; ++i)
 	{
 		llvm::Value *idx_list[2] = {
 			zero,
 			ConstantInt::get(Type::getInt64Ty(*backend->context), i),
 		};
-		auto name_elem_ptr = backend->builder->CreateGEP(member_names->getType(), member_names,
+		// @NOTE: pointer to pointer to u8 type
+		auto name_elem_ptr = backend->builder->CreateGEP(PointerType::get(PointerType::get(Type::getInt8Ty(*backend->context), 0), 0), member_names,
 				idx_list);
 		auto name_ptr = write_string(to_write.structure.member_names[i], func, backend);
 		store_inst = backend->builder->CreateStore(name_ptr, name_elem_ptr);
 		store_inst->setAlignment(Align(8));
 
-		auto type_elem_ptr = backend->builder->CreateGEP(member_types->getType(), member_types,
+		// @NOTE: pointer to type info
+		auto type_elem_ptr = backend->builder->CreateGEP(PointerType::get(get_type_info_kind("Type_Info", backend), 0), member_types,
 				idx_list);
 		write_type_info_to_llvm(to_write.structure.member_types[i], type_elem_ptr,
 				type_info_type, backend, func);
@@ -354,10 +360,10 @@ Metadata *
 create_struct_field(Debug_Info *debug, u8 *identifier,
 		Type_Info type, u64 offset_in_bits)
 {
-	auto desc = shget(debug->file_map, type.token.file);
+	auto desc = shget(debug->file_map, type.token->file);
 	auto name_ref = StringRef((char *)identifier, vstd_strlen((char *)identifier));
 
-	return debug->builder->createMemberType(desc.file, name_ref, desc.file, type.token.line,
+	return debug->builder->createMemberType(desc.file, name_ref, desc.file, type.token->line,
 			get_type_size(type) * 8, get_type_alignment(type) * 8, offset_in_bits,
 			DINode::FlagZero, to_debug_type(type, debug));
 }
@@ -365,7 +371,7 @@ create_struct_field(Debug_Info *debug, u8 *identifier,
 DICompositeType *
 create_struct_type(Type_Info type, Debug_Info *debug)
 {
-	auto desc = shget(debug->file_map, type.token.file);
+	auto desc = shget(debug->file_map, type.token->file);
 	if(type.structure.is_union)
 	{		
 		//Type_Info biggest_type = union_get_biggest_type(type.structure);
@@ -397,7 +403,7 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 
 		auto created =  debug->builder->createStructType(desc.file, (char *)type.identifier,
 				desc.file,
-				type.token.line, get_type_size(type) * 8, 
+				type.token->line, get_type_size(type) * 8, 
 				get_struct_alignment(type) * 8,
 				DINode::FlagZero, nullptr,
 				member_array);
@@ -471,7 +477,7 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 		
 		auto created =  debug->builder->createStructType(desc.file, (char *)type.identifier,
 				desc.file,
-				type.token.line, get_type_size(type) * 8, 
+				type.token->line, get_type_size(type) * 8, 
 				get_struct_alignment(type) * 8,
 				DINode::FlagZero, nullptr,
 				member_array);
@@ -513,6 +519,10 @@ type_to_func_type(Type_Info type, Backend_State *backend)
 		{
 			has_var_args = true;
 			Assert(i == param_count - 1);
+		}
+		else if((param_type.type == T_STRUCT || param_type.type == T_ARRAY) && !is_standard_size(&param_type))
+		{
+			param_types[i] = PointerType::get(apoc_type_to_llvm(param_type, backend), 0);
 		}
 		else
 			param_types[i] = apoc_type_to_llvm(param_type, backend);
@@ -609,7 +619,24 @@ llvm_store(llvm::Value *ptr, llvm::Value *value, Backend_State *backend, int ali
 void
 llvm_store(Type_Info *type, llvm::Value *ptr, llvm::Value *value, Backend_State *backend)
 {
-	llvm_store(ptr, value, backend, get_type_alignment(*type));
+	if(type->type == T_ARRAY)
+	{
+		auto llvm_type = apoc_type_to_llvm(*type, backend);
+		auto zero = ConstantInt::get(*backend->context, APInt::getZero(64));
+		llvm::Value *zero_index[] = { zero, zero };
+		llvm::Value *zero_ptr = backend->builder->CreateGEP(llvm_type, value, zero_index);
+
+		u64 type_size = get_type_size(*type);
+		Value *size = ConstantInt::get(*backend->context,
+				APInt(64, type_size, false));
+
+		Align alignment = llvm::Align(get_type_alignment(*type));
+		backend->builder->CreateMemCpy(ptr, alignment, zero_ptr, alignment, size);
+	}
+	else
+	{
+		llvm_store(ptr, value, backend, get_type_alignment(*type));
+	}
 }
 
 DIType *

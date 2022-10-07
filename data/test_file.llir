@@ -1,0 +1,26 @@
+	.text
+	.def	@feat.00;
+	.scl	3;
+	.type	0;
+	.endef
+	.globl	@feat.00
+.set @feat.00, 0
+	.file	"Test.apoc"
+	.def	add_nums;
+	.scl	2;
+	.type	32;
+	.endef
+	.globl	add_nums
+	.p2align	4, 0x90
+add_nums:
+.seh_proc add_nums
+	pushq	%rax
+	.seh_stackalloc 8
+	.seh_endprologue
+	vmovss	(%rsp), %xmm0
+	vaddss	4(%rsp), %xmm0, %xmm0
+	popq	%rax
+	retq
+	.seh_endproc
+
+	.globl	_fltused

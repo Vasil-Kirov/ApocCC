@@ -150,10 +150,7 @@ ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func)
 				global_var.position = last_segment.position + last_segment.size;
 			}
 			auto size = get_type_size(value.type);
-			// @TODO: structs and stuff 
-			if(size > 8)
-				Assert(false);
-			global_var.init_val = value._u64;
+			global_var.init_val = (u64)value.pointed;
 			global_var.size = size;
 			SDPush(ir->allocated, global_var);
 			shput(global_lookup, node->assignment.token.identifier, SDCount(ir->allocated) - 1);
@@ -342,12 +339,6 @@ size_to_type(int size)
 i32
 call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 {
-	// @TODO: Rework this, it generates a lot of repetitive intsturctions for no reason
-	// @TODO: Rework this, it generates a lot of repetitive intsturctions for no reason
-	// @TODO: Rework this, it generates a lot of repetitive intsturctions for no reason
-	// @TODO: Rework this, it generates a lot of repetitive intsturctions for no reason
-	// @TODO: Rework this, it generates a lot of repetitive intsturctions for no reason
-
 	i32 expr_count = SDCount(node->func_call.arguments);
 	// + 1 incase we need to pass the context
 	i32 *expressions = (i32 *)AllocateCompileMemory(sizeof(i32) * (expr_count + 1));
@@ -453,7 +444,7 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 	call->expressions = expressions;
 	call->expr_count = expr_count;
 	call->expr_types = expr_types;
-	instruction((u64)call, result, BC_CALL, block, type_64);
+	instruction((u64)call, -1, BC_CALL, block, &node->func_call.operand_type);
 
 	if(ret_address != -1)
 	{
@@ -462,7 +453,13 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 	}
 	else
 	{
-		instruction(result, reg_a, result, BC_MOVE_REG_TO_REG, block, node->func_call.operand_type.func.return_type);
+		if(node->func_call.operand_type.func.return_type->type == T_VOID)
+			return -1;
+
+		if(is_float(*node->func_call.operand_type.func.return_type))
+			instruction(result, reg_xmm0, result, BC_MOVE_REG_TO_REG, block, node->func_call.operand_type.func.return_type);
+		else
+			instruction(result, reg_a, result, BC_MOVE_REG_TO_REG, block, node->func_call.operand_type.func.return_type);
 	}
 	return result;
 }
@@ -610,9 +607,9 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 		case type_identifier:
 		{
 			if(get_pointer)
-				result = load_pointer(expr->identifier.name, ir, block, &expr->identifier.symbol_spot->type);
+				result = load_pointer(expr->identifier.name, ir, block, expr->identifier.symbol_spot->type);
 			else
-				result = load_variable(expr->identifier.name, ir, block, &expr->identifier.symbol_spot->type);
+				result = load_variable(expr->identifier.name, ir, block, expr->identifier.symbol_spot->type);
 		} break;
 		case type_overload:
 		{
@@ -636,13 +633,16 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 			// pass true to get_pointer if it's an array
 			result = expression_to_bc(expr->index.operand, block, ir, expr->index.operand_type.type != T_POINTER);
 			i64 type_size;
+			Type_Info *out_type = NULL;
 			if(expr->index.operand_type.type == T_POINTER)
 			{
 				type_size = get_type_size(*expr->index.operand_type.pointer.type);
+				out_type = expr->index.operand_type.pointer.type;
 			}
 			else if(expr->index.operand_type.type == T_ARRAY)
 			{
 				type_size = get_type_size(*expr->index.operand_type.array.type);
+				out_type = expr->index.operand_type.array.type;
 			}
 			else
 				Assert(false);
@@ -669,11 +669,11 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 			// Multiply the index by the size off the pointer type
 			instruction(reg_a_virtual, reg_c_virtual, reg_a_virtual, BC_I_MUL, block, type_64);
 			// Offset the pointer to get to the destination
-			instruction(result, reg_a_virtual, result, BC_OFFSET_POINTER, block, &expr->index.operand_type);
+			instruction(result, reg_a_virtual, result, BC_OFFSET_POINTER, block, ptr_type);
 			if(!get_pointer)
 			{
 				// Derefrence if needed
-				instruction(result, -1, result, BC_DEREFRENCE, block, &expr->index.operand_type);
+				instruction(result, -1, result, BC_DEREFRENCE, block, out_type);
 			}
 		} break;
 		case type_selector:
@@ -731,7 +731,7 @@ unary_expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 	if(expr->type == type_unary_expr)
 	{
 		//i32 expr_reg = expression_to_bc(expr->unary_expr.expression, block);
-		switch((int)expr->unary_expr.op.type)
+		switch((int)expr->unary_expr.op->type)
 		{
 			case '@':
 			{
@@ -741,11 +741,12 @@ unary_expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 			case '*':
 			{
 				i32 expr_reg = expression_to_bc(expr->unary_expr.expression, block, ir, get_pointer);
-				// I think you need to allocate a new register so that if you derefrence
-				// a register which is keept as the register for a memory location you don't
-				// overwrite it... probably
 				result = allocate_register(ir); 
-				instruction(expr_reg, -1, result, BC_DEREFRENCE, block, &expr->unary_expr.expr_type);
+				Type_Info *result_type = &expr->unary_expr.expr_type;
+				if(!get_pointer)
+					result_type = result_type->pointer.type;
+
+				instruction(expr_reg, -1, result, BC_DEREFRENCE, block, result_type);
 			} break;
 			case '-':
 			{
@@ -1155,7 +1156,10 @@ assign_to_bc(Ast_Node *node, IR_Block *block, IR *ir)
 	else {
 		i32 expr_register = expression_to_bc(node->assignment.rhs, block, ir, false);
 		i32 dst_pointer = expression_to_bc(node->assignment.lhs, block, ir, true);
-		instruction(dst_pointer, expr_register, -1, BC_STORE_REG, block, &node->assignment.decl_type);
+		i32 casted = do_cast(expr_register, &node->assignment.rhs_type, &node->assignment.decl_type, ir, block);
+		if(casted == -1)
+			casted = expr_register;
+		instruction(dst_pointer, casted, -1, BC_STORE_REG, block, &node->assignment.decl_type);
 	}
 }
 
@@ -1413,13 +1417,16 @@ ast_to_bc_func_level(Ast_Node *node, IR_Block *current_block, Ast_Node **list, i
 		{
 			if(!node->ret.expression)
 			{
-				instruction(-1, -1, -1, BC_RETURN, current_block, &node->ret.expression_type);
+				instruction(-1, -1, -1, BC_RETURN, current_block, &node->ret.func_type);
 				set_terminator(current_block);
 			}
 			else
 			{
 				i32 ret_reg = expression_to_bc(node->ret.expression, current_block, ir, false);
-				instruction(ret_reg, -1, -1, BC_RETURN, current_block, &node->ret.expression_type);
+				i32 casted = do_cast(ret_reg, &node->ret.expression_type, &node->ret.func_type, ir, current_block);
+				if(casted == -1)
+					casted = ret_reg;
+				instruction(casted, -1, -1, BC_RETURN, current_block, &node->ret.func_type);
 				set_terminator(current_block);
 			}
 		} break;
@@ -1500,6 +1507,18 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir, IR_Block *block)
 					} break;
 					case T_FLOAT:
 					{
+						int from_size = get_type_size(*from);
+						if(from_size < 4)
+						{
+							// We need to extend it to 32 bit atleast
+							Type_Info *to_intermidiate = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+							memcpy(to_intermidiate, from, sizeof(Type_Info));
+							to_intermidiate->primitive.size = byte4;
+							i32 extend_register = allocate_register(ir);
+							instruction(source, (u32)((u8 *)from - (u8 *)to_intermidiate), extend_register, BC_CAST_SEXT, block, to); 
+							source = extend_register;
+							from = to_intermidiate;
+						}
 						if(to->primitive.size == real64)
 							op = BC_CAST_I_TO_D;
 						else
@@ -1562,6 +1581,17 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir, IR_Block *block)
 					} break;
 					case T_FLOAT:
 					{
+						int from_size = get_type_size(*from);
+						if(from_size < 4)
+						{
+							Type_Info *to_intermidiate = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+							memcpy(to_intermidiate, from, sizeof(Type_Info));
+							to_intermidiate->primitive.size = ubyte4;
+							i32 extend_register = allocate_register(ir);
+							instruction(source, (u32)((u8 *)from - (u8 *)to_intermidiate), extend_register, BC_CAST_ZEXT, block, to); 
+							source = extend_register;
+							from = to_intermidiate;
+						}
 						if(to->primitive.size == real64)
 							op = BC_CAST_U_TO_D;
 						else
@@ -1665,7 +1695,7 @@ do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir, IR_Block *block)
 		} break;
 	}
 	if(op == BC_NO_OP)
-		return -1;
+		return source;
 	i32 result = allocate_register(ir);
 	instruction(source, (u32)((u8 *)from - (u8 *)to), result, op, block, to); 
 	return result;
@@ -1845,6 +1875,8 @@ allocate_for_function_calls(Bytecode bc, Register_Allocation_Tracker *phy_regs, 
 			stack_offset += 8;
 		}
 	}
+
+	// Put the function in the a register
 	free_phyisical_register(reg_a, phy_regs, v_regs, ir, out_bc, out_count);
 	put_virtual_register_into_phyisicla_without_touching_other(call->func_register, reg_a, phy_regs, v_regs, ir, out_bc, out_count, ptr_type);
 }
@@ -1882,7 +1914,13 @@ do_register_allocation(IR *ir, IR_Block *block, Virtual_Register_Tracker *v_regs
 		{
 			if(bc.left_idx != -1 && op_has_left_idx(bc.op) && bc.left_idx > reg_invalid)
 			{
-				bc.left_idx = free_up_register_for(bc.left_idx, v_regs, phy_regs, ir, new_bc, &new_count, bc.type);
+				if(bc.op >= BC_CAST_I_TO_F && bc.op <= BC_CAST_D_TO_I)
+				{
+					Type_Info *src_type = (Type_Info *)((u8 *)bc.type + bc.right_idx);
+					bc.left_idx = free_up_register_for(bc.left_idx, v_regs, phy_regs, ir, new_bc, &new_count, src_type);
+				}
+				else
+					bc.left_idx = free_up_register_for(bc.left_idx, v_regs, phy_regs, ir, new_bc, &new_count, bc.type);
 				if(bc.op == BC_CAST_ZEXT)
 				{
 					free_virtual_register(phy_regs[bc.left_idx].current_virtual_register, v_regs,
@@ -1938,49 +1976,43 @@ do_register_allocation(IR *ir, IR_Block *block, Virtual_Register_Tracker *v_regs
 			// Clear up any links to volitile registers
 
 			// @NOTE: DO NOT CLEAR RAX THE FUNCTION IS IN THERE
+			for(int i = 1; i < reg_b; ++i)
+			{
+				Register item = (Register)i;
+				free_phyisical_register(item, phy_regs, v_regs, ir, new_bc, &new_count);
+			}
+			for(int i = reg_xmm0; i < reg_xmm6; ++i)
+			{
+				Register item = (Register)i;
+				free_phyisical_register(item, phy_regs, v_regs, ir, new_bc, &new_count);
+			}
 			allocate_for_function_calls(bc, phy_regs, v_regs, ir, new_bc, &new_count);
-			for(size_t i = 1; i < reg_b; ++i)
+		}
+#if 1
+		else if(bc.op == BC_STORE_REG)
+		{
+			for(int i = 1; i < reg_b; ++i)
 			{
 				Register item = (Register)i;
 				if(phy_regs[item].current_virtual_register != -1)
 				{
-					i32 v_reg = phy_regs[item].current_virtual_register;
-					free_virtual_register(v_reg, v_regs, phy_regs, ir, new_bc, &new_count);
+					if(v_regs[phy_regs[item].current_virtual_register].in_memory != -1)
+						free_phyisical_register(item, phy_regs, v_regs, ir, new_bc, &new_count);
 				}
 			}
-			for(size_t i = reg_xmm0; i < reg_xmm6; ++i)
+			for(int i = reg_xmm0; i < reg_xmm6; ++i)
 			{
 				Register item = (Register)i;
 				if(phy_regs[item].current_virtual_register != -1)
 				{
-					i32 v_reg = phy_regs[item].current_virtual_register;
-					free_virtual_register(v_reg, v_regs, phy_regs, ir, new_bc, &new_count);
+					if(v_regs[phy_regs[item].current_virtual_register].in_memory != -1)
+						free_phyisical_register(item, phy_regs, v_regs, ir, new_bc, &new_count);
 				}
-			}
-			new_bc[new_count++] = bc;
-			
-			if(bc.result != -1)
-			{
-				Type_Info *ret_type;
-				if(bc.type->type == T_FUNC)
-				{
-					ret_type = bc.type->func.return_type;
-				}
-				else
-				{
-					ret_type = bc.type;
-				}
-				Register return_store;
-
-				if(bc.result < reg_invalid)
-					return_store = (Register)bc.result;
-				else
-					return_store = free_up_register_for(bc.result, v_regs, phy_regs, ir, new_bc, &new_count, ret_type);
-				out_instruction(return_store, reg_a, return_store, BC_MOVE_REG_TO_REG, new_bc, &new_count, ret_type);
 			}
 		}
-		else
-			new_bc[new_count++] = bc;
+#endif
+			
+		new_bc[new_count++] = bc;
 	}
 
 	if(vstd_strcmp((char *)block->id, (char *)"entry")) {
@@ -2143,6 +2175,8 @@ print_bytecode(IR *ir, IR_Block *block)
 	for(size_t i = 0; i < bc_count; ++i)
 	{
 		Bytecode bc = block->bc[i];
+		if(bc.type && bc.op != BC_NO_OP)
+			buffer_size += vstd_sprintf(buffer + buffer_size, "%s ", var_type_to_name(bc.type));
 		switch(bc.op)
 		{
 			case BC_POP_OFFSET:
@@ -2211,7 +2245,7 @@ print_bytecode(IR *ir, IR_Block *block)
 			} break;
 			case BC_CALL:
 			{
-				buffer_size += vstd_sprintf(buffer + buffer_size, "%s:\t CALL %s\n", register_to_name(reg_a), register_to_name(reg_a));
+				buffer_size += vstd_sprintf(buffer + buffer_size, "CALL %s\n", register_to_name(reg_a));
 			} break;
 			case BC_PUSH_OFFSET:
 			{

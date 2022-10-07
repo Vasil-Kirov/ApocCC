@@ -1,15 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.2.32526.322
+VisualStudioVersion = 17.3.32825.248
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "apoc", "apoc.exe", "{1EDCD7F6-AC03-4F3C-9028-8EB146AE4B3F}"
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "apoc", "apoc.exe", "{2BE9CFD5-EFC6-427C-9F75-BBE1532865A9}"
 	ProjectSection(DebuggerProjectSystem) = preProject
 		PortSupplier = 00000000-0000-0000-0000-000000000000
-		Executable = E:\C_Projects\ApocCompiler\bin\apoc.exe
-		RemoteMachine = STRAIGHTBILLY
-		StartingDirectory = E:\C_Projects\ApocCompiler\data
-		Arguments = E:\C_Projects\ApocCompiler\tests\operator_overloading.apoc --no-link --backend Fast
+		Executable = W:\ApocCompiler\bin\apoc.exe
+		RemoteMachine = DESKTOP-M4CBVHB
+		StartingDirectory = W:\ApocCompiler\bin
+		Arguments = Standard\C_Standard.apoc Standard\OS.apoc Standard\String.apoc Standard\Windows.apoc ..\Test.apoc --backend LLVM
 		Environment = Default
 		LaunchingEngine = 00000000-0000-0000-0000-000000000000
 		UseLegacyDebugEngines = No
@@ -23,12 +23,12 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{1EDCD7F6-AC03-4F3C-9028-8EB146AE4B3F}.Release|x64.ActiveCfg = Release|x64
+		{2BE9CFD5-EFC6-427C-9F75-BBE1532865A9}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {B434ACFD-2048-47D7-914C-07FAA47AC05D}
+		SolutionGuid = {377644E1-DC80-465D-931C-9E1333776224}
 	EndGlobalSection
 EndGlobal

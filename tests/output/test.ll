@@ -17,3 +17,7 @@ entry:
   %0 = load i32, ptr %my_var, align 4
   ret i32 %0
 }
+
+declare void @var_arg_start(ptr, ptr)
+
+declare void @var_arg_stop(ptr, ptr)

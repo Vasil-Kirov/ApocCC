@@ -1,4 +1,7 @@
 
+fn $intrinsic var_arg_start(list: **Any);
+fn $intrinsic var_arg_stop(list: **Any);
+
 true  :: #bool  1;
 false :: #bool  0;
 null  :: #*void 0;

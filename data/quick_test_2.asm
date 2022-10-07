@@ -14,13 +14,44 @@
 	.p2align	4, 0x90
 print_passed:
 .seh_proc print_passed
-	subq	$16, %rsp
-	.seh_stackalloc 16
+	pushq	%rbp
+	.seh_pushreg %rbp
+	movl	$4080, %eax
+	callq	__chkstk
+	subq	%rax, %rsp
+	.seh_stackalloc 4080
+	leaq	128(%rsp), %rbp
+	.seh_setframe %rbp, 128
 	.seh_endprologue
-	movq	%rcx, 8(%rsp)
-	movl	$1121088963, 4(%rsp)
-	movl	$105, %eax
-	addq	$16, %rsp
+	andq	$-1024, %rsp
+	movq	%rcx, 1016(%rsp)
+	leaq	1024(%rsp), %rcx
+	movl	$1028, %r8d
+	xorl	%edx, %edx
+	callq	memset
+	movl	$3, 2048(%rsp)
+	leaq	3056(%rsp), %rcx
+	movl	$1024, %r8d
+	xorl	%edx, %edx
+	callq	memset
+	movw	$3340, 3056(%rsp)
+	movb	$14, 3058(%rsp)
+	leaq	3059(%rsp), %rcx
+	movl	$1021, %r8d
+	xorl	%edx, %edx
+	callq	memset
+	movl	2048(%rsp), %eax
+	decl	%eax
+	cltq
+	addb	$74, 1024(%rsp,%rax)
+	movl	2048(%rsp), %eax
+	decl	%eax
+	cltq
+	movb	1024(%rsp,%rax), %al
+	shrb	%al
+	movzbl	%al, %eax
+	leaq	3952(%rbp), %rsp
+	popq	%rbp
 	retq
 	.seh_endproc
 
@@ -38,4 +69,3 @@ global_var.1:
 global_var.2:
 	.quad	0
 
-	.globl	_fltused

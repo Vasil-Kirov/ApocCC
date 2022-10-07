@@ -1,0 +1,26 @@
+
+
+These are things not to do on this project.
+If you do any these things you will be put in bad programmer jail.
+
+1. Write to tokens after parsing has begun:
+ - Tokens are passed as pointers for performance reasons
+   since if we put tokens as values in ast nodes they will
+   become very very big. All tokens should be pointers to
+   the initial array that is generated during lexing
+
+2. Write to type info structs:
+ - Same as tokens.
+ - This is partially ignored in x64 custom backend code generation
+   so we should probably change that
+
+3. Directly pass SD dynamic arrays to functions:
+ - If you pass an SD dynamic array to a function it can resize in that function
+   and then your original pointer will no longer be valid. Instead you can put
+   it in a struct and then pass a pointer to that struct
+
+4. Take a pointer to data that is in a dynamic array:
+ - Pretty much the same thing as the one above,
+   array resizes -> data points to garbage
+
+

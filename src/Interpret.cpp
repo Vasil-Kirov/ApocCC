@@ -158,7 +158,7 @@ interpret_func_call(Ast_Node *node, b32 *failed)
 	Interp_Val result = interpret_function(operand, node->func_call, failed);
 	if(*failed)
 		LG_ERROR("Cannot interpret function call at (%d:%d), it might be an external function",
-				node->func_call.token.line, node->func_call.token.column);
+				node->func_call.token->line, node->func_call.token->column);
 	return result;
 }
 
@@ -169,7 +169,7 @@ interpret_lhs(Ast_Node *lhs)
 	{
 		case type_unary_expr:
 		{
-			Assert(lhs->unary_expr.op.type == tok_star);
+			Assert(lhs->unary_expr.op->type == tok_star);
 			Assert(lhs->unary_expr.expr_type.type == T_POINTER);
 			Interp_Val *id = interpret_lhs(lhs->unary_expr.expression);
 			return (Interp_Val *)id->pointed;	
@@ -187,7 +187,7 @@ interpret_lhs(Ast_Node *lhs)
 			{
 				// @TODO: Hack
 				raise_interpret_error("Indexing expression cannot be interpreted", 
-						lhs->index.token);
+						*lhs->index.token);
 				LG_FATAL(".");
 			}
 			Assert(is_integer(index.type));
@@ -198,7 +198,7 @@ interpret_lhs(Ast_Node *lhs)
 				{
 					// @TODO: Hack
 					raise_interpret_error("Indexing expression cannot be a negative value", 
-							lhs->index.token);
+							*lhs->index.token);
 					LG_FATAL(".");
 				}
 				return ((Interp_Val *)indexed->pointed) + index_val;
@@ -303,18 +303,18 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 		case type_scope_start:
 		{
 			interp_push_scope();
-			*token = node->scope_desc.token;
+			*token = *node->scope_desc.token;
 			scope_count++;
 		} break;
 		case type_scope_end:
 		{
 			destroy_scope();
-			*token = node->scope_desc.token;
+			*token = *node->scope_desc.token;
 			scope_count--;
 		} break;
 		case type_if:
 		{
-			*token = node->condition.token;
+			*token = *node->condition.token;
 			result = interpret_expression(node->condition.expr, failed);
 			b32 is_true = val_to_bool(result);
 			if(is_true)
@@ -344,7 +344,7 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 		case type_for:
 		{
 			interp_push_scope();
-			*token = node->for_loop.token;
+			*token = *node->for_loop.token;
 			if(node->for_loop.expr1)
 				interpret_assignment(node->for_loop.expr1, failed);
 			Interp_Val expr2 = interpret_expression(node->for_loop.expr2, failed);
@@ -550,17 +550,17 @@ interpret_operand(Ast_Node *node, b32 *failed)
 			Assert(operand.location);
 
 			Interp_Val *location = (Interp_Val *)operand.location;
-			Assert(is_type_primitive(location->type));
+			Assert(is_type_primitive(&location->type));
 			// @NOTE: store the original value as this is a postfix operation
 			result = *location;
 			Interp_Val out = {};
 			Interp_Val tmp = *location;
 			// @NOTE: do the postfix op on a tmp variable
-			if(node->postfix.token.type == tok_plusplus)
+			if(node->postfix.token->type == tok_plusplus)
 			{
 				DO_U_OP(out, ++, tmp);
 			}
-			else if(node->postfix.token.type == tok_minusminus)
+			else if(node->postfix.token->type == tok_minusminus)
 			{
 				DO_U_OP(out, --, tmp);
 			}
@@ -609,7 +609,7 @@ interpret_unary(Ast_Node *node, b32 *failed)
 		case type_unary_expr:
 		{
 			Interp_Val operand = interpret_expression(node->unary_expr.expression, failed);
-			switch((int)node->unary_expr.op.type)
+			switch((int)node->unary_expr.op->type)
 			{
 				case tok_plusplus:
 				{

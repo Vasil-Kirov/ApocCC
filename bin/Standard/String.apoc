@@ -1,6 +1,7 @@
 
-STRING_BUFFER_SIZE :: 256;
+fn $call c_decl strcmp(str1: *u8, str2: *u8) -> i32;
 
+STRING_BUFFER_SIZE :: 256;
 struct string
 {
 	text:* u8;
@@ -12,6 +13,20 @@ struct String_Builder
 	buffer:[256] u8;
 	len: i64;
 	next:* String_Builder;
+}
+
+struct Printable_Type_Info
+{
+      function: fn(*void) -> string;
+      type_name: *u8;
+}
+
+printable_types: [1024]Printable_Type_Info;
+last_printable_type := 0;
+
+fn register_printable(print_fn: fn (*void) -> string, type_name: *u8) {
+	info := Printable_Type_Info { print_fn, type_name };
+	printable_types[last_printable_type] = info;
 }
 
 fn builder_to_string(builder: *String_Builder) -> string
@@ -105,10 +120,10 @@ overload +=(str: *String_Builder, c: u8)
 overload ==(str: string, text:* u8) -> bool
 {
 	str2 := string { text, len(text) };
-	-> compare(str, str2);
+	-> compare(@str, @str2);
 }
 
-fn compare(str1: string, str2: string) -> bool
+fn compare(str1: *string, str2: *string) -> bool
 {
 	if str1.len != str2.len
 		-> false;
@@ -194,6 +209,18 @@ fn float_to_str(num: f64, builder: *String_Builder)
 	int_to_str(#i64 num, builder);
 }
 
+fn find_printable_type(item: *Any, builder: *String_Builder)
+{
+	for i := 0; i < last_printable_type; ++i {
+		if strcmp(printable_types[i].type_name, item.type.structure.name) == 0 {
+			*builder += printable_types[i].function(item).text;
+			->;
+		}
+	}
+	*builder += "Unkown struct";
+	->;
+}
+
 fn parse_format(format: string, list:* Any) -> string
 {
 	builder := init_builder("");
@@ -224,6 +251,8 @@ fn parse_format(format: string, list:* Any) -> string
 					to_parse = *#*f64 item.value;
 
 				float_to_str(to_parse, @builder);
+			} else if type == Type_Type.STRUCT {
+				find_printable_type(@item, @builder);
 			} else {
 				builder += format[i];
 			}
@@ -233,6 +262,25 @@ fn parse_format(format: string, list:* Any) -> string
 	}
 	builder += #u8 10;
 	out := builder_to_string(@builder);
+	-> out;
+}
+
+fn format_args(format:* u8, ...) -> string
+{
+	str := to_string(format);
+	list:* Any;
+	var_arg_start(@list);
+	out := parse_format(str, list);
+	var_arg_stop(@list);
+	-> out;
+}
+
+fn format_args(format: string, ...) -> string
+{
+	list:* Any;
+	var_arg_start(@list);
+	out := parse_format(format, list);
+	var_arg_stop(@list);
 	-> out;
 }
 

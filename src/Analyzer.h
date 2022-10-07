@@ -35,9 +35,9 @@ typedef struct _Symbol
 		int index;
 	} s_member;
 	u8 *identifier;
-	Type_Info type;
+	Type_Info *type;
 	Ast_Node *node;
-	Token_Iden token;
+	Token_Iden *token;
 } Symbol;
 
 typedef struct 
@@ -47,6 +47,7 @@ typedef struct
 	unsigned int end_line;
 	const char *file;
 	Symbol *symbol_table;
+	i32 sym_count;
 } Scope_Info;
 
 typedef enum
@@ -126,20 +127,53 @@ typedef struct _File_Contents
 	int         expression_level;
 } File_Contents;
 
+enum Expression_Type
+{
+	EXPRT_DECL,
+	EXPRT_EVAL,
+	EXPRT_S_INIT,
+	EXPRT_A_INIT,
+	EXPRT_CALL
+};
+
+enum Expression_Flags
+{
+	EXPR_FLAG_NONE,
+	CAN_INIT_STRUCT,
+	CAN_INIT_ARRAY
+};
+
+struct Expression_Context
+{
+	Type_Info *opt_info;
+	union
+	{
+		struct
+		{
+			int current_index;
+		} struct_init;
+	};
+	int flags;
+	Expression_Type kind;
+};
+
 Type_Info
 number_to_untyped_type(u8 *number);
+
+void
+raise_formated_semantic_error(File_Contents *f, Token_Iden token, const char *format, ...);
 
 Ast_Node *
 get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, i32 *index);
 
 void
-overload_overwrite(Token_Iden token, Ast_Node *expression, Ast_Node *left_expr, Ast_Node *right_expr, Type_Info *left, Type_Info *right, Ast_Node *overload);
+overload_overwrite(Token_Iden *token, Ast_Node *expression, Ast_Node *left_expr, Ast_Node *right_expr, Type_Info *left, Type_Info *right, Ast_Node *overload);
 
 void
 push_scope(File_Contents *f, Scope_Info current_scope);
 
 void
-pop_scope(File_Contents *f, Token_Iden scope_tok);
+pop_scope(File_Contents *f, Token_Iden *scope_tok);
 
 void
 analyze(File_Contents *f, Ast_Node *ast_tree);
@@ -147,7 +181,7 @@ analyze(File_Contents *f, Ast_Node *ast_tree);
 Type_Info
 add_primitive_type(File_Contents *f, const char *name, Var_Size size);
 
-Type_Info
+Type_Info *
 get_type(File_Contents *f, u8 *name);
 
 void
@@ -166,7 +200,7 @@ void
 analyze_file_level_statement_list(File_Contents *f, Ast_Node *node);
 
 u8 *
-var_type_to_name(Type_Info type, b32 bracket = true);
+var_type_to_name(Type_Info *type, b32 bracket = true);
 
 Symbol *
 get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out = true);
@@ -194,10 +228,10 @@ void
 verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global);
 
 Type_Info
-get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden desc_token, Ast_Node *previous);
+get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden *desc_token, Ast_Node *previous, Expression_Context *info);
 
 Type_Info
-verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden expr_token, Ast_Node *previous);
+verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden *expr_token, Ast_Node *previous);
 
 Type_Info
 verify_struct_init(File_Contents *f, Ast_Node *struct_init);

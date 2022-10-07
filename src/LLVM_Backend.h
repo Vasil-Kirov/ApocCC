@@ -66,22 +66,16 @@ struct Struct_Table
 	StructType *value;
 };
 
-struct Function_Table
+struct Variable_Info
 {
-	u8 *key;
-	Function *value;
+	llvm::Value *value;
+	Type_Info *type;
 };
 
-struct Alloca_Table
+struct Variable_Lookup_Table
 {
 	u8 *key;
-	AllocaInst *value;
-};
-
-struct Global_Table
-{
-	u8 *key;
-	GlobalVariable *value;
+	Variable_Info *value;
 };
 
 struct Backend_State
@@ -89,10 +83,10 @@ struct Backend_State
 	LLVMContext *context;
 	IRBuilder<> *builder;
 	Module *module;
-	Alloca_Table *named_values;
-	Global_Table *named_globals;
+	Variable_Lookup_Table *named_values;
+	Variable_Lookup_Table *named_globals;
+	Variable_Lookup_Table *func_table;
 	Struct_Table *struct_types;
-	Function_Table *func_table;
 	//legacy::FunctionPassManager *func_pass;
 };
 
@@ -135,7 +129,7 @@ struct Debug_Info
 	Stack scope;
 };
 
-llvm::Value *
+Variable_Info *
 get_identifier(u8 *name, Variable_Types *returned_type);
 
 llvm::StructType *

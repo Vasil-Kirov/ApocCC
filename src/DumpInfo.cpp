@@ -46,7 +46,7 @@ dump_type(Type_Info *type, u8 **in_at)
 	u8 zero = 0;
 	i32 type_type = type->type;
 	DUMP(type_type, i32);
-	if (is_type_primitive(*type))
+	if (is_type_primitive(type))
 	{
 		i32 var_size = type->primitive.size;
 		DUMP(var_size, i32);
@@ -92,8 +92,8 @@ dump_program_info(File_Contents *f)
 			u32 sym_tag = sym.tag;
 			DUMP(sym_tag, u32);
 			DUMP_STR(sym.identifier);
-			dump_token(&sym.token, &at);
-			dump_type(&sym.type, &at);
+			dump_token(sym.token, &at);
+			dump_type(sym.type, &at);
 		}
 	}
 

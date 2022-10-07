@@ -130,20 +130,20 @@ load_token_position(File_Contents *f)
 	f->curr_token = f->saved_token;
 }
 
-Token_Iden
+Token_Iden *
 advance_token(File_Contents *f) 
 {
 	f->curr_token++;
 	f->prev_token = f->curr_token - 1;
 	f->next_token = f->curr_token + 1;
-	return *f->prev_token;
+	return f->prev_token;
 }
 
-Token_Iden
+Token_Iden *
 get_next_expecting(File_Contents *f, Token type, const char *error_msg)
 {
-	Token_Iden token = advance_token(f);
-	if(token.type != type)
+	Token_Iden *token = advance_token(f);
+	if(token->type != type)
 	{
 		raise_parsing_unexpected_token(error_msg, f);
 	}

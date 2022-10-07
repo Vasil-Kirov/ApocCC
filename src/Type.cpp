@@ -184,7 +184,7 @@ is_standard_size(Type_Info *type)
 b32
 is_signed(Type_Info type)
 {
-	Assert(is_type_primitive(type));
+	Assert(is_type_primitive(&type));
 	return type.type == T_UNTYPED_INTEGER || (type.primitive.size >= byte1 && byte8 >= type.primitive.size);
 }
 
@@ -243,43 +243,48 @@ is_castable(Type_Info type, Type_Info cast)
 }
 
 b32
-type_is_invalid(Type_Info type)
+type_is_invalid(Type_Info *type)
 {
-	if(type.type == T_POINTER)
-		return type_is_invalid(*type.pointer.type);
-	else if(type.type == T_ARRAY)
-		return type_is_invalid(*type.array.type);
-	else if(type.type == T_INVALID)
+	if(type->type == T_POINTER)
+		return type_is_invalid(type->pointer.type);
+	else if(type->type == T_ARRAY)
+		return type_is_invalid(type->array.type);
+	else if(type->type == T_INVALID)
 		return true;
 	return false;
 }
 
-Type_Info
-fix_type(File_Contents *f, Type_Info type, b32 is_fixing_struct)
+Type_Info *
+fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 {
-	Type_Info result = type;
-	if(result.type == T_POINTER)
+	Type_Info *result = NULL;
+	if(type->type == T_POINTER)
 	{
-		auto pointed = fix_type(f, *result.pointer.type, is_fixing_struct);
-		Type_Info *to_store = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-		memcpy(to_store, &pointed, sizeof(Type_Info));
-		result.pointer.type = to_store;
+		result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		memcpy(result, type, sizeof(Type_Info));
+		auto pointed = fix_type(f, type->pointer.type, is_fixing_struct);
+		result->pointer.type = pointed;
 		return result;
 	}
-	if(!type_is_invalid(result))
-	{}
-	else if(type.identifier)
+
+	if(!type_is_invalid(type))
 	{
-		result = get_type(f, type.identifier);
-		if(result.token.file == NULL)
-			result.token = type.token;
+		return type;
 	}
-	if(result.type == T_STRUCT && !is_fixing_struct)
+	else if(type->identifier)
 	{
-		size_t member_count = result.structure.member_count;
+		result = get_type(f, type->identifier);
+		if(result->token == NULL || result->token->file == NULL)
+			result->token = type->token;
+	}
+	if(type->type == T_STRUCT && !is_fixing_struct)
+	{
+		result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		memcpy(result, type, sizeof(Type_Info));
+		size_t member_count = type->structure.member_count;
 		for(size_t i = 0; i < member_count; ++i)
 		{
-			result.structure.member_types[i] = fix_type(f, result.structure.member_types[i], true);
+			result->structure.member_types[i] = *fix_type(f, &result->structure.member_types[i], true);
 		}
 	}
 	return result;
@@ -295,10 +300,10 @@ is_string_pointer(Type_Info type)
 }
 
 b32
-is_type_primitive(Type_Info type)
+is_type_primitive(Type_Info *type)
 {
-	if(type.type == T_UNTYPED_INTEGER || type.type == T_UNTYPED_FLOAT || 
-	   type.type == T_INTEGER || type.type == T_FLOAT || type.type == T_VOID || type.type == T_BOOLEAN)
+	if(type->type == T_UNTYPED_INTEGER || type->type == T_UNTYPED_FLOAT || 
+	   type->type == T_INTEGER || type->type == T_FLOAT || type->type == T_VOID || type->type == T_BOOLEAN)
 		return true;
 	return false;
 }
@@ -324,12 +329,12 @@ is_untyped(Type_Info type)
 }
 
 b32
-is_or_is_pointing_to(Type_Info type, Type_Type check)
+is_or_is_pointing_to(Type_Info *type, Type_Type check)
 {
-	if(type.type == check)
+	if(type->type == check)
 		return true;
-	else if(type.type == T_POINTER)
-		return is_or_is_pointing_to(*type.pointer.type, check);
+	else if(type->type == T_POINTER)
+		return is_or_is_pointing_to(type->pointer.type, check);
 	return false;
 }
 

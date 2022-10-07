@@ -4,7 +4,7 @@
 fn main() -> i32 {
       a :i32= 1024;
       ptr := @a;
-      *ptr = *ptr * 2;
+      *ptr *= 2;
       -> a;
 }
 

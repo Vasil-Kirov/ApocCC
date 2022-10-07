@@ -1,0 +1,14 @@
+// 42
+
+
+fn main() -> i32 {
+	the_fn := the_function;
+	-> the_fn();
+}
+
+
+fn the_function() -> i32 {
+	-> 42;
+}
+
+

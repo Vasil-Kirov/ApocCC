@@ -7,6 +7,7 @@
 struct _Ast_Identifier;
 struct _Type_Info;
 typedef struct _abstract_syntax_tree Ast_Node;
+typedef struct _Token_Iden Token_Iden;
 
 typedef enum : i32
 {
@@ -53,7 +54,7 @@ typedef enum
 typedef struct _Type_Info
 {
 	Type_Type type;
-	Token_Iden token;
+	Token_Iden *token;
 	union
 	{
 		struct
@@ -114,7 +115,7 @@ b32
 is_standard_size(Type_Info *type);
 
 b32
-is_or_is_pointing_to(Type_Info type, Type_Type check);
+is_or_is_pointing_to(Type_Info *type, Type_Type check);
 
 int
 get_type_size(Type_Info type);
@@ -129,7 +130,7 @@ b32
 is_signed(Type_Info type);
 
 b32
-is_type_primitive(Type_Info type);
+is_type_primitive(Type_Info *type);
 
 b32
 is_float(Type_Info type);
@@ -149,8 +150,8 @@ is_rhs_valid(Type_Info type);
 b32
 is_pointer_rhs_compatible(Type_Info type);
 
-Type_Info
-fix_type(File_Contents *f, Type_Info type, b32 is_fixing_struct = false);
+Type_Info *
+fix_type(struct _File_Contents *f, Type_Info *type, b32 is_fixing_struct = false);
 
 
 #endif //_TYPE_H

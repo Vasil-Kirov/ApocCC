@@ -13,7 +13,7 @@
 #pragma pack(push, 1)
 typedef struct _stack
 {
-	void *d_array_ptr;
+	void *array_ptr;
 	i32 top;
 	i32 default_value;
 	i32 type_size;
@@ -31,15 +31,15 @@ typedef struct _stack
 inline Stack
 _stack_allocate(int type_size)
 {
-	void *d_array = _ISimpleDArrayCreate(type_size);
-	Stack stack = {.d_array_ptr = d_array, .top = -1, .default_value = STACK_DEFAULT_VALUE, .type_size = type_size};
+	void *array = AllocatePermanentMemory(type_size * 4096 * 2);
+	Stack stack = {.array_ptr = array, .top = -1, .default_value = STACK_DEFAULT_VALUE, .type_size = type_size};
 	return stack;
 }
 
 inline void
 _stack_push(Stack *s, void *item)
 {
-	_ISimpleDArrayInsert(&s->d_array_ptr, item, ++s->top);
+	memcpy((u8 *)s->array_ptr + (++s->top * s->type_size), item, s->type_size);
 }
 
 inline void *
@@ -47,7 +47,7 @@ _stack_pop(Stack *s)
 {
 	if(s->top == -1) return NULL;
 
-	char *item_location = (char *)s->d_array_ptr + (s->top-- * s->type_size);
+	u8 *item_location = (u8 *)s->array_ptr + (s->top-- * s->type_size);
 	return (void *)item_location;
 }
 
@@ -56,22 +56,23 @@ _stack_peek(Stack *s)
 {
 	if(s->top == -1) return NULL;
 	
-	char *item_location = (char *)s->d_array_ptr + (s->top * s->type_size);
+	char *item_location = (char *)s->array_ptr + (s->top * s->type_size);
 	return (void *)item_location;
 }
 
 #define stack_allocate(type) _stack_allocate(sizeof(type))
 
-#define is_stack_empty(s) (s.top == -1)
+#define is_stack_empty(s) ((s).top == -1)
 
-#define stack_push(s, item) _stack_push(&s, (void *)&item)
+#define stack_push(s, item) _stack_push(&(s), (void *)&(item))
 
-#define stack_pop(s, type) *(type *)_stack_pop(&s)
+#define stack_pop(s, type) *(type *)_stack_pop(&(s))
 
 #define stack_peek(s, type) (*(type *)_stack_peek(&s))
 
+#define stack_peek_ptr(s, type) ((type *)_stack_peek(&(s)))
 
-#define stack_free(s) (SDFree(s.d_array_ptr))
+#define stack_free(s) 
 
 
 
