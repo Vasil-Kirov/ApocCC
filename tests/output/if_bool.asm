@@ -14,10 +14,9 @@
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	subq	$16, %rsp
-	.seh_stackalloc 16
+	pushq	%rax
+	.seh_stackalloc 8
 	.seh_endprologue
-	movq	%rcx, 8(%rsp)
 	movb	$1, 7(%rsp)
 	xorl	%eax, %eax
 	testb	%al, %al
@@ -27,7 +26,7 @@ main:
 .LBB0_3:
 	xorl	%eax, %eax
 .LBB0_2:
-	addq	$16, %rsp
+	popq	%rcx
 	retq
 	.seh_endproc
 

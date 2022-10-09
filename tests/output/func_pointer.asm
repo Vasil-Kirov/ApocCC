@@ -17,28 +17,32 @@ main:
 	subq	$56, %rsp
 	.seh_stackalloc 56
 	.seh_endprologue
-	movq	%rcx, 40(%rsp)
+	movq	the_function(%rip), %rax
+	movq	%rax, 40(%rsp)
 	leaq	48(%rsp), %rcx
-	callq	the_fn
+	leaq	40(%rsp), %rax
+	callq	*%rax
 	nop
 	addq	$56, %rsp
 	retq
 	.seh_endproc
 
-	.def	the_fn;
+	.def	the_function;
 	.scl	2;
 	.type	32;
 	.endef
-	.globl	the_fn
+	.globl	the_function
 	.p2align	4, 0x90
-the_fn:
-.seh_proc the_fn
-	pushq	%rax
-	.seh_stackalloc 8
+the_function:
+.seh_proc the_function
+	subq	$16, %rsp
+	.seh_stackalloc 16
 	.seh_endprologue
 	movq	%rcx, (%rsp)
+	movq	(%rcx), %rax
+	movq	%rax, 8(%rsp)
 	movl	$42, %eax
-	popq	%rcx
+	addq	$16, %rsp
 	retq
 	.seh_endproc
 

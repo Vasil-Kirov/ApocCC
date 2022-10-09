@@ -14,22 +14,15 @@
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	pushq	%rbp
-	.seh_pushreg %rbp
-	subq	$80, %rsp
-	.seh_stackalloc 80
-	leaq	80(%rsp), %rbp
-	.seh_setframe %rbp, 80
+	subq	$104, %rsp
+	.seh_stackalloc 104
 	.seh_endprologue
-	andq	$-32, %rsp
-	movq	%rcx, 72(%rsp)
-	vxorps	%xmm0, %xmm0, %xmm0
-	vmovaps	%ymm0, 32(%rsp)
-	leaq	32(%rsp), %rax
+	leaq	72(%rsp), %rax
 	movq	%rax, 64(%rsp)
 	leaq	64(%rsp), %rcx
-	vzeroupper
 	callq	give_struct
+	vmovups	72(%rsp), %ymm0
+	vmovups	%ymm0, 32(%rsp)
 	movl	32(%rsp), %eax
 	addl	36(%rsp), %eax
 	addl	40(%rsp), %eax
@@ -38,8 +31,8 @@ main:
 	addl	52(%rsp), %eax
 	addl	56(%rsp), %eax
 	addl	60(%rsp), %eax
-	movq	%rbp, %rsp
-	popq	%rbp
+	addq	$104, %rsp
+	vzeroupper
 	retq
 	.seh_endproc
 
@@ -60,22 +53,18 @@ __ymm@0000000800000007000000060000000500000004000000030000000200000001:
 	.p2align	4, 0x90
 give_struct:
 .seh_proc give_struct
-	pushq	%rbp
-	.seh_pushreg %rbp
-	subq	$80, %rsp
-	.seh_stackalloc 80
-	leaq	80(%rsp), %rbp
-	.seh_setframe %rbp, 80
+	subq	$88, %rsp
+	.seh_stackalloc 88
 	.seh_endprologue
-	andq	$-32, %rsp
-	movq	%rcx, 24(%rsp)
-	vmovaps	__ymm@0000000800000007000000060000000500000004000000030000000200000001(%rip), %ymm0
-	vmovaps	%ymm0, 32(%rsp)
+	movq	%rcx, (%rsp)
 	movq	(%rcx), %rax
-	vmovaps	32(%rsp), %ymm0
+	movq	%rax, 8(%rsp)
+	vmovaps	__ymm@0000000800000007000000060000000500000004000000030000000200000001(%rip), %ymm0
+	vmovups	%ymm0, 16(%rsp)
+	vmovups	16(%rsp), %ymm0
+	vmovups	%ymm0, 48(%rsp)
 	vmovups	%ymm0, (%rax)
-	movq	%rbp, %rsp
-	popq	%rbp
+	addq	$88, %rsp
 	vzeroupper
 	retq
 	.seh_endproc

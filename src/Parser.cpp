@@ -161,14 +161,15 @@ ast_enum(Ast_Identifier id, Ast_Node **members, Type_Info type, Token_Iden *erro
 }
 
 Ast_Node *
-ast_struct(Ast_Identifier id, Ast_Variable *members, int member_count, b32 is_union)
+ast_struct(Ast_Identifier id, Ast_Variable *members, int member_count, b32 is_union, b32 is_packed)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_struct;
 	result->structure.struct_id = id;
 	result->structure.members = members;
 	result->structure.member_count = member_count;
-	result->structure.is_union = is_union;
+	result->structure.is_union  = is_union;
+	result->structure.is_packed = is_packed;
 	
 	return result;
 }
@@ -1277,7 +1278,6 @@ parse_type(File_Contents *f)
 	}
 	else if(pointer_or_type->type == tok_func)
 	{
-		advance_token(f);
 		if(f->curr_token->type == tok_call_conv)
 		{
 			advance_token(f);
@@ -1313,6 +1313,24 @@ parse_type(File_Contents *f)
 		}
 		result.identifier = var_type_to_name(&result, false);
 	}
+	else if(pointer_or_type->type == tok_struct)
+	{
+		Ast_Node *struct_node = parse_struct_type(f, false);
+		result.type = T_STRUCT;
+
+		result.structure.is_packed    = struct_node->structure.is_packed;
+		result.structure.is_union     = struct_node->structure.is_union;
+		result.structure.member_count = struct_node->structure.member_count;
+		result.structure.name         = struct_node->structure.struct_id.name;
+
+		result.structure.member_names = (u8 **)AllocateCompileMemory(result.structure.member_count * sizeof(u8 *));
+		result.structure.member_types = (Type_Info *)AllocateCompileMemory(result.structure.member_count * sizeof(Type_Info));
+		for(size_t i = 0; i < struct_node->structure.member_count; ++i)
+		{
+			result.structure.member_names[i] = struct_node->structure.members[i].identifier.name;
+			result.structure.member_types[i] = struct_node->structure.members[i].type;
+		}
+	}
 	else
 	{
 		advance_token(f);
@@ -1325,16 +1343,33 @@ parse_type(File_Contents *f)
 }
 
 Ast_Node *
-parse_struct(File_Contents *f)
+parse_struct_type(File_Contents *f, b32 is_named)
 {
 	parser_eat(f, tok_struct);
 	b32 is_union = false;
-	if(f->curr_token->type == tok_union)
+	b32 is_packed = false;
+	while(f->curr_token->type == tok_union || f->curr_token->type == tok_pack)
 	{
-		is_union = true;
+		if(f->curr_token->type == tok_union)
+		{
+			is_union = true;
+		}
+		else if(f->curr_token->type == tok_pack)
+		{
+			is_packed = true;
+		}
+
 		advance_token(f);
 	}
-	Token_Iden *struct_id = get_next_expecting(f, tok_identifier, "struct name");
+	Token_Iden *struct_id = NULL;
+
+	if(is_union && is_packed)
+		raise_parsing_unexpected_token("Non-packed union, packed unions are currently not supported", f);
+
+	if(is_named)
+	{
+		struct_id = get_next_expecting(f, tok_identifier, "struct name");
+	}
 	parser_eat(f, (Token)'{');
 	Token_Iden *curr_tok = NULL;
 	Ast_Variable *members = SDCreate(Ast_Variable);
@@ -1358,16 +1393,26 @@ parse_struct(File_Contents *f)
 		Ast_Variable member = ast_variable(type, ast_identifier(f, curr_tok)->identifier, false)->variable;
 		SDPush(members, member);
 	}
-	// @NOTE: this is dumb
-	/*
-	if(SDCount(members) == 0)
-	{
-		raise_parsing_unexpected_token("struct members", f);
-	}
-	*/
 
-	Ast_Node *result = ast_struct(ast_identifier(f, struct_id)->identifier,
-			members, SDCount(members), is_union);
+	Ast_Node *result = NULL;
+
+	if(struct_id)
+	{
+		result = ast_struct(pure_identifier(struct_id),
+				members, SDCount(members), is_union, is_packed);
+	}
+	else
+	{
+		result = ast_struct({}, members, SDCount(members), is_union, is_packed);
+	}
+
+	return result;
+}
+
+Ast_Node *
+parse_struct(File_Contents *f)
+{
+	Ast_Node *result = parse_struct_type(f, true);
 	add_type(f, result);
 	return result;
 }
@@ -1529,6 +1574,9 @@ parse_func(File_Contents *f)
 
 	Ast_Node *func_id = ast_identifier(f, advance_token(f));
 	this_func.identifier = func_id->identifier;
+	if(strcmp((char *)this_func.identifier.name, "main") == 0)
+		this_func.conv = CALL_C_DECL;
+
 	this_func.arguments = delimited(f, '(', ')', ',', parse_func_arg);
 	size_t arg_count = SDCount(this_func.arguments);
 	for(size_t i = 0; i < arg_count; ++i)

@@ -1,0 +1,29 @@
+// 0
+
+
+
+fn main() -> i32
+{
+	x: i32;
+	p: *i32;
+	pp: **i32;
+
+	x = 0;
+	p = @x;
+	pp = @p;
+
+	if #bool *p
+		-> 1;
+	if #bool **pp
+		-> 1;
+	else
+		**pp = 1;
+
+	if #bool x
+		-> 0;
+	else
+		-> 1;
+
+	// @NOTE: shouldn't happen
+	-> 2;
+}

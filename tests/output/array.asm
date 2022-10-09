@@ -14,28 +14,27 @@
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	pushq	%rbp
-	.seh_pushreg %rbp
-	subq	$48, %rsp
-	.seh_stackalloc 48
-	leaq	48(%rsp), %rbp
-	.seh_setframe %rbp, 48
+	subq	$88, %rsp
+	.seh_stackalloc 88
 	.seh_endprologue
-	andq	$-32, %rsp
-	movq	%rcx, 40(%rsp)
-	vxorps	%xmm0, %xmm0, %xmm0
-	vmovaps	%ymm0, (%rsp)
-	movq	$0, 32(%rsp)
 	movabsq	$8589934593, %rax
-	movq	%rax, (%rsp)
-	movl	$3, 8(%rsp)
+	movq	%rax, 8(%rsp)
+	movl	$3, 16(%rsp)
 	vxorps	%xmm0, %xmm0, %xmm0
-	vmovups	%xmm0, 12(%rsp)
-	vmovups	%xmm0, 24(%rsp)
-	movl	$3, %eax
-	movq	%rbp, %rsp
-	popq	%rbp
-	vzeroupper
+	vmovups	%xmm0, 20(%rsp)
+	vmovups	%xmm0, 32(%rsp)
+	movq	8(%rsp), %rax
+	movq	%rax, 48(%rsp)
+	movl	16(%rsp), %eax
+	movl	%eax, 56(%rsp)
+	vmovups	20(%rsp), %xmm0
+	vmovups	%xmm0, 60(%rsp)
+	movl	36(%rsp), %eax
+	movl	%eax, 76(%rsp)
+	movq	40(%rsp), %rax
+	movq	%rax, 80(%rsp)
+	movl	56(%rsp), %eax
+	addq	$88, %rsp
 	retq
 	.seh_endproc
 

@@ -125,6 +125,7 @@ typedef struct _Ast_Struct
 	Ast_Variable *members;
 	int member_count;
 	b32 is_union;
+	b32 is_packed;
 } Ast_Struct;
 
 typedef enum
@@ -152,6 +153,7 @@ typedef enum
 	FF_HAS_VAR_ARGS   = 1 << 0,
 	FF_IS_INTERP_ONLY = 1 << 1,
 	FF_IS_INTRINSIC   = 1 << 2,
+	FF_PASS_RETURN_PTR= 1 << 3
 } Func_Flags;
 
 typedef enum
@@ -447,6 +449,9 @@ parse_next_token();
 
 Ast_Node *
 parse_func(File_Contents *f);
+
+Ast_Node *
+parse_struct_type(File_Contents *f, b32 is_named);
 
 void
 parser_eat(File_Contents *f, Token expected_token);

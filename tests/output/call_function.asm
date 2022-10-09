@@ -14,14 +14,13 @@
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	subq	$56, %rsp
-	.seh_stackalloc 56
+	subq	$40, %rsp
+	.seh_stackalloc 40
 	.seh_endprologue
-	movq	%rcx, 40(%rsp)
-	leaq	48(%rsp), %rcx
+	leaq	32(%rsp), %rcx
 	callq	give_number
 	nop
-	addq	$56, %rsp
+	addq	$40, %rsp
 	retq
 	.seh_endproc
 
@@ -33,12 +32,14 @@ main:
 	.p2align	4, 0x90
 give_number:
 .seh_proc give_number
-	pushq	%rax
-	.seh_stackalloc 8
+	subq	$16, %rsp
+	.seh_stackalloc 16
 	.seh_endprologue
 	movq	%rcx, (%rsp)
+	movq	(%rcx), %rax
+	movq	%rax, 8(%rsp)
 	movl	$256, %eax
-	popq	%rcx
+	addq	$16, %rsp
 	retq
 	.seh_endproc
 

@@ -17,10 +17,11 @@ main:
 	subq	$16, %rsp
 	.seh_stackalloc 16
 	.seh_endprologue
-	movq	%rcx, (%rsp)
 	movabsq	$64424509450, %rax
 	movq	%rax, 8(%rsp)
-	movl	$25, %eax
+	movq	%rax, (%rsp)
+	movl	4(%rsp), %eax
+	addl	$10, %eax
 	addq	$16, %rsp
 	retq
 	.seh_endproc

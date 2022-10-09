@@ -1,0 +1,20 @@
+// 0
+
+
+fn main() -> i32
+{
+	x: i32;
+	
+	x = 1;
+	for x = 10; #bool x; --x {
+		;
+	}
+
+	if #bool x
+		-> 1;
+	x = 10;
+	for ; #bool x ; {
+		x = x - 1;
+	}
+	-> x;
+}

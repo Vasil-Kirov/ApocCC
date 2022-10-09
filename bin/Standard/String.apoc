@@ -27,6 +27,7 @@ last_printable_type := 0;
 fn register_printable(print_fn: fn (*void) -> string, type_name: *u8) {
 	info := Printable_Type_Info { print_fn, type_name };
 	printable_types[last_printable_type] = info;
+	last_printable_type += 1;
 }
 
 fn builder_to_string(builder: *String_Builder) -> string
@@ -225,6 +226,8 @@ fn parse_format(format: string, list:* Any) -> string
 {
 	builder := init_builder("");
 	list_index := 0;
+	printf("%p\n", @format);
+	printf("%d\n", format.len);
 	for i := 0; i < format.len; ++i {
 		if format[i] == '%' {
 			item := list[list_index];
@@ -287,6 +290,7 @@ fn format_args(format: string, ...) -> string
 fn print(format:* u8, ...)
 {
 	str := to_string(format);
+	printf("len: %d, text %s", str.len, str.text);
 	list:* Any;
 	var_arg_start(@list);
 	out := parse_format(str, list);

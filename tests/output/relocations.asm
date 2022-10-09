@@ -20,12 +20,14 @@ __real@42b875c3:
 	.p2align	4, 0x90
 final_function:
 .seh_proc final_function
-	pushq	%rax
-	.seh_stackalloc 8
+	subq	$16, %rsp
+	.seh_stackalloc 16
 	.seh_endprologue
 	movq	%rcx, (%rsp)
+	movq	(%rcx), %rax
+	movq	%rax, 8(%rsp)
 	vmovss	__real@42b875c3(%rip), %xmm0
-	popq	%rax
+	addq	$16, %rsp
 	retq
 	.seh_endproc
 
@@ -40,10 +42,9 @@ main:
 	subq	$56, %rsp
 	.seh_stackalloc 56
 	.seh_endprologue
-	movq	%rcx, 40(%rsp)
 	leaq	48(%rsp), %rcx
 	callq	not_main
-	vmovss	%xmm0, 36(%rsp)
+	vmovss	%xmm0, 44(%rsp)
 	vcvttss2si	%xmm0, %eax
 	addq	$56, %rsp
 	retq
@@ -57,16 +58,18 @@ main:
 	.p2align	4, 0x90
 not_main:
 .seh_proc not_main
-	subq	$56, %rsp
-	.seh_stackalloc 56
+	subq	$72, %rsp
+	.seh_stackalloc 72
 	.seh_endprologue
-	movq	%rcx, 40(%rsp)
-	movl	$1067282596, 36(%rsp)
-	leaq	48(%rsp), %rcx
-	leaq	36(%rsp), %rdx
+	movq	%rcx, 48(%rsp)
+	movq	(%rcx), %rax
+	movq	%rax, 56(%rsp)
+	movl	$1067282596, 44(%rsp)
+	leaq	64(%rsp), %rcx
+	leaq	44(%rsp), %rdx
 	callq	other_function
-	vmovss	36(%rsp), %xmm0
-	addq	$56, %rsp
+	vmovss	44(%rsp), %xmm0
+	addq	$72, %rsp
 	retq
 	.seh_endproc
 
@@ -83,13 +86,15 @@ other_function:
 	vmovaps	%xmm6, 64(%rsp)
 	.seh_savexmm %xmm6, 64
 	.seh_endprologue
-	movq	%rcx, 48(%rsp)
-	movq	%rdx, 40(%rsp)
+	movq	%rcx, 40(%rsp)
+	movq	(%rcx), %rax
+	movq	%rax, 48(%rsp)
+	movq	%rdx, 32(%rsp)
 	vmovss	(%rdx), %xmm6
 	leaq	56(%rsp), %rcx
 	callq	final_function
 	vaddss	%xmm0, %xmm6, %xmm0
-	movq	40(%rsp), %rax
+	movq	32(%rsp), %rax
 	vmovss	%xmm0, (%rax)
 	vmovaps	64(%rsp), %xmm6
 	addq	$88, %rsp

@@ -6,52 +6,47 @@
 	.globl	@feat.00
 .set @feat.00, 0
 	.file	"quick_test_2.apoc"
-	.def	print_passed;
+	.def	some_other;
 	.scl	2;
 	.type	32;
 	.endef
-	.globl	print_passed
+	.globl	some_other
 	.p2align	4, 0x90
-print_passed:
-.seh_proc print_passed
-	pushq	%rbp
-	.seh_pushreg %rbp
-	movl	$4080, %eax
-	callq	__chkstk
-	subq	%rax, %rsp
-	.seh_stackalloc 4080
-	leaq	128(%rsp), %rbp
-	.seh_setframe %rbp, 128
+some_other:
+.seh_proc some_other
+	subq	$24, %rsp
+	.seh_stackalloc 24
 	.seh_endprologue
-	andq	$-1024, %rsp
-	movq	%rcx, 1016(%rsp)
-	leaq	1024(%rsp), %rcx
-	movl	$1028, %r8d
-	xorl	%edx, %edx
-	callq	memset
-	movl	$3, 2048(%rsp)
-	leaq	3056(%rsp), %rcx
-	movl	$1024, %r8d
-	xorl	%edx, %edx
-	callq	memset
-	movw	$3340, 3056(%rsp)
-	movb	$14, 3058(%rsp)
-	leaq	3059(%rsp), %rcx
-	movl	$1021, %r8d
-	xorl	%edx, %edx
-	callq	memset
-	movl	2048(%rsp), %eax
-	decl	%eax
-	cltq
-	addb	$74, 1024(%rsp,%rax)
-	movl	2048(%rsp), %eax
-	decl	%eax
-	cltq
-	movb	1024(%rsp,%rax), %al
-	shrb	%al
-	movzbl	%al, %eax
-	leaq	3952(%rbp), %rsp
-	popq	%rbp
+	movq	%rcx, 8(%rsp)
+	movq	(%rcx), %rax
+	movq	%rax, 16(%rsp)
+	movl	$786444, (%rsp)
+	movw	$12, %ax
+	movw	$12, %dx
+	addq	$24, %rsp
+	retq
+	.seh_endproc
+
+	.def	main;
+	.scl	2;
+	.type	32;
+	.endef
+	.globl	main
+	.p2align	4, 0x90
+main:
+.seh_proc main
+	subq	$72, %rsp
+	.seh_stackalloc 72
+	.seh_endprologue
+	movl	$786444, 56(%rsp)
+	movl	$0, 48(%rsp)
+	leaq	64(%rsp), %rcx
+	callq	some_other
+	movw	%ax, 40(%rsp)
+	movw	%dx, 42(%rsp)
+	movl	40(%rsp), %eax
+	movl	%eax, 48(%rsp)
+	addq	$72, %rsp
 	retq
 	.seh_endproc
 

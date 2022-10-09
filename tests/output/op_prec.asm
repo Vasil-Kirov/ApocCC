@@ -13,15 +13,8 @@
 	.globl	main
 	.p2align	4, 0x90
 main:
-.seh_proc main
-	pushq	%rax
-	.seh_stackalloc 8
-	.seh_endprologue
-	movq	%rcx, (%rsp)
 	xorl	%eax, %eax
-	popq	%rcx
 	retq
-	.seh_endproc
 
 	.section	.rdata,"dr"
 	.globl	global_var

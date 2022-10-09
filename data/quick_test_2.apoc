@@ -1,23 +1,43 @@
 
 //fn $call c_decl printf(str: *u8, ...) -> i32;
 
-fn print_passed() -> i32 {
-	arr := Array_Struct { { 12, 13, 14 }, 3 };
-	arr.data[arr.len - 1] = arr.data[arr.len - 1] + 74;
-	-> #i32 (arr.data[arr.len - 1] / 2);
-}
-
-
-struct Array_Struct
+fn some_other() -> Foo
 {
-	data: [1024]u8;
-	len: i32;
+	foo: Foo;
+	foo.bar.a = 0x0C;
+	foo.bar.b = 0x0C;
+	-> foo;
+}
+
+$if NOPE
+fn foo() -> struct { a: i16; b: i16 }
+{
+
+}
+$end_if
+
+fn main() -> i32 {
+
+	my_struct: struct {
+		a: i16;
+		b: i16;
+	};
+	my_struct.a = 0x0C;
+	my_struct.b = 0x0C;
+
+	foo: Foo;
+	foo.bar = some_other().bar;
+	-> #i32 foo.c;
 }
 
 
-struct Test_Struct {
-      num_1: i32;
-      num_2: i32;
+struct $union Foo
+{
+	bar: struct {
+		a: i16;
+		b: i16;
+	};
+	c: i32;
 }
 
 

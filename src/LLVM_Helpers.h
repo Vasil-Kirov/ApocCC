@@ -13,6 +13,9 @@ llvm_store(Type_Info *type, llvm::Value *ptr, llvm::Value *value, Backend_State 
 void
 llvm_store(llvm::Value *ptr, llvm::Value *value, Backend_State *backend, int alignment);
 
+void
+llvm_zero_out_memory(llvm::Value *ptr, u64 size, llvm::Align alignment, IRBuilder<> *builder);
+
 llvm::FunctionType *
 type_to_func_type(Type_Info type, Backend_State *backend);
 
@@ -23,16 +26,17 @@ write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_t
 llvm::StructType *
 get_type_info_kind(const char *name, Backend_State *backend);
 
+llvm::Value *
+bit_cast_llvm_type(llvm::Value *value, llvm::Type *to, Backend_State *backend);
+
 void
 create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State *backend);
 
-AllocaInst *
-allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type,
-		u64 align);
+void
+llvm_memcpy(llvm::Value *dst, llvm::Value *src, Type_Info *type, Backend_State *backend);
 
 AllocaInst *
-allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State *backend,
-		u64 align, u64 size_in_bytes);
+allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, u64 align);
 
 AllocaInst *
 allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State *backend);

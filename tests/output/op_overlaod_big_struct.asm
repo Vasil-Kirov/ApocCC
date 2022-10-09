@@ -31,268 +31,83 @@ __xmm@00000005000000040000000300000002:
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	pushq	%rbp
-	.seh_pushreg %rbp
 	pushq	%rsi
 	.seh_pushreg %rsi
-	pushq	%rdi
-	.seh_pushreg %rdi
-	movl	$6112, %eax
+	movl	$4176, %eax
 	callq	__chkstk
 	subq	%rax, %rsp
-	.seh_stackalloc 6112
-	leaq	128(%rsp), %rbp
-	.seh_setframe %rbp, 128
+	.seh_stackalloc 4176
 	.seh_endprologue
-	andq	$-512, %rsp
-	movq	%rcx, 1016(%rsp)
-	leaq	2048(%rsp), %rsi
-	movl	$516, %r8d
-	movq	%rsi, %rcx
-	xorl	%edx, %edx
-	callq	memset
-	movl	$4, 2560(%rsp)
-	vxorps	%xmm1, %xmm1, %xmm1
-	vmovaps	%ymm1, 1024(%rsp)
-	vmovaps	%ymm1, 1472(%rsp)
-	vmovaps	%ymm1, 1440(%rsp)
-	vmovaps	%ymm1, 1408(%rsp)
-	vmovaps	%ymm1, 1376(%rsp)
-	vmovaps	%ymm1, 1344(%rsp)
-	vmovaps	%ymm1, 1312(%rsp)
-	vmovaps	%ymm1, 1280(%rsp)
-	vmovaps	%ymm1, 1248(%rsp)
-	vmovaps	%ymm1, 1216(%rsp)
-	vmovaps	%ymm1, 1184(%rsp)
-	vmovaps	%ymm1, 1152(%rsp)
-	vmovaps	%ymm1, 1120(%rsp)
-	vmovaps	%ymm1, 1088(%rsp)
-	vmovaps	%ymm1, 1056(%rsp)
-	vmovaps	%ymm1, 1504(%rsp)
+	movl	$4, 1568(%rsp)
 	vmovaps	__xmm@00000004000000030000000200000001(%rip), %xmm0
-	vmovaps	%xmm0, 1024(%rsp)
-	vmovups	%ymm1, 1456(%rsp)
-	vmovups	%ymm1, 1424(%rsp)
-	vmovups	%ymm1, 1392(%rsp)
-	vmovups	%ymm1, 1360(%rsp)
-	vmovups	%ymm1, 1328(%rsp)
-	vmovups	%ymm1, 1296(%rsp)
-	vmovups	%ymm1, 1264(%rsp)
-	vmovups	%ymm1, 1232(%rsp)
-	vmovups	%ymm1, 1200(%rsp)
-	vmovups	%ymm1, 1168(%rsp)
-	vmovups	%ymm1, 1136(%rsp)
-	vmovups	%ymm1, 1104(%rsp)
-	vmovups	%ymm1, 1072(%rsp)
-	vmovups	%ymm1, 1040(%rsp)
-	vmovups	%ymm1, 1504(%rsp)
-	vmovups	%ymm1, 1488(%rsp)
-	leaq	1024(%rsp), %rdx
+	vmovups	%xmm0, 32(%rsp)
+	vxorps	%xmm0, %xmm0, %xmm0
+	vmovups	%ymm0, 48(%rsp)
+	vmovups	%ymm0, 80(%rsp)
+	vmovups	%ymm0, 112(%rsp)
+	vmovups	%ymm0, 144(%rsp)
+	vmovups	%ymm0, 176(%rsp)
+	vmovups	%ymm0, 208(%rsp)
+	vmovups	%ymm0, 240(%rsp)
+	vmovups	%ymm0, 272(%rsp)
+	vmovups	%ymm0, 304(%rsp)
+	vmovups	%ymm0, 336(%rsp)
+	vmovups	%ymm0, 368(%rsp)
+	vmovups	%ymm0, 400(%rsp)
+	vmovups	%ymm0, 432(%rsp)
+	vmovups	%ymm0, 464(%rsp)
+	vmovups	%ymm0, 496(%rsp)
+	vmovups	%ymm0, 512(%rsp)
+	leaq	1056(%rsp), %rsi
+	leaq	32(%rsp), %rdx
 	movl	$512, %r8d
 	movq	%rsi, %rcx
 	vzeroupper
 	callq	memcpy
-	leaq	3072(%rsp), %rsi
+	leaq	1576(%rsp), %rcx
 	movl	$516, %r8d
-	movq	%rsi, %rcx
-	xorl	%edx, %edx
-	callq	memset
-	movl	$4, 3584(%rsp)
-	vxorps	%xmm1, %xmm1, %xmm1
-	vmovaps	%ymm1, 1536(%rsp)
-	vmovaps	%ymm1, 1984(%rsp)
-	vmovaps	%ymm1, 1952(%rsp)
-	vmovaps	%ymm1, 1920(%rsp)
-	vmovaps	%ymm1, 1888(%rsp)
-	vmovaps	%ymm1, 1856(%rsp)
-	vmovaps	%ymm1, 1824(%rsp)
-	vmovaps	%ymm1, 1792(%rsp)
-	vmovaps	%ymm1, 1760(%rsp)
-	vmovaps	%ymm1, 1728(%rsp)
-	vmovaps	%ymm1, 1696(%rsp)
-	vmovaps	%ymm1, 1664(%rsp)
-	vmovaps	%ymm1, 1632(%rsp)
-	vmovaps	%ymm1, 1600(%rsp)
-	vmovaps	%ymm1, 1568(%rsp)
-	vmovaps	%ymm1, 2016(%rsp)
+	movq	%rsi, %rdx
+	callq	memcpy
+	movl	$4, 2608(%rsp)
 	vmovaps	__xmm@00000005000000040000000300000002(%rip), %xmm0
-	vmovaps	%xmm0, 1536(%rsp)
-	vmovups	%ymm1, 1968(%rsp)
-	vmovups	%ymm1, 1936(%rsp)
-	vmovups	%ymm1, 1904(%rsp)
-	vmovups	%ymm1, 1872(%rsp)
-	vmovups	%ymm1, 1840(%rsp)
-	vmovups	%ymm1, 1808(%rsp)
-	vmovups	%ymm1, 1776(%rsp)
-	vmovups	%ymm1, 1744(%rsp)
-	vmovups	%ymm1, 1712(%rsp)
-	vmovups	%ymm1, 1680(%rsp)
-	vmovups	%ymm1, 1648(%rsp)
-	vmovups	%ymm1, 1616(%rsp)
-	vmovups	%ymm1, 1584(%rsp)
-	vmovups	%ymm1, 1552(%rsp)
-	vmovups	%ymm1, 2016(%rsp)
-	vmovups	%ymm1, 2000(%rsp)
-	leaq	1536(%rsp), %rdx
+	vmovups	%xmm0, 544(%rsp)
+	vxorps	%xmm0, %xmm0, %xmm0
+	vmovups	%ymm0, 560(%rsp)
+	vmovups	%ymm0, 592(%rsp)
+	vmovups	%ymm0, 624(%rsp)
+	vmovups	%ymm0, 656(%rsp)
+	vmovups	%ymm0, 688(%rsp)
+	vmovups	%ymm0, 720(%rsp)
+	vmovups	%ymm0, 752(%rsp)
+	vmovups	%ymm0, 784(%rsp)
+	vmovups	%ymm0, 816(%rsp)
+	vmovups	%ymm0, 848(%rsp)
+	vmovups	%ymm0, 880(%rsp)
+	vmovups	%ymm0, 912(%rsp)
+	vmovups	%ymm0, 944(%rsp)
+	vmovups	%ymm0, 976(%rsp)
+	vmovups	%ymm0, 1008(%rsp)
+	vmovups	%ymm0, 1024(%rsp)
+	leaq	2096(%rsp), %rsi
+	leaq	544(%rsp), %rdx
 	movl	$512, %r8d
 	movq	%rsi, %rcx
 	vzeroupper
 	callq	memcpy
-	movl	2560(%rsp), %edi
-	vmovaps	2528(%rsp), %ymm0
-	vmovaps	%ymm0, 960(%rsp)
-	vmovaps	2496(%rsp), %ymm0
-	vmovaps	%ymm0, 928(%rsp)
-	vmovaps	2464(%rsp), %ymm0
-	vmovaps	%ymm0, 896(%rsp)
-	vmovaps	2432(%rsp), %ymm0
-	vmovaps	%ymm0, 864(%rsp)
-	vmovaps	2400(%rsp), %ymm0
-	vmovaps	%ymm0, 832(%rsp)
-	vmovaps	2368(%rsp), %ymm0
-	vmovaps	%ymm0, 800(%rsp)
-	vmovaps	2336(%rsp), %ymm0
-	vmovaps	%ymm0, 768(%rsp)
-	vmovaps	2304(%rsp), %ymm0
-	vmovaps	%ymm0, 736(%rsp)
-	vmovaps	2272(%rsp), %ymm0
-	vmovaps	%ymm0, 704(%rsp)
-	vmovaps	2240(%rsp), %ymm0
-	vmovaps	%ymm0, 672(%rsp)
-	vmovaps	2208(%rsp), %ymm0
-	vmovaps	%ymm0, 640(%rsp)
-	vmovaps	2176(%rsp), %ymm0
-	vmovaps	%ymm0, 608(%rsp)
-	vmovaps	2048(%rsp), %ymm0
-	vmovaps	%ymm0, 576(%rsp)
-	vmovaps	2080(%rsp), %ymm0
-	vmovaps	%ymm0, 544(%rsp)
-	vmovaps	2112(%rsp), %ymm0
-	vmovaps	%ymm0, 512(%rsp)
-	vmovaps	2144(%rsp), %ymm0
-	vmovaps	%ymm0, 480(%rsp)
-	leaq	4096(%rsp), %rsi
+	leaq	2616(%rsp), %rcx
 	movl	$516, %r8d
-	movq	%rsi, %rcx
-	xorl	%edx, %edx
-	vzeroupper
-	callq	memset
-	vmovaps	576(%rsp), %ymm0
-	vmovaps	%ymm0, 4096(%rsp)
-	vmovaps	544(%rsp), %ymm0
-	vmovaps	%ymm0, 4128(%rsp)
-	vmovaps	512(%rsp), %ymm0
-	vmovaps	%ymm0, 4160(%rsp)
-	vmovaps	480(%rsp), %ymm0
-	vmovaps	%ymm0, 4192(%rsp)
-	vmovaps	608(%rsp), %ymm0
-	vmovaps	%ymm0, 4224(%rsp)
-	vmovaps	640(%rsp), %ymm0
-	vmovaps	%ymm0, 4256(%rsp)
-	vmovaps	672(%rsp), %ymm0
-	vmovaps	%ymm0, 4288(%rsp)
-	vmovaps	704(%rsp), %ymm0
-	vmovaps	%ymm0, 4320(%rsp)
-	vmovaps	736(%rsp), %ymm0
-	vmovaps	%ymm0, 4352(%rsp)
-	vmovaps	768(%rsp), %ymm0
-	vmovaps	%ymm0, 4384(%rsp)
-	vmovaps	800(%rsp), %ymm0
-	vmovaps	%ymm0, 4416(%rsp)
-	vmovaps	832(%rsp), %ymm0
-	vmovaps	%ymm0, 4448(%rsp)
-	vmovaps	864(%rsp), %ymm0
-	vmovaps	%ymm0, 4480(%rsp)
-	vmovaps	896(%rsp), %ymm0
-	vmovaps	%ymm0, 4512(%rsp)
-	vmovaps	928(%rsp), %ymm0
-	vmovaps	%ymm0, 4544(%rsp)
-	vmovaps	960(%rsp), %ymm0
-	vmovaps	%ymm0, 4576(%rsp)
-	movl	%edi, 4608(%rsp)
-	movq	%rsi, 464(%rsp)
-	movl	3584(%rsp), %edi
-	vmovaps	3552(%rsp), %ymm0
-	vmovaps	%ymm0, 960(%rsp)
-	vmovaps	3520(%rsp), %ymm0
-	vmovaps	%ymm0, 928(%rsp)
-	vmovaps	3488(%rsp), %ymm0
-	vmovaps	%ymm0, 896(%rsp)
-	vmovaps	3456(%rsp), %ymm0
-	vmovaps	%ymm0, 864(%rsp)
-	vmovaps	3424(%rsp), %ymm0
-	vmovaps	%ymm0, 832(%rsp)
-	vmovaps	3392(%rsp), %ymm0
-	vmovaps	%ymm0, 800(%rsp)
-	vmovaps	3360(%rsp), %ymm0
-	vmovaps	%ymm0, 768(%rsp)
-	vmovaps	3328(%rsp), %ymm0
-	vmovaps	%ymm0, 736(%rsp)
-	vmovaps	3296(%rsp), %ymm0
-	vmovaps	%ymm0, 704(%rsp)
-	vmovaps	3264(%rsp), %ymm0
-	vmovaps	%ymm0, 672(%rsp)
-	vmovaps	3232(%rsp), %ymm0
-	vmovaps	%ymm0, 640(%rsp)
-	vmovaps	3200(%rsp), %ymm0
-	vmovaps	%ymm0, 608(%rsp)
-	vmovaps	3072(%rsp), %ymm0
-	vmovaps	%ymm0, 576(%rsp)
-	vmovaps	3104(%rsp), %ymm0
-	vmovaps	%ymm0, 544(%rsp)
-	vmovaps	3136(%rsp), %ymm0
-	vmovaps	%ymm0, 512(%rsp)
-	vmovaps	3168(%rsp), %ymm0
-	vmovaps	%ymm0, 480(%rsp)
-	leaq	5120(%rsp), %rsi
-	movl	$516, %r8d
-	movq	%rsi, %rcx
-	xorl	%edx, %edx
-	vzeroupper
-	callq	memset
-	vmovaps	576(%rsp), %ymm0
-	vmovaps	%ymm0, 5120(%rsp)
-	vmovaps	544(%rsp), %ymm0
-	vmovaps	%ymm0, 5152(%rsp)
-	vmovaps	512(%rsp), %ymm0
-	vmovaps	%ymm0, 5184(%rsp)
-	vmovaps	480(%rsp), %ymm0
-	vmovaps	%ymm0, 5216(%rsp)
-	vmovaps	608(%rsp), %ymm0
-	vmovaps	%ymm0, 5248(%rsp)
-	vmovaps	640(%rsp), %ymm0
-	vmovaps	%ymm0, 5280(%rsp)
-	vmovaps	672(%rsp), %ymm0
-	vmovaps	%ymm0, 5312(%rsp)
-	vmovaps	704(%rsp), %ymm0
-	vmovaps	%ymm0, 5344(%rsp)
-	vmovaps	736(%rsp), %ymm0
-	vmovaps	%ymm0, 5376(%rsp)
-	vmovaps	768(%rsp), %ymm0
-	vmovaps	%ymm0, 5408(%rsp)
-	vmovaps	800(%rsp), %ymm0
-	vmovaps	%ymm0, 5440(%rsp)
-	vmovaps	832(%rsp), %ymm0
-	vmovaps	%ymm0, 5472(%rsp)
-	vmovaps	864(%rsp), %ymm0
-	vmovaps	%ymm0, 5504(%rsp)
-	vmovaps	896(%rsp), %ymm0
-	vmovaps	%ymm0, 5536(%rsp)
-	vmovaps	928(%rsp), %ymm0
-	vmovaps	%ymm0, 5568(%rsp)
-	vmovaps	960(%rsp), %ymm0
-	vmovaps	%ymm0, 5600(%rsp)
-	movl	%edi, 5632(%rsp)
-	movq	%rsi, 472(%rsp)
-	leaq	464(%rsp), %rcx
-	leaq	472(%rsp), %rdx
-	vzeroupper
+	movq	%rsi, %rdx
+	callq	memcpy
+	movl	1576(%rsp), %eax
+	movl	%eax, 3136(%rsp)
+	movl	2616(%rsp), %eax
+	movl	%eax, 3656(%rsp)
+	leaq	3136(%rsp), %rcx
+	leaq	3656(%rsp), %rdx
 	callq	"overload+"
 	nop
-	leaq	5984(%rbp), %rsp
-	popq	%rdi
+	addq	$4176, %rsp
 	popq	%rsi
-	popq	%rbp
 	retq
 	.seh_endproc
 
@@ -304,36 +119,111 @@ main:
 	.p2align	4, 0x90
 "overload+":
 .seh_proc "overload+"
-	pushq	%rbp
-	.seh_pushreg %rbp
-	pushq	%rsi
-	.seh_pushreg %rsi
-	pushq	%rdi
-	.seh_pushreg %rdi
-	subq	$2528, %rsp
-	.seh_stackalloc 2528
-	leaq	128(%rsp), %rbp
-	.seh_setframe %rbp, 128
+	subq	$1208, %rsp
+	.seh_stackalloc 1208
+	vmovaps	%xmm15, 1184(%rsp)
+	.seh_savexmm %xmm15, 1184
+	vmovaps	%xmm14, 1168(%rsp)
+	.seh_savexmm %xmm14, 1168
+	vmovaps	%xmm13, 1152(%rsp)
+	.seh_savexmm %xmm13, 1152
+	vmovaps	%xmm12, 1136(%rsp)
+	.seh_savexmm %xmm12, 1136
+	vmovaps	%xmm11, 1120(%rsp)
+	.seh_savexmm %xmm11, 1120
+	vmovaps	%xmm10, 1104(%rsp)
+	.seh_savexmm %xmm10, 1104
+	vmovaps	%xmm9, 1088(%rsp)
+	.seh_savexmm %xmm9, 1088
+	vmovaps	%xmm8, 1072(%rsp)
+	.seh_savexmm %xmm8, 1072
+	vmovaps	%xmm7, 1056(%rsp)
+	.seh_savexmm %xmm7, 1056
+	vmovaps	%xmm6, 1040(%rsp)
+	.seh_savexmm %xmm6, 1040
 	.seh_endprologue
-	andq	$-512, %rsp
-	movq	%rdx, %rsi
-	movq	%rcx, %rdi
-	leaq	512(%rsp), %rcx
-	movl	$516, %r8d
-	xorl	%edx, %edx
-	callq	memset
-	movq	(%rdi), %rdi
-	leaq	1536(%rsp), %rcx
-	movl	$516, %r8d
-	xorl	%edx, %edx
-	callq	memset
-	movq	(%rsi), %rcx
-	movl	(%rdi), %eax
-	addl	(%rcx), %eax
-	leaq	2400(%rbp), %rsp
-	popq	%rdi
-	popq	%rsi
-	popq	%rbp
+	vmovups	256(%rcx), %ymm0
+	vmovups	288(%rcx), %ymm1
+	vmovups	320(%rcx), %ymm2
+	vmovups	352(%rcx), %ymm3
+	vmovups	384(%rcx), %ymm4
+	vmovups	416(%rcx), %ymm5
+	vmovups	448(%rcx), %ymm6
+	vmovups	480(%rcx), %ymm7
+	vmovups	224(%rcx), %ymm8
+	vmovups	192(%rcx), %ymm9
+	vmovups	160(%rcx), %ymm10
+	vmovups	128(%rcx), %ymm11
+	vmovups	(%rcx), %ymm12
+	vmovups	32(%rcx), %ymm13
+	vmovups	64(%rcx), %ymm14
+	vmovups	96(%rcx), %ymm15
+	movl	512(%rcx), %eax
+	movl	%eax, 512(%rsp)
+	vmovups	%ymm13, 32(%rsp)
+	vmovups	%ymm14, 64(%rsp)
+	vmovups	%ymm15, 96(%rsp)
+	vmovups	%ymm11, 128(%rsp)
+	vmovups	%ymm10, 160(%rsp)
+	vmovups	%ymm9, 192(%rsp)
+	vmovups	%ymm8, 224(%rsp)
+	vmovups	%ymm7, 480(%rsp)
+	vmovups	%ymm6, 448(%rsp)
+	vmovups	%ymm5, 416(%rsp)
+	vmovups	%ymm4, 384(%rsp)
+	vmovups	%ymm3, 352(%rsp)
+	vmovups	%ymm2, 320(%rsp)
+	vmovups	%ymm1, 288(%rsp)
+	vmovups	%ymm0, 256(%rsp)
+	vmovups	%ymm12, (%rsp)
+	vmovups	256(%rdx), %ymm0
+	vmovups	288(%rdx), %ymm1
+	vmovups	320(%rdx), %ymm2
+	vmovups	352(%rdx), %ymm3
+	vmovups	384(%rdx), %ymm4
+	vmovups	416(%rdx), %ymm5
+	vmovups	448(%rdx), %ymm6
+	vmovups	480(%rdx), %ymm7
+	vmovups	224(%rdx), %ymm8
+	vmovups	192(%rdx), %ymm9
+	vmovups	160(%rdx), %ymm10
+	vmovups	128(%rdx), %ymm11
+	movl	512(%rdx), %eax
+	vmovups	(%rdx), %ymm12
+	vmovups	32(%rdx), %ymm13
+	vmovups	64(%rdx), %ymm14
+	vmovups	96(%rdx), %ymm15
+	vmovups	%ymm12, 520(%rsp)
+	movl	%eax, 1032(%rsp)
+	vmovups	%ymm13, 552(%rsp)
+	vmovups	%ymm14, 584(%rsp)
+	vmovups	%ymm15, 616(%rsp)
+	vmovups	%ymm11, 648(%rsp)
+	vmovups	%ymm10, 680(%rsp)
+	vmovups	%ymm9, 712(%rsp)
+	vmovups	%ymm8, 744(%rsp)
+	vmovups	%ymm7, 1000(%rsp)
+	vmovups	%ymm6, 968(%rsp)
+	vmovups	%ymm5, 936(%rsp)
+	vmovups	%ymm4, 904(%rsp)
+	vmovups	%ymm3, 872(%rsp)
+	vmovups	%ymm2, 840(%rsp)
+	vmovups	%ymm1, 808(%rsp)
+	vmovups	%ymm0, 776(%rsp)
+	movl	(%rsp), %eax
+	addl	520(%rsp), %eax
+	vmovaps	1040(%rsp), %xmm6
+	vmovaps	1056(%rsp), %xmm7
+	vmovaps	1072(%rsp), %xmm8
+	vmovaps	1088(%rsp), %xmm9
+	vmovaps	1104(%rsp), %xmm10
+	vmovaps	1120(%rsp), %xmm11
+	vmovaps	1136(%rsp), %xmm12
+	vmovaps	1152(%rsp), %xmm13
+	vmovaps	1168(%rsp), %xmm14
+	vmovaps	1184(%rsp), %xmm15
+	addq	$1208, %rsp
+	vzeroupper
 	retq
 	.seh_endproc
 

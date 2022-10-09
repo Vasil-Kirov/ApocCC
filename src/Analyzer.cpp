@@ -47,11 +47,14 @@ add_type(File_Contents *f, Ast_Node *structure)
 {
 	Assert(structure->type == type_struct);
 	Type_Info type_info = { T_STRUCT };
+
 	type_info.structure.member_count = structure->structure.member_count;
-	type_info.structure.is_union = structure->structure.is_union;
-	type_info.structure.name = structure->structure.struct_id.name;
+	type_info.structure.is_union     = structure->structure.is_union;
+	type_info.structure.is_packed    = structure->structure.is_packed;
+	type_info.structure.name         = structure->structure.struct_id.name;
 	type_info.structure.member_names = (u8 **)AllocateCompileMemory(type_info.structure.member_count * sizeof(u8 *));
 	type_info.structure.member_types = (Type_Info *)AllocateCompileMemory(type_info.structure.member_count * sizeof(Type_Info));
+
 	for(size_t i = 0; i < structure->structure.member_count; ++i)
 	{
 		type_info.structure.member_names[i] = structure->structure.members[i].identifier.name;
@@ -255,6 +258,9 @@ overload_fix_types(File_Contents *f, Ast_Node *overload)
 	func->function.type->type = T_FUNC;
 	func->function.type->func.return_type = return_type;
 	func->function.type->func.param_types = SDCreate(Type_Info);
+
+	func->function.type->token = return_type->token;
+
 	auto func_param_types = func->function.type->func.param_types;
 	size_t arg_count = SDCount(func->function.arguments);
 	
@@ -311,6 +317,7 @@ verify_overload(File_Contents *f, Ast_Node *overload)
 		if(is_type_primitive(&left_arg->type))
 			raise_semantic_error(f, "Cannot overload primitive type", *overload->overload.token);
 	}
+	check_func_type_doesnt_have_anonymous_structs(f, func->function.type, func->function.identifier.name);
 	verify_func_level_statement_list(f, func->function.body, func);
 }
 
@@ -430,6 +437,33 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 		} break;
 	}
 	return NULL;
+}
+
+b32
+is_type_anonymous_struct(Type_Info *type)
+{
+
+	if(type->type == T_STRUCT && vstd_strcmp((char *)type->identifier, (char *)"anonymous struct"))
+		return true;
+	return false;
+}
+
+void
+check_func_type_doesnt_have_anonymous_structs(File_Contents *f, Type_Info *func, u8 *func_name)
+{
+	if(is_type_anonymous_struct(func->func.return_type))
+	{
+		raise_formated_semantic_error(f, *func->token, "Function %s has an anonymous struct as a return type. That is not allowed", func_name);
+	}
+	auto param_count = SDCount(func->func.param_types);
+	for(size_t i = 0; i < param_count; ++i)
+	{
+		if(is_type_anonymous_struct(&func->func.param_types[i]))
+		{
+			raise_formated_semantic_error(f, *func->func.param_types[i].token, "Paramater #%d of function %s is an anonymous struct. Anonymous structs are not allowed as parameters", i + 1, func_name);
+		}
+
+	}
 }
 
 void
@@ -613,7 +647,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 void
 func_fix_types(File_Contents *f, Ast_Node *node)
 {
-	Assert(node->function.type->identifier);
+	Assert(node->function.identifier.token);
 
 	auto func_sym = get_symbol_spot(f, *node->function.identifier.token);
 	node->function.type = fix_type(f, node->function.type);
@@ -660,6 +694,7 @@ func_fix_types(File_Contents *f, Ast_Node *node)
 	memcpy(return_type, node->function.type, sizeof(Type_Info));
 	func_sym->type->func.return_type = return_type;
 	func_sym->type->func.param_types = SDCreate(Type_Info);
+	func_sym->type->token = return_type->token;
 	auto func_param_types = func_sym->type->func.param_types;
 	size_t arg_count = SDCount(node->function.arguments);
 	
@@ -685,7 +720,6 @@ void
 verify_func(File_Contents *f, Ast_Node *node)
 {
 	Assert(node->function.type->identifier);
-
 
 	Token_Iden *type_error_token = node->function.type->token;
 	node->function.type = fix_type(f, node->function.type);
@@ -747,6 +781,7 @@ verify_func(File_Contents *f, Ast_Node *node)
 		raise_semantic_error(f, error_msg, *type_error_token);
 	}
 
+	check_func_type_doesnt_have_anonymous_structs(f, node->function.type, node->function.identifier.name);
 	if(has_body)
 	{
 		verify_func_level_statement_list(f, node->function.body, node);
@@ -1038,8 +1073,10 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 		Type_Info rhs_value = get_expression_type(f, node->assignment.rhs, &node->assignment.token, NULL, expr_info);
 		memcpy(lhs_type, &lhs_value, sizeof(Type_Info));
 		memcpy(rhs_type, &rhs_value, sizeof(Type_Info));
-		Type_Info left = *fix_type(f, lhs_type);
-		Type_Info right = *fix_type(f, rhs_type);
+		Type_Info *left_ptr = fix_type(f, lhs_type);
+		Type_Info *right_ptr = fix_type(f, rhs_type);
+		Type_Info left = *left_ptr;
+		Type_Info right = *right_ptr;
 		i32 index = 0;
 		auto overload = get_overload(f, &left, &right, node, &index);
 		if(overload)
@@ -1048,12 +1085,18 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 			Token_Iden *at_tok = (Token_Iden *)AllocateCompileMemory(sizeof(Token_Iden));
 			memcpy(at_tok, &node->assignment.token, sizeof(Token_Iden));
 			at_tok->type = (Token)'@';
+
+			Type_Info *left_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			left_type->type = T_POINTER;
+			left_type->pointer.type = left_ptr;
+			left_type->identifier = var_type_to_name(left_type, false);
+
 			auto left_expr = alloc_node();
 			left_expr->type = type_unary_expr;
 			left_expr->unary_expr.expression = node->assignment.lhs;
-			left_expr->unary_expr.expr_type = left;
+			left_expr->unary_expr.expr_type = *left_type;
 			left_expr->unary_expr.op = at_tok;
-			overload_overwrite(&node->assignment.token, node, left_expr, node->assignment.rhs, &left, &right, overload);
+			overload_overwrite(&node->assignment.token, node, left_expr, node->assignment.rhs, left_type, right_ptr, overload);
 			return;
 		}
 		else
@@ -2221,6 +2264,26 @@ are_op_compatible(Type_Info a, Type_Info b)
 }
 
 b32
+compare_structs_by_fields(Type_Info *a, Type_Info *b)
+{
+	if(a->type != T_STRUCT || b->type != T_STRUCT)
+		return false;
+
+	if(a->structure.member_count != b->structure.member_count)
+		return false;
+
+	int member_count = a->structure.member_count;
+	for(int i = 0; i < member_count; ++i)
+	{
+		Type_Info a_mem = a->structure.member_types[i];
+		Type_Info b_mem = b->structure.member_types[i];
+		if(!check_type_compatibility(a_mem, b_mem))
+			return false;
+	}
+	return true;
+}
+
+b32
 check_type_compatibility(Type_Info a, Type_Info b)
 {
 	if(a.type == T_UNTYPED_INTEGER && b.type == T_POINTER)
@@ -2272,6 +2335,13 @@ check_type_compatibility(Type_Info a, Type_Info b)
 	}
 	if(a.type == T_BOOLEAN && b.type == T_BOOLEAN)
 		return true;
+	if(a.type == T_STRUCT || b.type == T_STRUCT)
+	{
+		if(vstd_strcmp((char *)a.identifier, (char *)"anonymous struct") || vstd_strcmp((char *)a.identifier, (char *)"anonymous struct"))
+		{
+			return compare_structs_by_fields(&a, &b);
+		}
+	}
 	if(!vstd_strcmp((char *)a.identifier, (char *)b.identifier))
 		return false;
 	
@@ -2385,7 +2455,12 @@ var_type_to_name(Type_Info *type, b32 bracket)
 	}
 	else if(type->type == T_STRUCT)
 	{
-		vstd_strcat(result, (const char *)type->structure.name);
+		if(!type->structure.name)
+		{
+			vstd_strcat(result, "anonymous struct");
+		}
+		else
+			vstd_strcat(result, (const char *)type->structure.name);
 	}
 	else if(type->type == T_POINTER)
 	{

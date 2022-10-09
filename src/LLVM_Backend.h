@@ -143,6 +143,9 @@ llvm::Constant *
 interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func);
 
 void
+generate_struct_type(File_Contents *f, Type_Info type, llvm::StructType *opaque_struct);
+
+void
 generate_signatures(File_Contents *f);
 
 llvm::Value *

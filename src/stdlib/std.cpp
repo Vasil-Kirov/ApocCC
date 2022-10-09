@@ -457,6 +457,9 @@ _vstd_u32_to_x(u32 num, char *arr_to_fill, b32 lower_case)
 b32
 vstd_strcmp(char *str1, char *str2)
 {
+	if(!str1 || !str2)
+		return str1 == str2;
+
 	while(*str1 == *str2)
 	{
 		if(*str1 == 0 && *str2 == 0) return true;

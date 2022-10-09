@@ -1,15 +1,3 @@
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DebugInfoMetadata.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/Support/CommandLine.h"
 #include <LLVM_Backend.h>
 #include <LLVM_Helpers.h>
 #include <Type.h>
@@ -68,8 +56,7 @@ llvm_zero_out_memory(llvm::Value *ptr, u64 size, llvm::Align alignment, IRBuilde
 }
 
 AllocaInst *
-allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type,
-		u64 align)
+allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, u64 align)
 {
 	Assert(func);
 	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
@@ -80,13 +67,11 @@ allocate_with_llvm_no_zero(Function *func, u8 *var_name, llvm::Type *type,
 }
 
 AllocaInst *
-allocate_with_llvm(Function *func, u8 *var_name, llvm::Type *type, Backend_State *backend,
-		u64 align, u64 size_in_bytes)
+allocate_size(Function *func, u8 *var_name, int size, Backend_State *backend)
 {
-	Assert(func);
-	auto location = allocate_with_llvm_no_zero(func, var_name, type, align);
-	auto alignment = Align(align);
-	llvm_zero_out_memory(location, size_in_bytes, alignment, backend->builder);
+	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
+	auto value_size = ConstantInt::get(*backend->context, APInt(64, (u64)size));
+	auto location = temp_builder.CreateAlloca(Type::getInt8Ty(*backend->context), value_size, (char *)var_name);
 	return location;
 }
 
@@ -100,7 +85,7 @@ allocate_variable(Function *func, u8 *var_name, Type_Info type, Backend_State *b
 		auto location = temp_builder.CreateAlloca(alloc_type, 0, (char *)var_name);
 		auto alignment = Align(get_type_alignment(type));
 		location->setAlignment(alignment);
-		llvm_zero_out_memory(location, get_type_size(type), alignment, backend->builder);
+		//llvm_zero_out_memory(location, get_type_size(type), alignment, backend->builder);
 		return location;
 	}
 	else
@@ -177,8 +162,8 @@ write_type_info_pointer_to_llvm(Type_Info *type_ptr, llvm::Value *ptr,
 	}
 }
 
-AllocaInst *
-write_string(u8 *str, llvm::Function *func, Backend_State *backend)
+llvm::Value *
+get_string(u8 *str, llvm::Function *func, Backend_State *backend)
 {
 	size_t len = vstd_strlen((char *)str);
 	Type_Info u8_t = {};
@@ -187,73 +172,67 @@ write_string(u8 *str, llvm::Function *func, Backend_State *backend)
 
 	Type_Info str_array = {};
 	str_array.type = T_STRING;
-	str_array.array.type = &u8_t;
-	// @TODO: null character?
-	str_array.array.elem_count = len + 1;
-	str_array.array.array_type = ARR_STATIC;
-	auto llvm_array = apoc_type_to_llvm(str_array, backend);
-
-	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
-	auto ptr_ptr = temp_builder.CreateAlloca(llvm_array, 0, (char *)"str_ptr");
 	GlobalVariable *global_str_lit = backend->builder->CreateGlobalString(
 			StringRef((char *)str, len)
 			);
-	auto store_inst = backend->builder->CreateStore(global_str_lit, ptr_ptr);
-	store_inst->setAlignment(Align(8));
-	return ptr_ptr;
+	return global_str_lit;
 }
 
 void
 write_struct_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State *backend,
-		Function *func, llvm::Type *type_info_type)
+		Function *func, llvm::Type *type_info_type, StructType *llvm_type)
 {
-	auto llvm_type = get_type_info_kind("Type_Struct", backend);
 	gep_and_write_val_int(ptr, llvm_type, backend, 1, to_write.structure.member_count, 32);
 	gep_and_write_val_int(ptr, llvm_type, backend, 2, to_write.structure.is_union, 8);
 	gep_and_write_val_int(ptr, llvm_type, backend, 3, to_write.structure.is_packed, 8);
 	auto name_idx = backend->builder->CreateStructGEP(llvm_type, ptr, 4);
-	auto name_ptr = write_string(to_write.structure.name, func, backend);
+	auto name_ptr = get_string(to_write.structure.name, func, backend);
 	auto store_inst = backend->builder->CreateStore(name_ptr, name_idx);
 	store_inst->setAlignment(Align(8));
-	auto member_names = backend->builder->CreateStructGEP(llvm_type, ptr, 5);
-	auto member_types = backend->builder->CreateStructGEP(llvm_type, ptr, 6);
-	auto zero = ConstantInt::get(*backend->context, llvm::APInt(64, 0, true));
+	auto member_names_ptr = backend->builder->CreateStructGEP(llvm_type, ptr, 5);
+	auto member_types_ptr = backend->builder->CreateStructGEP(llvm_type, ptr, 6);
 
-	LG_DEBUG("opaque? %d", member_names->getType()->isOpaquePointerTy());
+	auto member_names = allocate_size(func, (u8 *)"member_names",
+			sizeof(u8 *) * to_write.structure.member_count, backend);
+	member_names->setAllocatedType(PointerType::get(Type::getInt8Ty(*backend->context), 0));
+	/*
+	auto member_names = backend->builder->CreateLoad(
+			PointerType::get(Type::getInt8PtrTy(*backend->context), 0),
+			member_names_ptr);
+			*/
 	for(size_t i = 0; i < to_write.structure.member_count; ++i)
 	{
-		llvm::Value *idx_list[2] = {
-			zero,
+		llvm::Value *idx_list[] = {
 			ConstantInt::get(Type::getInt64Ty(*backend->context), i),
 		};
-		// @NOTE: pointer to pointer to u8 type
-		auto name_elem_ptr = backend->builder->CreateGEP(PointerType::get(PointerType::get(Type::getInt8Ty(*backend->context), 0), 0), member_names,
-				idx_list);
-		auto name_ptr = write_string(to_write.structure.member_names[i], func, backend);
+		auto name_elem_ptr = backend->builder->CreateGEP(
+					Type::getInt8PtrTy(*backend->context), member_names, idx_list);
+		auto name_ptr = get_string(to_write.structure.member_names[i], func, backend);
 		store_inst = backend->builder->CreateStore(name_ptr, name_elem_ptr);
 		store_inst->setAlignment(Align(8));
 
 		// @NOTE: pointer to type info
+		/*
 		auto type_elem_ptr = backend->builder->CreateGEP(PointerType::get(get_type_info_kind("Type_Info", backend), 0), member_types,
 				idx_list);
 		write_type_info_to_llvm(to_write.structure.member_types[i], type_elem_ptr,
 				type_info_type, backend, func);
+				*/
 	}
+	backend->builder->CreateStore(member_names, member_names_ptr);
 }
 
 void
 write_array_to_llvm(Type_Info to_write, llvm::Value *ptr,
-		Backend_State *backend, llvm::Function *func)
+		Backend_State *backend, llvm::Function *func, StructType *llvm_type)
 {
-	auto llvm_type = get_type_info_kind("Type_Array", backend);
 	write_type_info_pointer_to_llvm(to_write.array.type, ptr, llvm_type, backend, func);
 	gep_and_write_val_int(ptr, llvm_type, backend, 2, to_write.array.elem_count, 64);
 }
 
 void
-write_primitive_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State *backend)
+write_primitive_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State *backend, llvm::StructType *llvm_type)
 {
-	auto llvm_type = get_type_info_kind("Type_Primitive", backend);
 	gep_and_write_val_int(ptr, llvm_type, backend, 1, to_write.primitive.size, 32);
 }
 
@@ -280,21 +259,28 @@ write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_t
 		case T_BOOLEAN:
 		case T_INTEGER:
 		{
-			write_primitive_to_llvm(to_write, ptr, backend);
+			auto prim_type = get_type_info_kind("Type_Primitive", backend);
+			auto casted = bit_cast_llvm_type(ptr, PointerType::get(prim_type, 0), backend);
+			write_primitive_to_llvm(to_write, casted, backend, prim_type);
 		} break;
 		case T_STRUCT:
 		{
-			write_struct_to_llvm(to_write, ptr, backend, func, llvm_type);
+			auto struct_type = get_type_info_kind("Type_Struct", backend);
+			auto casted = bit_cast_llvm_type(ptr, PointerType::get(struct_type, 0), backend);
+			write_struct_to_llvm(to_write, casted, backend, func, llvm_type, struct_type);
 		} break;
 		case T_POINTER:
 		{
 			auto pointer_type = get_type_info_kind("Type_Pointer", backend);
-			write_type_info_pointer_to_llvm(to_write.pointer.type, ptr, pointer_type, backend,
+			auto casted = bit_cast_llvm_type(ptr, PointerType::get(pointer_type, 0), backend);
+			write_type_info_pointer_to_llvm(to_write.pointer.type, casted, pointer_type, backend,
 					func);
 		} break;
 		case T_ARRAY:
 		{
-			write_array_to_llvm(to_write, ptr, backend, func);
+			auto array_type = get_type_info_kind("Type_Array", backend);
+			auto casted = bit_cast_llvm_type(ptr, PointerType::get(array_type, 0), backend);
+			write_array_to_llvm(to_write, casted, backend, func, array_type);
 		} break;
 		default:
 		{
@@ -497,12 +483,21 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 	}
 }
 
+void
+llvm_memcpy(llvm::Value *dst, llvm::Value *src, Type_Info *type, Backend_State *backend)
+{
+	auto align = Align(get_type_alignment(*type));
+	auto size  = get_type_size(*type);
+	backend->builder->CreateMemCpy(dst, align, src, align, size);
+}
+
 llvm::FunctionType *
 type_to_func_type(Type_Info type, Backend_State *backend)
 {
 	b32 is_apoc = type.func.calling_convention == CALL_APOC;
+	b32 send_ptr = !is_standard_size(type.func.return_type);
 	size_t param_count = SDCount(type.func.param_types);
-	if(is_apoc)
+	if(is_apoc || send_ptr)
 		param_count++;
 	llvm::Type *param_types[param_count];
 	memset(param_types, 0, param_count);
@@ -512,9 +507,13 @@ type_to_func_type(Type_Info type, Backend_State *backend)
 	{
 		param_types[i++] = PointerType::get(get_context_type(), 0);
 	}
+	else if(send_ptr)
+	{
+		param_types[i++] = PointerType::get(apoc_type_to_llvm(*type.func.return_type, backend), 0);
+	}
 	for (; i < param_count; ++i)
 	{
-		Type_Info param_type = type.func.param_types[i - (is_apoc ? 1 : 0)];
+		Type_Info param_type = type.func.param_types[i - (is_apoc | send_ptr ? 1 : 0)];
 		if (param_type.type == T_DETECT)
 		{
 			has_var_args = true;
@@ -527,10 +526,24 @@ type_to_func_type(Type_Info type, Backend_State *backend)
 		else
 			param_types[i] = apoc_type_to_llvm(param_type, backend);
 	}
+
+	if(send_ptr)
+	{
+		Type_Info *void_ty = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		void_ty->type = T_VOID;
+		void_ty->identifier = (u8 *)"void";
+		type.func.return_type = void_ty;
+	}
 	auto args = makeArrayRef((llvm::Type **)param_types, has_var_args ?
 			param_count - 1 : param_count);
 	return FunctionType::get(apoc_type_to_llvm(*type.func.return_type, backend),
 			args, has_var_args);
+}
+
+llvm::Value *
+bit_cast_llvm_type(llvm::Value *value, llvm::Type *to, Backend_State *backend)
+{
+	return backend->builder->CreateCast(Instruction::CastOps::BitCast, value, to, "bit_cast"); 
 }
 
 llvm::Type *
@@ -578,6 +591,11 @@ apoc_type_to_llvm(Type_Info type, Backend_State *backend)
 	else if (type.type == T_STRUCT)
 	{
 		auto struct_type = shget(backend->struct_types, type.identifier);
+		if(!struct_type)
+		{
+			struct_type = StructType::get(*backend->context, type.structure.is_packed);
+			generate_struct_type(NULL, type, struct_type);
+		}
 		return struct_type;
 	}
 	else if (type.type == T_ARRAY)

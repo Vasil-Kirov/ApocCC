@@ -52,7 +52,7 @@ initialize_compiler(File_Contents *f)
 	// NOTE(Vasko): Add keywords to string hash table
 	if(!keyword_table)
 	{
-		shput(keyword_table, "fn",       tok_func);
+		shput(keyword_table, "fn",         tok_func);
 		shput(keyword_table, "extern",     tok_extern);
 		shput(keyword_table, "struct",     tok_struct);
 		shput(keyword_table, "enum",       tok_enum);
@@ -94,10 +94,11 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "$size",      tok_size);
 		shput(keyword_table, "$default",   tok_default);
 		shput(keyword_table, "$union",     tok_union);
+		shput(keyword_table, "$pack",      tok_pack);
 		shput(keyword_table, "$intrinsic", tok_intrinsic);
 		shput(keyword_table, "$call",      tok_call_conv);
-		shput(keyword_table, "$is_defined",tok_is_defined);
-		shput(keyword_table, "$end_is",    tok_end_is);
+		shput(keyword_table, "$if",        tok_is_defined);
+		shput(keyword_table, "$end_if",    tok_end_is);
 		shput(keyword_table, "overload",   tok_overload);
 		shput(keyword_table, "defer",      tok_defer);
 	}

@@ -1,4 +1,5 @@
 import os
+from os.path import isdir
 import subprocess
 from time import time
 
@@ -8,8 +9,8 @@ from colorama import Style
 def get_absolute_paths(directory):
     paths = list()
     for dirpath,_,filenames in os.walk(directory):
-        if str(dirpath).endswith('..'):
-            for f in filenames:
+        for f in filenames:
+            if f.endswith('.apoc'):
                 paths.append(os.path.abspath(os.path.join(dirpath, f)))
 
     return paths;

@@ -14,13 +14,12 @@
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	subq	$16, %rsp
-	.seh_stackalloc 16
+	pushq	%rax
+	.seh_stackalloc 8
 	.seh_endprologue
-	movq	%rcx, 8(%rsp)
 	movl	$10, 4(%rsp)
 	movl	$10, %eax
-	addq	$16, %rsp
+	popq	%rcx
 	retq
 	.seh_endproc
 

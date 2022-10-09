@@ -14,14 +14,17 @@
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	subq	$56, %rsp
-	.seh_stackalloc 56
+	subq	$72, %rsp
+	.seh_stackalloc 72
 	.seh_endprologue
-	movq	%rcx, 48(%rsp)
-	vxorps	%xmm0, %xmm0, %xmm0
-	vmovaps	%xmm0, 32(%rsp)
-	movl	$0, 40(%rsp)
-	movq	$0, 32(%rsp)
+	movl	$0, 64(%rsp)
+	movq	$0, 56(%rsp)
+	movq	56(%rsp), %rax
+	movq	%rax, 32(%rsp)
+	movl	64(%rsp), %eax
+	movl	%eax, 40(%rsp)
+	movl	68(%rsp), %eax
+	movl	%eax, 44(%rsp)
 	movl	$10, %ecx
 	callq	malloc
 	movq	%rax, 32(%rsp)
@@ -33,7 +36,7 @@ main:
 	movq	32(%rsp), %rdx
 	movsbl	(%rdx,%rax), %eax
 	subl	%ecx, %eax
-	addq	$56, %rsp
+	addq	$72, %rsp
 	retq
 	.seh_endproc
 

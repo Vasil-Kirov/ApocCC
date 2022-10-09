@@ -251,4 +251,7 @@ func_fix_types(File_Contents *f, Ast_Node *node);
 b32
 is_logical_op(Token op);
 
+void
+check_func_type_doesnt_have_anonymous_structs(File_Contents *f, Type_Info *func, u8 *func_name);
+
 #endif

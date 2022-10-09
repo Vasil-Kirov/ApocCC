@@ -83,10 +83,7 @@ get_struct_alignment(Type_Info struct_type)
 	for(size_t i = 0; i < member_count; ++i)
 	{
 		int this_member = 1;
-		if(member_types[i].type == T_STRUCT)
-			this_member = get_struct_alignment(member_types[i]);
-		else
-			this_member = get_type_size(member_types[i]);
+		this_member = get_type_alignment(member_types[i]);
 		
 		if(this_member > biggest_member) biggest_member = this_member;
 	}
@@ -176,7 +173,7 @@ b32
 is_standard_size(Type_Info *type)
 {
 	int size = get_type_size(*type);
-	if(size == 1 || size == 2 || size == 4 || size == 8)
+	if(size == 0 || size == 1 || size == 2 || size == 4 || size == 8)
 		return true;
 	return false;
 }
@@ -266,6 +263,16 @@ fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 		result->pointer.type = pointed;
 		return result;
 	}
+	else if(type->type == T_STRUCT && !is_fixing_struct)
+	{
+		result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		memcpy(result, type, sizeof(Type_Info));
+		size_t member_count = type->structure.member_count;
+		for(size_t i = 0; i < member_count; ++i)
+		{
+			result->structure.member_types[i] = *fix_type(f, &result->structure.member_types[i], true);
+		}
+	}
 
 	if(!type_is_invalid(type))
 	{
@@ -276,16 +283,6 @@ fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 		result = get_type(f, type->identifier);
 		if(result->token == NULL || result->token->file == NULL)
 			result->token = type->token;
-	}
-	if(type->type == T_STRUCT && !is_fixing_struct)
-	{
-		result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-		memcpy(result, type, sizeof(Type_Info));
-		size_t member_count = type->structure.member_count;
-		for(size_t i = 0; i < member_count; ++i)
-		{
-			result->structure.member_types[i] = *fix_type(f, &result->structure.member_types[i], true);
-		}
 	}
 	return result;
 }

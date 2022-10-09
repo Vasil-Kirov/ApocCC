@@ -14,15 +14,14 @@
 	.p2align	4, 0x90
 main:
 .seh_proc main
-	subq	$56, %rsp
-	.seh_stackalloc 56
+	subq	$40, %rsp
+	.seh_stackalloc 40
 	.seh_endprologue
-	movq	%rcx, 40(%rsp)
-	leaq	48(%rsp), %rcx
+	leaq	32(%rsp), %rcx
 	movl	$20, %edx
 	callq	increment_number
 	nop
-	addq	$56, %rsp
+	addq	$40, %rsp
 	retq
 	.seh_endproc
 
@@ -34,15 +33,17 @@ main:
 	.p2align	4, 0x90
 increment_number:
 .seh_proc increment_number
-	subq	$56, %rsp
-	.seh_stackalloc 56
+	subq	$72, %rsp
+	.seh_stackalloc 72
 	.seh_endprologue
-	movq	%rcx, 40(%rsp)
-	movl	%edx, 36(%rsp)
-	leaq	48(%rsp), %rcx
+	movq	%rcx, 48(%rsp)
+	movq	(%rcx), %rax
+	movq	%rax, 56(%rsp)
+	movl	%edx, 44(%rsp)
+	leaq	64(%rsp), %rcx
 	callq	increment_number_again
 	incl	%eax
-	addq	$56, %rsp
+	addq	$72, %rsp
 	retq
 	.seh_endproc
 
@@ -54,13 +55,15 @@ increment_number:
 	.p2align	4, 0x90
 increment_number_again:
 .seh_proc increment_number_again
-	subq	$16, %rsp
-	.seh_stackalloc 16
+	subq	$24, %rsp
+	.seh_stackalloc 24
 	.seh_endprologue
 	movq	%rcx, 8(%rsp)
+	movq	(%rcx), %rax
+	movq	%rax, 16(%rsp)
 	movl	%edx, 4(%rsp)
 	leal	1(%rdx), %eax
-	addq	$16, %rsp
+	addq	$24, %rsp
 	retq
 	.seh_endproc
 
