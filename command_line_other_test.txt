@@ -1,4 +1,0 @@
---debug Test.apoc Standard\String.apoc Standard\OS.apoc Standard\Windows.apoc Standard\Basic.apoc Standard\C_Standard.apoc
-
-
-E:\C_Projects\Apocalypse\Test.apoc E:\C_Projects\Apocalypse\Standard\String.apoc E:\C_Projects\Apocalypse\Standard\OS.apoc E:\C_Projects\Apocalypse\Standard\Windows.apoc E:\C_Projects\Apocalypse\Standard\Basic.apoc E:\C_Projects\Apocalypse\Standard\C_Standard.apoc
