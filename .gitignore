@@ -1,13 +1,42 @@
+# Custome
+stdout_pipe
+windows-build.txt
+compile_flags.txt
+copy_syntax_file.bat
+debug.log
+CppProperties.json
+LLVM_LIBS.txt
+apoc-lsp-debugging.txt
+c_args.txt
+debug_buffer.txt
+error_file.txt
+command_line_other_test.txt
+GPUCache
+c_out
+x64
+*.wasm
+*.llir
+*.lnk
+*.vscode
+
+# Project Files
+*.vcxproj
+*.filters
+*.user
+*.sln
+
 # Prerequisites
 *.d
 *.cmake
 
 # Assembly Outputed files
-.s
+*.s
+*.asm
 
 # LLVM IR
-.ll
+*.ll
 
+# Visual Studio Projects
 .vs
 bin\.vs
 

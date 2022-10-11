@@ -21,6 +21,6 @@ If you do any these things you will be put in bad programmer jail.
 
 4. Take a pointer to data that is in a dynamic array:
  - Pretty much the same thing as the one above,
-   array resizes -> data points to garbage
+   array resizes -> pointer points to garbage
 
 
