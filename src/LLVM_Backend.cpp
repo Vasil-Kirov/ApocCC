@@ -368,23 +368,6 @@ generate_opaque_struct(u8 *name)
 	return StructType::create(*backend.context, StringRef((char *)name, vstd_strlen((char *)name)));
 }
 
-u8 *
-get_non_overloaded_name(u8 *overloaded_name)
-{
-	size_t i = 0;
-	for(; overloaded_name[i] != '!'; ++i)
-		if(overloaded_name[i] == '\0') return overloaded_name;
-	size_t before_name = vstd_strlen((char *)overloaded_name);
-	overloaded_name[i] = 0;
-	size_t after_name  = vstd_strlen((char *)overloaded_name);
-	if(before_name == after_name)
-		return overloaded_name;
-
-	auto non_overloaded = (u8 *)AllocateCompileMemory(after_name + 1);
-	memcpy(non_overloaded, overloaded_name, after_name);
-	return overloaded_name;
-}
-
 void
 generate_signatures(File_Contents *f)
 {
@@ -594,6 +577,11 @@ generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count)
 llvm::Value *
 create_cast(Type_Info to, Type_Info from, llvm::Value *castee)
 {
+	if(to.type == T_BOOLEAN && from.type != T_BOOLEAN)
+	{
+		auto zero = ConstantInt::get(apoc_type_to_llvm(from, &backend), 0);
+		return backend.builder->CreateICmpNE(castee, zero);
+	}
 	b32 should_cast = true;
 	auto to_cast = get_cast_type(to, from, &should_cast);
 
@@ -605,21 +593,21 @@ create_cast(Type_Info to, Type_Info from, llvm::Value *castee)
 }
 
 DISubroutineType *
-create_func_debug_type(Ast_Node *node)
+create_func_debug_type(Type_Info *func_type)
 {
-	auto arguments = node->function.arguments;
-	size_t param_count = SDCount(node->function.arguments) + 1;
+	auto arguments = func_type->func.param_types;
+	size_t param_count = SDCount(func_type->func.param_types) + 1;
 	Metadata *types[param_count];
-	types[0] = to_debug_type(*node->function.type->func.return_type, &debug);
+	types[0] = to_debug_type(*func_type->func.return_type, &debug);
 	i32 j = 0;
 	b32 found_var_args = false;
 	for(size_t i = 1; i < param_count; ++i)
 	{
-		Type_Info type = arguments[j]->variable.type;
+		Type_Info type = arguments[j];
 		if(type.type == T_DETECT)
 			found_var_args = true;
 		else
-			types[i] = to_debug_type(arguments[j]->variable.type, &debug);
+			types[i] = to_debug_type(type, &debug);
 		if(!found_var_args)
 			j++;
 	}
@@ -845,8 +833,7 @@ llvm::Value *
 copy_argument_to_ptr(llvm::Value *arg, Function *func, Type_Info type)
 {
 	auto result = allocate_variable(func, (u8 *)"arg_copy", type, &backend);
-	auto align = Align(get_type_alignment(type));
-	backend.builder->CreateMemCpy(result, align, arg, align, get_type_alignment(type));
+	llvm_memcpy(result, arg, &type, &backend);
 #if 0
 	auto llvm_type = apoc_type_to_llvm(type, &backend);
 	auto pointer_to_result = allocate_with_llvm(func, (u8 *)"arg_copy&",
@@ -930,11 +917,22 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	{
 		b32 expr_i = i - (is_apoc || ret_ptr ? 1 : 0);
 		arg_exprs[i] = generate_expression(f, call_node->func_call.arguments[expr_i], func);
+
 		if(arg_types[j].type != T_DETECT)
 		{
 			arg_exprs[i] = create_cast(arg_types[j], expr_types[expr_i], arg_exprs[i]);
 		}
-		else
+
+		if((expr_types[expr_i].type == T_STRUCT || expr_types[expr_i].type == T_ARRAY) && !is_standard_size(&expr_types[expr_i]))
+		{
+			arg_exprs[i] = copy_argument_to_ptr(arg_exprs[i], func, expr_types[expr_i]);
+		}
+		else if(!found_var_args && expr_types[expr_i].type == T_STRUCT && is_standard_size(&expr_types[expr_i]))
+		{
+			arg_exprs[i] = llvm_load(&expr_types[expr_i], arg_exprs[i], "loaded_arg_struct", &backend);
+		}
+
+		if(arg_types[j].type == T_DETECT)
 		{
 			found_var_args = true;
 			if(call_node->func_call.operand_type.func.calling_convention == CALL_APOC)
@@ -948,10 +946,6 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		}
 		if(!found_var_args)
 			j++;
-		if((expr_types[expr_i].type == T_STRUCT || expr_types[expr_i].type == T_ARRAY) && !is_standard_size(&expr_types[expr_i]))
-		{
-			arg_exprs[i] = copy_argument_to_ptr(arg_exprs[i], func, expr_types[expr_i]);
-		}
 	}
 	if(ret_ptr)
 	{
@@ -1193,7 +1187,7 @@ generate_func(File_Contents *f, Ast_Node *node)
 			u64 line = node->function.identifier.token->line;
 			u64 scope_line = node->function.body->scope_desc.token->line;
 			subprogram = debug.builder->createFunction((DIScope *)debug_unit.file, debug_name, StringRef(),
-					debug_unit.file, line, create_func_debug_type(node), scope_line, DINode::FlagZero, DISubprogram::SPFlagDefinition);
+					debug_unit.file, line, create_func_debug_type(node->function.type), scope_line, DINode::FlagZero, DISubprogram::SPFlagDefinition);
 			Assert(subprogram);
 			func->setSubprogram(subprogram);
 			stack_push(debug.scope, subprogram);
@@ -1586,17 +1580,28 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_struct_init:
 		{
+			Assert(node->struct_init.type.type == T_STRUCT);
 			AllocaInst *struct_loc = allocate_variable(func, node->struct_init.operand->identifier.name, node->struct_init.type, &backend);
-			StructType *type = shget(backend.struct_types, node->struct_init.operand->identifier.name);
+			
+			// @NOTE: fast path
 			if(node->struct_init.is_empty_init)
 			{
+				llvm_memset(struct_loc, 0, get_type_size(node->struct_init.type), get_type_alignment(node->struct_init.type), &backend);
 			}
 			else
 			{
+				StructType *type = llvm::dyn_cast<StructType>(apoc_type_to_llvm(node->struct_init.type, &backend));
 				size_t expr_count = SDCount(node->struct_init.expressions);
 				auto expressions = node->struct_init.expressions;
 
 				auto members = node->struct_init.type.structure.member_types;
+
+				if(expr_count < node->struct_init.type.structure.member_count)
+				{
+					auto size_to_fill = get_type_size(node->struct_init.type);
+					auto alignment    = get_type_alignment(node->struct_init.type);
+					llvm_memset(struct_loc, 0, size_to_fill, alignment, &backend);
+				}
 
 				for(i64 i = expr_count - 1; i >= 0; --i)
 				{
@@ -2045,10 +2050,19 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 	else
 	{
 		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type, &identifier);
-		llvm_memcpy(location, expression_value, &node->assignment.decl_type, &backend);
 
 		Type_Info *type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 		memcpy(type, &node->assignment.decl_type, sizeof(Type_Info));
+		
+		if(node->assignment.decl_type.type == T_POINTER && node->assignment.decl_type.pointer.type->type == T_FUNC)
+		{
+			llvm_store(location, expression_value, &backend, sizeof(size_t));
+		}
+		else
+		{
+			llvm_memcpy(location, expression_value, &node->assignment.decl_type, &backend);
+		}
+
 		Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
 		var_info->value = location;
 		var_info->type  = type;

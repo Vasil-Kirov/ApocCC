@@ -505,6 +505,11 @@ parse_identifier_statement(File_Contents *f, Token ends_with)
 		} break;
 		default:
 		{
+			if(f->curr_token->type == tok_identifier)
+			{
+				raise_parsing_unexpected_token("an assignment or declaration.\n\tSince you put 2 identifiers one after another you might be doing a C-style declaration.\n\t"
+						"The syntax for a declaration in this language is: [ name: Type; ]", f);
+			}
 			parser_eat(f, ends_with);
 			return lhs;
 		} break;
@@ -611,9 +616,16 @@ parse_statement(File_Contents *f)
 			result->scope_desc.token = advance_token(f);
 			pop_scope(f, result->scope_desc.token);
 		} break;
+		case ';':
+		{
+			advance_token(f);
+			result = alloc_node();
+			result->type = type_dunn;
+		} break;
 		default:
 		{
-			raise_parsing_unexpected_token("[ '}' ]", f);
+			advance_token(f);
+			raise_parsing_unexpected_token("valid statement", f);
 		}
 	}
 	return result;
@@ -1278,21 +1290,24 @@ parse_type(File_Contents *f)
 	}
 	else if(pointer_or_type->type == tok_func)
 	{
+		advance_token(f);
+		Type_Info *func = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 		if(f->curr_token->type == tok_call_conv)
 		{
 			advance_token(f);
-			result.func.calling_convention = parse_call_conv(f);
+			func->func.calling_convention = parse_call_conv(f);
 			advance_token(f);
 		}
 		else
-			result.func.calling_convention = CALL_APOC;
-		result.type = T_FUNC;
-		result.func.param_types = SDCreate(Type_Info);
+			func->func.calling_convention = CALL_APOC;
+		
+		func->type = T_FUNC;
+		func->func.param_types = SDCreate(Type_Info);
 		Ast_Node **types = delimited(f, '(', ')', ',', parse_type_ast);
 		size_t type_count = SDCount(types);
 		for(size_t i = 0; i < type_count; ++i)
 		{
-			SDPush(result.func.param_types, types[i]->only_type.type);
+			SDPush(func->func.param_types, types[i]->only_type.type);
 		}
 		if(f->curr_token->type == tok_arrow)
 		{
@@ -1300,7 +1315,7 @@ parse_type(File_Contents *f)
 			auto return_type = parse_type(f);
 			auto allocated_ret_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 			memcpy(allocated_ret_type, &return_type, sizeof(Type_Info));
-			result.func.return_type = allocated_ret_type;
+			func->func.return_type = allocated_ret_type;
 		}
 		else
 		{
@@ -1309,9 +1324,12 @@ parse_type(File_Contents *f)
 			allocated_ret_type->identifier = (u8 *)"void";
 			allocated_ret_type->token = f->prev_token;
 			allocated_ret_type->primitive.size = empty_void;
-			result.func.return_type = allocated_ret_type;
+			func->func.return_type = allocated_ret_type;
 		}
-		result.identifier = var_type_to_name(&result, false);
+		func->identifier = var_type_to_name(func, false);
+		result.type = T_POINTER;
+		result.pointer.type = func;
+		result.pointer.type->identifier = var_type_to_name(&result, false);
 	}
 	else if(pointer_or_type->type == tok_struct)
 	{

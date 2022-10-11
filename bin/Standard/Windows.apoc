@@ -1,5 +1,5 @@
 
-$is_defined Windows
+$if Windows
 
 fn $call c_decl GetLastError() -> u32;
 
@@ -118,5 +118,5 @@ enum File_Permission
 					   SYNCHRONIZE;
 }
 
-$end_is
+$end_if
 

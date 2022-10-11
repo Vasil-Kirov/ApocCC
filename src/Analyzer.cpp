@@ -234,6 +234,20 @@ analyze(File_Contents *f, Ast_Node *ast_tree)
 	pop_scope(f, f->prev_token);
 }
 
+u8 *
+get_non_overloaded_name(u8 *overloaded_name)
+{
+	size_t i = 0;
+	for(; overloaded_name[i] != '!'; ++i)
+		if(overloaded_name[i] == '\0') return overloaded_name;
+
+	auto non_overloaded = (u8 *)AllocateCompileMemory(i + 1);
+	memcpy(non_overloaded, overloaded_name, i);
+
+	return non_overloaded;
+}
+
+
 void
 overload_fix_types(File_Contents *f, Ast_Node *overload) 
 {
@@ -1129,8 +1143,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 		{
 			if(is_untyped(expression_type))
 			{
-				expression_type = untyped_to_type(expression_type);
-				//expression_type.identifier = (u8 *)"i64";
+				node->assignment.decl_type = untyped_to_type(expression_type);
 			}
 			else if(expression_type.type == T_ARRAY)
 			{
@@ -1139,8 +1152,17 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 					Type_Info elem_type = untyped_to_type(*expression_type.array.type);
 					memcpy(expression_type.array.type, &elem_type, sizeof(Type_Info));
 				}
+				node->assignment.decl_type = expression_type;
 			}
-			node->assignment.decl_type = expression_type;
+			else if(expression_type.type == T_FUNC)
+			{
+				Type_Info *func = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+				memcpy(func, &expression_type, sizeof(Type_Info));
+				node->assignment.decl_type.type = T_POINTER;
+				node->assignment.decl_type.pointer.type = func;
+			}
+			else
+				node->assignment.decl_type = expression_type;
 		}
 		else if(!check_type_compatibility(node->assignment.decl_type, expression_type))
 		{
@@ -1898,9 +1920,23 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden *expr_token, 
 
 	func_call->func_call.operand_type = get_expression_type(f, func_call->func_call.operand, func_call->func_call.token, previous, NULL);
 	Type_Info operand_type = func_call->func_call.operand_type;
-	if(operand_type.type != T_FUNC)
+
+	b32 is_func = false;
+	if(operand_type.type == T_FUNC)
+		is_func = true;
+	else if(operand_type.type == T_POINTER && operand_type.pointer.type->type == T_FUNC)
+	{
+		is_func = true;
+		operand_type = *operand_type.pointer.type;
+		func_call->func_call.operand_type = operand_type;
+	}
+
+
+	if(!is_func)
+	{
 		raise_formated_semantic_error(f, *expr_token, "Operand of call is not a function. Tried to call %s", 
 				var_type_to_name(&operand_type));
+	}
 
 
 	if(func_call->func_call.operand->type == type_identifier)
@@ -1944,7 +1980,8 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden *expr_token, 
 			size_t id_len = to_allocate;
 			to_allocate += 128 * SDCount(func_sym->node->function.arguments);
 			u8 *out = (u8 *)AllocatePermanentMemory(to_allocate * 1.5f);
-			vstd_strcat((char *)out, (char *)func_sym->node->function.identifier.name);
+			u8 *non_overloaded = get_non_overloaded_name(func_sym->node->function.identifier.name);
+			vstd_strcat((char *)out, (char *)non_overloaded);
 			vstd_strcat((char *)out, "!@");
 			for(size_t i = 0; i < expr_count; ++i)
 			{
@@ -2321,8 +2358,6 @@ check_type_compatibility(Type_Info a, Type_Info b)
 		return true;
 	if(b.type == T_STRING && is_string_pointer(a))
 		return true;
-	if(a.type != b.type)
-		return false;
 	if(a.type == T_POINTER)
 	{
 		if(b.type == T_POINTER)
@@ -2330,11 +2365,19 @@ check_type_compatibility(Type_Info a, Type_Info b)
 			if(a.pointer.type->type == T_VOID || b.pointer.type->type == T_VOID)
 				return true;
 		}
-		if(b.type == T_UNTYPED_INTEGER)
+		else if(b.type == T_UNTYPED_INTEGER)
 			return true;
+		else if(b.type == T_FUNC)
+		{
+			if(a.pointer.type->type == T_FUNC)
+				return true;
+		}
 	}
 	if(a.type == T_BOOLEAN && b.type == T_BOOLEAN)
 		return true;
+
+	if(a.type != b.type)
+		return false;
 	if(a.type == T_STRUCT || b.type == T_STRUCT)
 	{
 		if(vstd_strcmp((char *)a.identifier, (char *)"anonymous struct") || vstd_strcmp((char *)a.identifier, (char *)"anonymous struct"))
@@ -2468,24 +2511,13 @@ var_type_to_name(Type_Info *type, b32 bracket)
 		
 		while(current->type == T_POINTER)
 		{
-			vstd_strcat(result, "*");
+			if(current->pointer.type->type != T_FUNC)
+				vstd_strcat(result, "*");
 			current = current->pointer.type;
 		}
-		vstd_strcat(result, " ");
-		vstd_strcat(result, (const char *)var_type_to_name(current));
-		
-		char *edited_copy = (char *)AllocatePermanentMemory(4096);
-		int e_i = 0;
-		
-		for(int i = 0; result[i] != 0; ++i)
-		{
-			if((result[i] == '[' || result[i] == ']') && i > 0)
-			{}
-			else
-				edited_copy[e_i++] = result[i];
-		}
-		strcpy_secure(result, 1024, edited_copy);
-		
+		if(current->type != T_FUNC)
+			vstd_strcat(result, " ");
+		vstd_strcat(result, (const char *)var_type_to_name(current, false));
 	}
 	else if(type->type == T_STRING)
 	{
@@ -2504,3 +2536,4 @@ var_type_to_name(Type_Info *type, b32 bracket)
 
 	return (u8 *)result;
 }
+

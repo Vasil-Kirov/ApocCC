@@ -59,12 +59,8 @@ Foo get_type()
 
 int main()
 {
-	struct { short a; short b; } my_var;
-	my_var.a = 0x0C;
-	my_var.b = 0x0C;
-	Foo foo;
-	foo.c = get_type().c;
-	return foo.c;
+	Foo (*fn_ptr)() = get_type;
+	return 0;
 }
 
 #endif

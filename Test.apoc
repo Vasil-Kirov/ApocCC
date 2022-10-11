@@ -1,12 +1,9 @@
 
-fn $intrinsic get_type(ptr:*void) -> Type_Info;
-
-my_global_var := 54321;
-
 fn $call c_decl main() -> i32
 {
 	to_print := Printable_Struct { 10, 20 };
 	register_printable(print_printable_struct, "Printable_Struct");
+
 	print("works? %", to_print);
 	-> 0;
 }

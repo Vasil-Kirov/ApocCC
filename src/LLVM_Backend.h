@@ -129,6 +129,9 @@ struct Debug_Info
 	Stack scope;
 };
 
+DISubroutineType *
+create_func_debug_type(Type_Info *func_type);
+
 Variable_Info *
 get_identifier(u8 *name, Variable_Types *returned_type);
 

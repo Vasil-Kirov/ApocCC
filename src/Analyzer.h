@@ -200,6 +200,9 @@ void
 analyze_file_level_statement_list(File_Contents *f, Ast_Node *node);
 
 u8 *
+get_non_overloaded_name(u8 *overloaded_name);
+
+u8 *
 var_type_to_name(Type_Info *type, b32 bracket = true);
 
 Symbol *

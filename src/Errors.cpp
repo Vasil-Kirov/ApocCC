@@ -139,12 +139,12 @@ void raise_parsing_unexpected_token(const char *expected_tok, File_Contents *f)
 	u8 *error_location = get_error_segment(token);
 	if(token.type == tok_identifier)
 	{
-		LG_FATAL("%s (%d, %d):\n\tFound unexpected token %s, expected %s, got [ \"%s\" ].\n\n%s",
+		LG_FATAL("%s (%d, %d):\n\tFound an unexpected token %s, expected %s, got [ \"%s\" ].\n\n%s",
 				 token.file, token.line, token.column, token_to_str(token.type),
 				 expected_tok, token.identifier, error_location);
 	}
 	else
-		LG_FATAL("%s (%d, %d):\n\tFound unexpected token %s, expected %s.\n\n%s",
+		LG_FATAL("%s (%d, %d):\n\tFound an unexpected token %s, expected %s.\n\n%s",
 			 token.file, token.line, token.column, token_to_str(token.type), expected_tok, error_location);
 }
 

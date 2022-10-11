@@ -1,6 +1,7 @@
 
 fn $intrinsic var_arg_start(list: **Any);
 fn $intrinsic var_arg_stop(list: **Any);
+fn $intrinsic get_type(ptr:*void) -> Type_Info;
 
 true  :: #bool  1;
 false :: #bool  0;

@@ -33,6 +33,9 @@ void
 create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State *backend);
 
 void
+llvm_memset(llvm::Value *dst, u8 value, size_t size, int alignment, Backend_State *backend);
+
+void
 llvm_memcpy(llvm::Value *dst, llvm::Value *src, Type_Info *type, Backend_State *backend);
 
 AllocaInst *

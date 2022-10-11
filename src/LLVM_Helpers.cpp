@@ -484,6 +484,15 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 }
 
 void
+llvm_memset(llvm::Value *dst, u8 value, size_t size, int alignment, Backend_State *backend)
+{
+	auto align = Align(alignment);
+	auto llvm_value = ConstantInt::get(*backend->context, APInt(8, value));
+	auto llvm_size  = ConstantInt::get(*backend->context, APInt(sizeof(size_t) * 8, size));
+	backend->builder->CreateMemSet(dst, llvm_value, llvm_size, align);
+}
+
+void
 llvm_memcpy(llvm::Value *dst, llvm::Value *src, Type_Info *type, Backend_State *backend)
 {
 	auto align = Align(get_type_alignment(*type));
@@ -657,6 +666,8 @@ llvm_store(Type_Info *type, llvm::Value *ptr, llvm::Value *value, Backend_State 
 	}
 }
 
+// @TODO: this function uses a lot of hard coded sizes,
+// if we decide to support different platforms it might be worth checking that out
 DIType *
 to_debug_type(Type_Info type, Debug_Info *debug)
 {
@@ -729,6 +740,11 @@ to_debug_type(Type_Info type, Debug_Info *debug)
 		// @TODO: change for systems different than 64 bits
 		if(type.pointer.type == NULL)
 			return debug->builder->createPointerType(NULL, 64);
+
+		// @NOTE: we don't call to_debug_type again because the T_FUNC case
+		// automatically makes a pointer so it turn to be a pointer to a pointer to a function
+		if(type.pointer.type->type == T_FUNC)
+			return debug->builder->createPointerType(create_func_debug_type(type.pointer.type), 64);
 		return debug->builder->createPointerType(to_debug_type(*type.pointer.type, debug),  64);
 	}
 	else if (type.type == T_STRUCT)
@@ -761,7 +777,8 @@ to_debug_type(Type_Info type, Debug_Info *debug)
 	}
 	else if (type.type == T_FUNC)
 	{
-		auto func_type = debug->builder->createPointerType(0, sizeof(size_t) * 8);
+		// Automatically make it a pointer to a function
+		auto func_type = debug->builder->createPointerType(create_func_debug_type(&type), 64);
 		return func_type;
 	}
 	Assert(false);
@@ -956,6 +973,11 @@ get_cast_type(Type_Info to, Type_Info from, b32 *should_cast)
 	{
 		if(is_integer(from))
 			return Instruction::CastOps::Trunc;
+		if(from.type == T_BOOLEAN)
+		{
+			*should_cast = false;
+			return Instruction::CastOps::CastOpsEnd;
+		}
 		Assert(false);
 	}
 	else

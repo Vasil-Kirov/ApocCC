@@ -88,11 +88,11 @@ overload +(str: string, text:* u8) -> string
 	-> out;
 }
 
-overload +=(str: *String_Builder, text:* u8)
+overload +=(builder: *String_Builder, text:* u8)
 {
 	text_len := len(text);
 	times := text_len / STRING_BUFFER_SIZE;
-	current := str;
+	current := builder;
 	for i := 0; i - 1 < times; ++i {
 		copy_size := text_len;
 		if copy_size > STRING_BUFFER_SIZE copy_size = STRING_BUFFER_SIZE;
@@ -104,9 +104,24 @@ overload +=(str: *String_Builder, text:* u8)
 	
 }
 
-overload +=(str: *String_Builder, c: u8)
+overload +=(builder: *String_Builder, str: string)
 {
-	to_put := str;
+	str_len := str.len;
+	times := str.len / STRING_BUFFER_SIZE;
+	current := builder;
+	for i := 0; i - 1 < times; ++i {
+		copy_size := str_len;
+		if copy_size > STRING_BUFFER_SIZE copy_size = STRING_BUFFER_SIZE;
+		copy(@current.buffer[current.len], @str.text[i * STRING_BUFFER_SIZE], #u64 copy_size);
+		current.len += copy_size;
+		str_len -= STRING_BUFFER_SIZE;
+		current = current.next;
+	}
+}
+
+overload +=(builder: *String_Builder, c: u8)
+{
+	to_put := builder;
 	for ; to_put != null && to_put.len == STRING_BUFFER_SIZE; null {
 		if to_put.next == null  {
 			to_put.next = #*String_Builder mem_alloc($size String_Builder);
@@ -214,7 +229,7 @@ fn find_printable_type(item: *Any, builder: *String_Builder)
 {
 	for i := 0; i < last_printable_type; ++i {
 		if strcmp(printable_types[i].type_name, item.type.structure.name) == 0 {
-			*builder += printable_types[i].function(item).text;
+			*builder += printable_types[i].function(item.value);
 			->;
 		}
 	}
@@ -226,8 +241,6 @@ fn parse_format(format: string, list:* Any) -> string
 {
 	builder := init_builder("");
 	list_index := 0;
-	printf("%p\n", @format);
-	printf("%d\n", format.len);
 	for i := 0; i < format.len; ++i {
 		if format[i] == '%' {
 			item := list[list_index];
@@ -290,7 +303,6 @@ fn format_args(format: string, ...) -> string
 fn print(format:* u8, ...)
 {
 	str := to_string(format);
-	printf("len: %d, text %s", str.len, str.text);
 	list:* Any;
 	var_arg_start(@list);
 	out := parse_format(str, list);

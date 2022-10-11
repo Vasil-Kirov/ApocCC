@@ -1,0 +1,42 @@
+// 742
+
+
+
+fn main() -> i32 {
+	large_anon: struct {
+		num1: i64;
+		num2: i64;
+	};
+
+	large_copy: struct {
+		num1: i64;
+		num2: i64;
+	};
+
+	large_anon.num1 = 0xE6;
+	large_anon.num2 = 0x02;
+
+	large_copy = large_anon;
+
+	anon: struct {
+		num1: i8;
+		num2: i8;
+	};
+
+	anon.num1 = #i8 large_copy.num1;
+	anon.num2 = #i8 large_copy.num2;
+
+	foo: Foo;
+	foo.bar = anon;
+	-> #i32 foo.combined;
+}
+
+struct $union Foo
+{
+	bar: struct {
+		num1: i8;
+		num2: i8;
+	};
+	combined: i16;
+}
+
