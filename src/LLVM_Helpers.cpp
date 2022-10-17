@@ -104,9 +104,9 @@ create_branch(llvm::BasicBlock *from, llvm::BasicBlock *to, Backend_State *backe
 }
 
 llvm::StructType *
-get_type_info_kind(const char *name, Backend_State *backend)
+get_type_info_kind(File_Contents *f, const char *name, Backend_State *backend)
 {
-	auto result = shget(backend->struct_types, name);
+	auto result = shget(f->struct_types, name);
 	if(!result)
 	{
 		LG_FATAL("%s is not defined, this type is needed for using\n"
@@ -148,7 +148,7 @@ gep_and_write_val_int(llvm::Value *ptr, llvm::StructType *type, Backend_State *b
 }
 
 void
-write_type_info_pointer_to_llvm(Type_Info *type_ptr, llvm::Value *ptr,
+write_type_info_pointer_to_llvm(File_Contents *f, Type_Info *type_ptr, llvm::Value *ptr,
 		llvm::StructType *type_info_type, Backend_State *backend, llvm::Function *func)
 {
 	if(type_ptr)
@@ -156,7 +156,7 @@ write_type_info_pointer_to_llvm(Type_Info *type_ptr, llvm::Value *ptr,
 		IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
 		auto ptr_ptr = temp_builder.CreateAlloca(type_info_type, 0, (char *)"type_info_ptr");
 		ptr_ptr->setAlignment(Align(16));
-		write_type_info_to_llvm(*type_ptr, ptr_ptr, type_info_type, backend, func);
+		write_type_info_to_llvm(f, *type_ptr, ptr_ptr, type_info_type, backend, func);
 		auto pointed_ptr = backend->builder->CreateStructGEP(type_info_type, ptr, 1);
 		backend->builder->CreateStore(ptr_ptr, pointed_ptr);
 	}
@@ -223,10 +223,10 @@ write_struct_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State *backen
 }
 
 void
-write_array_to_llvm(Type_Info to_write, llvm::Value *ptr,
+write_array_to_llvm(File_Contents *f, Type_Info to_write, llvm::Value *ptr,
 		Backend_State *backend, llvm::Function *func, StructType *llvm_type)
 {
-	write_type_info_pointer_to_llvm(to_write.array.type, ptr, llvm_type, backend, func);
+	write_type_info_pointer_to_llvm(f, to_write.array.type, ptr, llvm_type, backend, func);
 	gep_and_write_val_int(ptr, llvm_type, backend, 2, to_write.array.elem_count, 64);
 }
 
@@ -237,7 +237,7 @@ write_primitive_to_llvm(Type_Info to_write, llvm::Value *ptr, Backend_State *bac
 }
 
 void
-write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_type,
+write_type_info_to_llvm(File_Contents *f, Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_type,
 		Backend_State *backend, llvm::Function *func)
 {
 	if(to_write.type == T_UNTYPED_INTEGER)
@@ -259,28 +259,28 @@ write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_t
 		case T_BOOLEAN:
 		case T_INTEGER:
 		{
-			auto prim_type = get_type_info_kind("Type_Primitive", backend);
+			auto prim_type = get_type_info_kind(f, "Type_Primitive", backend);
 			auto casted = bit_cast_llvm_type(ptr, PointerType::get(prim_type, 0), backend);
 			write_primitive_to_llvm(to_write, casted, backend, prim_type);
 		} break;
 		case T_STRUCT:
 		{
-			auto struct_type = get_type_info_kind("Type_Struct", backend);
+			auto struct_type = get_type_info_kind(f, "Type_Struct", backend);
 			auto casted = bit_cast_llvm_type(ptr, PointerType::get(struct_type, 0), backend);
 			write_struct_to_llvm(to_write, casted, backend, func, llvm_type, struct_type);
 		} break;
 		case T_POINTER:
 		{
-			auto pointer_type = get_type_info_kind("Type_Pointer", backend);
+			auto pointer_type = get_type_info_kind(f, "Type_Pointer", backend);
 			auto casted = bit_cast_llvm_type(ptr, PointerType::get(pointer_type, 0), backend);
-			write_type_info_pointer_to_llvm(to_write.pointer.type, casted, pointer_type, backend,
+			write_type_info_pointer_to_llvm(f, to_write.pointer.type, casted, pointer_type, backend,
 					func);
 		} break;
 		case T_ARRAY:
 		{
-			auto array_type = get_type_info_kind("Type_Array", backend);
+			auto array_type = get_type_info_kind(f, "Type_Array", backend);
 			auto casted = bit_cast_llvm_type(ptr, PointerType::get(array_type, 0), backend);
-			write_array_to_llvm(to_write, casted, backend, func, array_type);
+			write_array_to_llvm(f, to_write, casted, backend, func, array_type);
 		} break;
 		default:
 		{
@@ -599,7 +599,8 @@ apoc_type_to_llvm(Type_Info type, Backend_State *backend)
 	}
 	else if (type.type == T_STRUCT)
 	{
-		auto struct_type = shget(backend->struct_types, type.identifier);
+		Assert(type.f_nullable);
+		auto struct_type = shget(type.f_nullable->struct_types, type.identifier);
 		if(!struct_type)
 		{
 			struct_type = StructType::get(*backend->context, type.structure.is_packed);

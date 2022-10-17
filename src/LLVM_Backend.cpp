@@ -18,6 +18,14 @@
 static Backend_State backend;
 static Debug_Info debug;
 
+// @TODO: remove this
+// @HACK
+// @TODO: remove this
+// @HACK
+// @TODO: remove this
+// @HACK
+static File_Contents *basic_f;
+
 #define __INTERNAL_CONTEXT_SIZE sizeof(size_t)
 
 //#define ONLY_IR
@@ -86,17 +94,22 @@ do_passes(File_Contents *f)
 }
 
 Backend_State
-llvm_initialize(File_Contents *f, File_Contents **files)
+llvm_initialize(File_Contents **files)
 {
 	Backend_State backend = {};
 	backend.context = new LLVMContext();
-	backend.module = new Module(platform_path_to_file_name((char *)f->path), *backend.context);
+	backend.module = new Module(platform_path_to_file_name((char *)files[0]->path), *backend.context);
 	backend.builder = new IRBuilder<>(*backend.context);
 
 
-	shdefault(backend.struct_types, 0);
+	size_t file_count = SDCount(files);
+	LOOP_FILES
+	{
+		File_Contents *f = files[file_idx];
+		shdefault(f->struct_types, 0);
+	}
 	
-	if (f->build_commands.debug_info) {
+	if (files[0]->build_commands.debug_info) {
 		debug.builder = new DIBuilder(*backend.module);
 		debug.scope = stack_allocate(DINode*);
 		size_t file_count = SDCount(files);
@@ -121,7 +134,7 @@ llvm_initialize(File_Contents *f, File_Contents **files)
 			result.file = debug.builder->createFile(file_name, (char*)lookup_name);
 			if (!compile_unit)
 				compile_unit = debug.builder->createCompileUnit(dwarf::DW_LANG_C99,
-					result.file, "Apoc Compiler", f->build_commands.optimization > OPT_NONE,
+					result.file, "Apoc Compiler", files[0]->build_commands.optimization > OPT_NONE,
 					"", 0);
 			result.unit = compile_unit;
 			shput(debug.file_map, files[i]->path, result);
@@ -286,20 +299,38 @@ generate_obj(File_Contents* f)
 }
 
 void
-llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files)
+llvm_backend_generate(File_Contents **files)
 {
-	backend = llvm_initialize(f, files);
+	backend = llvm_initialize(files);
 
 	if(sizeof(size_t) == 8)
 		backend.module->setDataLayout(StringRef("i64:64:64"));
 
-	generate_signatures(f);
-	i32 func_count = 0;
-	generate_statement_list(f, root, &func_count);
+	generate_signatures(files);
+	size_t file_count = SDCount(files);
 
-	DEBUG_INFO(
+	// Loop through all the global statements in all the files
+	// and generate any global variables since they can be cross
+	// refrenced in other files
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		auto list = f->ast_root->statements.list;
+		size_t list_size = SDCount(list);
+		for(int i = 0; i < list_size; ++i)
+		{
+			generate_if_global_var(f, list[i]);
+		}
+	}
+
+	// Loop through all files and generate the code
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		i32 func_count = 0;
+		generate_statement_list(f, f->ast_root, &func_count);
+	}
+
+	if(files[0]->build_commands.debug_info)
 		debug.builder->finalize();
-			)
 
 #if defined(DEBUG)
 	std::error_code error_code;
@@ -314,7 +345,7 @@ llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files)
 	if(debug_info_error)
 		LG_ERROR("Debug Info Error");
 #endif
-	generate_obj(f);
+	generate_obj(files[0]);
 }
 
 void
@@ -368,86 +399,319 @@ generate_opaque_struct(u8 *name)
 	return StructType::create(*backend.context, StringRef((char *)name, vstd_strlen((char *)name)));
 }
 
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+// @TODO: DELETE ALL THIS vvv
+
+u8 *
+generate_module_name(u8 *name, Ast_Node *id)
+{
+	if(!id)
+		return name;
+	Assert(id->type == type_identifier);
+	int name_len = vstd_strlen((char *)name);
+	int mod_len  = vstd_strlen((char *)id->identifier.name);
+	u8 *result = (u8 *)AllocateCompileMemory(name_len + mod_len + 10);
+	memcpy(result, name, name_len);
+	result[name_len] = '!';
+	memcpy(result + name_len + 1, id->identifier.name, mod_len);
+	result[name_len + mod_len + 1] = '\0';
+	return result;
+}
+
+b32
+is_name_mangled(u8 *name)
+{
+	for(int i = 0; name[i] != 0; ++i)
+		if(name[i] == '!')
+			return true;
+
+	return false;
+}
+
+Type_Info *
+fix_type_name_spaces(File_Contents *f, Type_Info *type, Ast_Node *to_append, int depth = 0)
+{
+	Assert(to_append->type == type_identifier);
+	Assert(type->f_nullable);
+	if(depth == 4)
+		return type;
+
+	u8 *identifier = type->identifier;
+	Type_Info *result = type;
+	if(!is_name_mangled(result->identifier) && result->f_nullable == f)
+	{
+		result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		memcpy(result, type, sizeof(Type_Info));
+		result->identifier = generate_module_name(type->identifier, to_append);
+		type->identifier = result->identifier;
+	}
+	switch(result->type)
+	{
+		case T_STRUCT:
+		{
+			int member_count = result->structure.member_count;
+			result->structure.name = result->identifier;
+			result->structure.member_types = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info) * member_count);
+			for(int i = 0; i < member_count; ++i)
+			{
+				if(!is_name_mangled(type->structure.member_types[i].identifier))
+					result->structure.member_types[i] = *fix_type_name_spaces(f, &type->structure.member_types[i], to_append, depth + 1);
+			}
+		} break;
+		case T_POINTER:
+		{
+			result->identifier = identifier;
+			type->identifier = identifier;
+			result->pointer.type = fix_type_name_spaces(f, result->pointer.type, to_append, depth + 1);
+		} break;
+		case T_ARRAY:
+		{
+			result->identifier = identifier;
+			type->identifier = identifier;
+			result->array.type = fix_type_name_spaces(f, result->array.type, to_append, depth + 1);
+		} break;
+		case T_ENUM:
+		{
+			result->enumerator.type = fix_type_name_spaces(f, result->enumerator.type, to_append, depth + 1);
+		} break;
+		case T_FUNC:
+		{
+			result->identifier = identifier;
+			type->identifier = identifier;
+			int param_count = SDCount(result->func.param_types);
+			result->func.param_types = SDCreate(Type_Info);
+			result->func.return_type = fix_type_name_spaces(f, result->func.return_type, to_append, depth + 1);
+			for(int i = 0; i < param_count; ++i)
+			{
+				auto fixed_type = fix_type_name_spaces(f, &type->func.param_types[i], to_append, depth + 1);
+				SDPush(result->func.param_types, fixed_type);
+			}
+		} break;
+		case T_MODULE:
+		{
+			Assert(false);
+		} break;
+		case T_INVALID:
+		case T_DETECT:
+		case T_STRING:
+		case T_UNTYPED_INTEGER:
+		case T_UNTYPED_FLOAT:
+		case T_INTEGER:
+		case T_FLOAT:
+		case T_VOID:
+		case T_BOOLEAN:
+		{
+			result->identifier = identifier;
+			type->identifier = identifier;
+		} break;
+	}
+	return result;
+}
+
 void
-generate_signatures(File_Contents *f)
+unmangle_type_name(Type_Info *type)
+{
+	for(int i = 0; type->identifier[i] != '\0'; ++i)
+		if(type->identifier[i] == '!')
+		{
+			type->identifier[i] = 0;
+			return;
+		}
+}
+
+void
+generate_opaque_structs(File_Contents *f)
 {
 	Type_Table *type_table = f->type_table;
 	size_t type_len = shlen(type_table);
 
-	// @NOTE: generate opaque structs and then fill them out
-	// so that structs that contain pointers or hold other structs
-	// are easily made
 	for(size_t i = 0; i < type_len; ++i)
 	{
 		Type_Info *type = &type_table[i].value;
 		if(type->type == T_STRUCT)
 		{
+			Assert(type->f_nullable);
 			Assert(type->identifier);
+
 			auto opaque_struct = generate_opaque_struct(type->identifier);
-			shput(backend.struct_types, type->identifier, opaque_struct);
+			shput(f->struct_types, type->identifier, opaque_struct);
 		}
 	}
+}
+
+void
+generate_structs(File_Contents *f)
+{
+	Type_Table *type_table = f->type_table;
+	size_t type_len = shlen(type_table);
 
 	// @NOTE: fill out the opaque structs
 	for(size_t i = 0; i < type_len; ++i)
 	{
-		Type_Info type = type_table[i].value;
-		if(type.type == T_STRUCT)
+		Type_Info *type = &type_table[i].value;
+		if(type->type == T_STRUCT)
 		{
-			auto opaque_struct = shget(backend.struct_types, type.identifier);
-			if(type.structure.is_union)
-				generate_union_type(f, type, opaque_struct);
+			auto opaque_struct = shget(f->struct_types, type->identifier);
+			if(type->structure.is_union)
+				generate_union_type(f, *type, opaque_struct);
 			else
-				generate_struct_type(f, type, opaque_struct);
+				generate_struct_type(f, *type, opaque_struct);
 		}
 	}
-	
-	Scope_Info *scopes = f->scopes;
-	size_t scope_count = SDCount(scopes);
-	for(size_t i = 0; i < scope_count; ++i)
-	{
-		Symbol *sym_table = scopes[i].symbol_table;
-		size_t sym_count = scopes[i].sym_count;
-		for(size_t j = 0; j < sym_count; ++j)
+}
+
+void
+generate_signatures(File_Contents **files)
+{
+	// @NOTE: generate opaque structs and then fill them out
+	// so that structs that contain pointers or hold other structs
+	// are easily made
+
+	size_t file_count = SDCount(files);
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		// @TODO: remove this
+		// @HACK
+		// @TODO: remove this
+		// @HACK
+		// @TODO: remove this
+		// @HACK
+		if(vstd_str_ends_with((char *)f->path, (char *)"\\Basic.apoc") || vstd_str_ends_with((char *)f->path, (char *)"/Basic.apoc"))
+			basic_f = f;
+
+		generate_opaque_structs(f);
+	}
+
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		generate_structs(f);
+	}
+
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		Scope_Info *scopes = f->scopes;
+		size_t scope_count = SDCount(scopes);
+		for(size_t i = 0; i < scope_count; ++i)
 		{
-			Symbol symbol = sym_table[j];
-			if(symbol.tag == S_FUNCTION)
+			Symbol *sym_table = scopes[i].symbol_table;
+			size_t sym_count = scopes[i].sym_count;
+			for(size_t j = 0; j < sym_count; ++j)
 			{
-				Assert(symbol.node->type == type_func);
-				if(symbol.node->function.overloads)
+				Symbol symbol = sym_table[j];
+				if(symbol.tag == S_FUNCTION)
 				{
-					auto overloads = symbol.node->function.overloads;
-					size_t overload_count = SDCount(overloads);
-					llvm::Function *func = NULL;
-					for(size_t k = 0; k < overload_count; ++k)
+					Assert(symbol.node->type == type_func);
+					if(symbol.node->function.overloads)
 					{
-						func = generate_func_signature(f, overloads[k]);
+						auto overloads = symbol.node->function.overloads;
+						size_t overload_count = SDCount(overloads);
+						llvm::Function *func = NULL;
+						for(size_t k = 0; k < overload_count; ++k)
+						{
+							func = generate_func_signature(f, overloads[k]);
+
+							Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
+							var_info->value = func;
+							var_info->type  = overloads[k]->function.type;
+
+							shput(f->func_table, overloads[k]->function.identifier.name, var_info);
+						}
+						//put_not_overloaded(symbol.node->function.identifier.name, func);
 
 						Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
 						var_info->value = func;
-						var_info->type  = overloads[k]->function.type;
+						var_info->type  = symbol.node->function.type;
 
-						shput(backend.func_table, overloads[k]->function.identifier.name, var_info);
+						shput(f->func_table, get_non_overloaded_name(symbol.node->function.identifier.name), var_info);
 					}
-					//put_not_overloaded(symbol.node->function.identifier.name, func);
+					else
+					{
+						llvm::Function *func = generate_func_signature(f, symbol.node);
 
-					Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
-					var_info->value = func;
-					var_info->type  = symbol.node->function.type;
+						Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
+						var_info->value = func;
+						var_info->type  = symbol.node->function.type;
 
-					shput(backend.func_table, get_non_overloaded_name(symbol.node->function.identifier.name), var_info);
-				}
-				else
-				{
-					llvm::Function *func = generate_func_signature(f, symbol.node);
-
-					Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
-					var_info->value = func;
-					var_info->type  = symbol.node->function.type;
-
-					shput(backend.func_table, symbol.node->function.identifier.name, var_info);
+						shput(f->func_table, symbol.node->function.identifier.name, var_info);
+					}
 				}
 			}
+		}
+	}
+}
+
+void
+generate_if_global_var(File_Contents *f, Ast_Node *node)
+{
+	if (node->type == type_assignment)
+	{
+		// @NOTE: recomputing the expression is probably faster than looking it up, maybe not?
+		Constant *const_val = NULL;
+		if(node->assignment.rhs)
+		{
+			b32 failed = false;
+			auto interp_val = interpret_expression(node->assignment.rhs, &failed);
+			if(failed)
+			{
+				raise_interpret_error("Global decleration must be constant",
+						node->assignment.token);
+				LG_FATAL(".");
+			}
+			const_val = interp_val_to_llvm(interp_val, &backend, NULL);
+		}
+		if(!const_val)
+		{
+			const_val = llvm::Constant::getNullValue(apoc_type_to_llvm(node->assignment.decl_type, &backend));
+		}
+
+		Type_Info from = node->assignment.decl_type;
+		if(is_integer(from))
+		{
+			if(is_signed(from))
+			{
+				from.primitive.size = byte8;
+				from.identifier = (u8 *)"i64";
+			}
+			else
+			{
+				from.primitive.size = ubyte8;
+				from.identifier = (u8 *)"u64";
+			}
+		}
+		else if(is_float(from))
+		{
+			from.primitive.size = real64;
+			from.identifier = (u8 *)"f64";
+		}
+		const_val = (Constant *)create_cast(node->assignment.decl_type, from, const_val);
+
+		auto global_type = apoc_type_to_llvm(node->assignment.decl_type, &backend);
+		auto global_var = new GlobalVariable(
+				*backend.module, global_type, node->assignment.is_const,
+				GlobalValue::LinkageTypes::ExternalLinkage,
+				const_val, "global_var");
+
+		Type_Info *type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		memcpy(type, &node->assignment.decl_type, sizeof(Type_Info));
+
+		Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
+		var_info->value = global_var;
+		var_info->type  = type;
+		shput(f->named_globals, node->assignment.token.identifier, var_info);
+		if (f->build_commands.debug_info) {
+			auto d_info = emit_global_var(f, node,
+					node->assignment.token.identifier, global_var);
+			if (d_info)
+				global_var->addDebugInfo(d_info);
 		}
 	}
 }
@@ -464,65 +728,6 @@ generate_statement(File_Contents *f, Ast_Node *node)
 		} break;
 		case type_assignment:
 		{
-			// @NOTE: recomputing the expression is probably faster than looking it up, maybe not?
-			Constant *const_val = NULL;
-			if(node->assignment.rhs)
-			{
-				b32 failed = false;
-				auto interp_val = interpret_expression(node->assignment.rhs, &failed);
-				if(failed)
-				{
-					raise_interpret_error("Global decleration must be constant",
-							node->assignment.token);
-					LG_FATAL(".");
-				}
-				const_val = interp_val_to_llvm(interp_val, &backend, NULL);
-			}
-			if(!const_val)
-			{
-				const_val = llvm::Constant::getNullValue(apoc_type_to_llvm(node->assignment.decl_type, &backend));
-			}
-
-			Type_Info from = node->assignment.decl_type;
-			if(is_integer(from))
-			{
-				if(is_signed(from))
-				{
-					from.primitive.size = byte8;
-					from.identifier = (u8 *)"i64";
-				}
-				else
-				{
-					from.primitive.size = ubyte8;
-					from.identifier = (u8 *)"u64";
-				}
-			}
-			else if(is_float(from))
-			{
-				from.primitive.size = real64;
-				from.identifier = (u8 *)"f64";
-			}
-			const_val = (Constant *)create_cast(node->assignment.decl_type, from, const_val);
-
-			auto global_type = apoc_type_to_llvm(node->assignment.decl_type, &backend);
-			auto global_var = new GlobalVariable(
-					*backend.module, global_type, node->assignment.is_const,
-					GlobalValue::LinkageTypes::ExternalLinkage,
-					const_val, "global_var");
-
-			Type_Info *type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-			memcpy(type, &node->assignment.decl_type, sizeof(Type_Info));
-
-			Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
-			var_info->value = global_var;
-			var_info->type  = type;
-			shput(backend.named_globals, node->assignment.token.identifier, var_info);
-			if (f->build_commands.debug_info) {
-				auto d_info = emit_global_var(f, node,
-					node->assignment.token.identifier, global_var);
-				if (d_info)
-					global_var->addDebugInfo(d_info);
-			}
 		} break;
 		case type_enum: break;
 		case type_struct: break;
@@ -619,7 +824,7 @@ llvm::Function *
 generate_func_signature(File_Contents *f, Ast_Node *node, b32 is_overload)
 {
 	Assert(node->type == type_func);
-	auto got_function = shget(backend.func_table, node->function.identifier.name);
+	auto got_function = shget(f->func_table, node->function.identifier.name);
 	if(got_function)
 		return (llvm::Function *)got_function->value;
 	
@@ -652,7 +857,7 @@ generate_func_signature(File_Contents *f, Ast_Node *node, b32 is_overload)
 llvm::StructType *
 get_type_info_type()
 {
-	auto struct_type = shget(backend.struct_types, "Type_Info");
+	auto struct_type = shget(basic_f->struct_types, "Type_Info");
 	if(!struct_type)
 		LG_FATAL("Type_Info struct is not defined, it is necessary for using\n"
 				"apoc calling convention var args functions and the Any type.\n"
@@ -663,11 +868,11 @@ get_type_info_type()
 llvm::AllocaInst *
 generate_type_info(Type_Info type, llvm::Function *func)
 {
-	auto llvm_type = get_type_info_kind("Type_Info", &backend);
+	auto llvm_type = get_type_info_kind(basic_f, "Type_Info", &backend);
 	IRBuilder<> temp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
 	auto ptr = temp_builder.CreateAlloca(llvm_type, 0, (char *)"runtime_type_info");
 	ptr->setAlignment(Align(16));
-	write_type_info_to_llvm(type, ptr, llvm_type, &backend, func);
+	write_type_info_to_llvm(basic_f, type, ptr, llvm_type, &backend, func);
 	return ptr;
 }
 
@@ -739,11 +944,19 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 		incr = BasicBlock::Create(*backend.context, "for.incr", func);
 
 	auto after_body = node->for_loop.expr3 ? incr : cond;
+
+	f->break_block = aftr;
+	f->continue_block = after_body;
+
 	backend.builder->SetInsertPoint(body);
 	Assert(list[*idx]->type == type_scope_start);
 
 	generate_blocks_from_list(f, list[*idx]->scope_desc.body, func, body, "for.body",
 			after_body);
+
+	f->break_block = NULL;
+	f->continue_block = NULL;
+
 	*idx += 1;
 	if(body->getTerminator() == NULL)
 		backend.builder->CreateBr(after_body);
@@ -772,7 +985,7 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 llvm::Value *
 to_any(llvm::AllocaInst *type, llvm::AllocaInst *value, llvm::Function *func)
 {
-	auto any_type  = get_type_info_kind("Any", &backend);
+	auto any_type  = get_type_info_kind(basic_f, "Any", &backend);
 	auto result    = allocate_with_llvm(func, (u8 *)"to_any", any_type, 8);
 	auto type_ptr  = backend.builder->CreateStructGEP(any_type, result, 0);
 	auto value_ptr = backend.builder->CreateStructGEP(any_type, result, 1);
@@ -809,12 +1022,12 @@ generate_intrinsic(File_Contents *f, Symbol *intrinsic_sym, Ast_Node *call_node,
 }
 
 llvm::FunctionCallee
-get_callee_maybe_overloaded(llvm::Value *operand, Ast_Node *call_node)
+get_callee_maybe_overloaded(File_Contents *f, llvm::Value *operand, Ast_Node *call_node)
 {
 	if(call_node->func_call.overload_name)
 	{
 		Variable_Types val_type = ID_INVALID;
-		auto func_val = get_identifier(call_node->func_call.overload_name, &val_type);
+		auto func_val = get_identifier(f, call_node->func_call.overload_name, &val_type);
 		Assert(val_type == ID_FUNCTION);
 		auto func_pointer_type = type_to_func_type(call_node->func_call.operand_type, &backend);
 		auto callee = FunctionCallee(func_pointer_type, func_val->value);
@@ -881,7 +1094,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	if(call_node->func_call.operand_type.func.calling_convention == CALL_APOC)
 		is_apoc = true;
 
-	auto callee = get_callee_maybe_overloaded(operand, call_node);
+	auto callee = get_callee_maybe_overloaded(f, operand, call_node);
 	size_t arg_count = SDCount(call_node->func_call.arguments);
 	size_t i = 0;
 	size_t j = 0;
@@ -1028,6 +1241,23 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 			}
 			else
 				backend.builder->CreateRetVoid();
+		} break;
+		case type_break:
+		{
+			if(f->break_block == NULL) {
+				// @TODO: put into the analyzer
+				raise_semantic_error(f, "break statement outside a loop/switch statement", *node->brk.token);
+			}
+			create_branch(passed_block, f->break_block, &backend);
+		} break;
+		case type_continue:
+		{
+			if(f->continue_block == NULL) {
+				// @TODO: put into the analyzer
+				raise_semantic_error(f, "continue statement outside a loop statement", *node->cont.token);
+			}
+			create_branch(passed_block, f->continue_block, &backend);
+
 		} break;
 		case type_for:
 		{
@@ -1304,17 +1534,44 @@ generate_func(File_Contents *f, Ast_Node *node)
 }
 
 Variable_Info *
-get_identifier(u8 *name, Variable_Types *returned_type)
+get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type)
 {
 	auto var_location = shget(backend.named_values, name);
 	if(var_location == NULL)
 	{
-		auto global_var = shget(backend.named_globals, name);
+		auto global_var = shget(f->named_globals, name);
 		if(global_var == NULL)
 		{
-			auto function = shget(backend.func_table, name);
+			auto function = shget(f->func_table, name);
 			if(function == NULL)
 			{
+				size_t modeul_count = SDCount(f->modules);
+				for(size_t module_idx = 0; module_idx < modeul_count; ++module_idx)
+				{
+					// @TODO: in the analyzer or somewhere make a way to check if on include there are
+					// namespace conflictions
+					// @TODO: in the analyzer or somewhere make a way to check if on include there are
+					// namespace conflictions
+					// @TODO: in the analyzer or somewhere make a way to check if on include there are
+					// namespace conflictions
+					// @TODO: in the analyzer or somewhere make a way to check if on include there are
+					// namespace conflictions
+					// @TODO: in the analyzer or somewhere make a way to check if on include there are
+					// namespace conflictions
+					// @TODO: in the analyzer or somewhere make a way to check if on include there are
+					// namespace conflictions
+					Variable_Info *result;
+					Import_Module *mod = &f->modules[module_idx];
+					if(mod->identifier_nullable == NULL) {
+						Assert(mod->f);
+						result = get_identifier(mod->f, name, returned_type);
+						if(result)
+							return result;
+					}
+					return result;
+
+				}
+
 				*returned_type = ID_INVALID;
 				return NULL;
 			}
@@ -1332,8 +1589,8 @@ llvm::Value *
 generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 {
 	llvm::Value *operand = NULL;
-	Type_Info op_type = node->selector.operand_type;
-	if(op_type.type == T_POINTER)
+	Type_Info *op_type = node->selector.operand_type;
+	if(op_type->type == T_POINTER)
 	{
 		if(node->selector.operand->type != type_identifier)
 			operand = generate_lhs(f, func, node->selector.operand,
@@ -1342,15 +1599,15 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 			operand = shget(backend.named_values, node->selector.operand->identifier.name)->value;
 	}
 
-	while(op_type.type == T_POINTER)
+	while(op_type->type == T_POINTER)
 	{
-		operand = llvm_load(&op_type, operand, "derefrence struct", &backend);
-		op_type = *op_type.pointer.type;
+		operand = llvm_load(op_type, operand, "derefrence struct", &backend);
+		op_type = op_type->pointer.type;
 	}
 
-	if(op_type.type == T_STRUCT)
+	if(op_type->type == T_STRUCT)
 	{
-		auto struct_type = apoc_type_to_llvm(op_type, &backend);
+		auto struct_type = apoc_type_to_llvm(*op_type, &backend);
 		if(!operand)
 		{
 			if(node->selector.operand->type == type_identifier)
@@ -1359,7 +1616,7 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 				operand = generate_lhs(f, func, node->selector.operand,
 						NULL, false, (Type_Info){});
 		}
-		if(op_type.structure.is_union)
+		if(op_type->structure.is_union)
 		{
 			auto elem_ptr = backend.builder->CreateStructGEP(
 					struct_type, operand, 0,
@@ -1374,9 +1631,9 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 			return elem_ptr;
 		}
 	}
-	else if(op_type.type == T_ENUM)
+	else if(op_type->type == T_ENUM)
 	{
-		auto enumerator = op_type.enumerator.node->enumerator;
+		auto enumerator = op_type->enumerator.node->enumerator;
 		auto member = enumerator.members[node->selector.selected_index];
 		llvm::Value *val = interp_val_to_llvm(member->interp_val.val, &backend, func);
 		return create_cast(enumerator.type, member->interp_val.val.type, val);
@@ -1393,6 +1650,42 @@ should_load(Type_Info *type)
 }
 
 llvm::Value *
+load_got_identifier(Variable_Info *variable, Variable_Types type)
+{
+	switch(type)
+	{
+		case ID_CONST_GLOBAL:
+		{
+			return ((GlobalVariable *)variable->value)->getInitializer();
+		} break;
+		case ID_FUNCTION:
+			return variable->value;
+		case ID_GLOBAL:
+		{
+			if(should_load(variable->type))
+				return llvm_load(variable->type, variable->value, "", &backend);
+
+			return variable->value;
+		} break;
+		case ID_LOCAL:
+		{
+			if(variable->type->type == T_FUNC || variable->type->type == T_STRUCT)
+				return variable->value;
+			return backend.builder->CreateLoad(
+					apoc_type_to_llvm(*variable->type, &backend), variable->value);
+
+			//return variable->value;
+		} break;
+		case ID_INVALID:
+		{
+			Assert(false);
+		} break;
+	}
+	Assert(false);
+
+}
+
+llvm::Value *
 generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 {
 	switch (node->type)
@@ -1400,35 +1693,9 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		case type_identifier:
 		{
 			Variable_Types type;
-			auto variable = get_identifier(node->identifier.name, &type);
+			auto variable = get_identifier(f, node->identifier.name, &type);
 			Assert(type != ID_INVALID);
-			
-			switch(type)
-			{
-				case ID_CONST_GLOBAL:
-				{
-					return ((GlobalVariable *)variable->value)->getInitializer();
-				} break;
-				case ID_FUNCTION:
-					return variable->value;
-				case ID_GLOBAL:
-				{
-					if(should_load(variable->type))
-						return llvm_load(variable->type, variable->value, "", &backend);
-
-					return variable->value;
-				} break;
-				case ID_LOCAL:
-				{
-					if(variable->type->type == T_FUNC || variable->type->type == T_STRUCT)
-						return variable->value;
-					return backend.builder->CreateLoad(
-							apoc_type_to_llvm(*variable->type, &backend), variable->value);
-
-					//return variable->value;
-				} break;
-			}
-			Assert(false);
+			return load_got_identifier(variable, type);
 		} break;
 		case type_run:
 		{
@@ -1506,14 +1773,23 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_selector:
 		{
-			if(node->selector.operand_type.type == T_ENUM)
+			if(node->selector.operand_type->type == T_ENUM)
 			{
 				return generate_selector(f, node, func);
+			}
+			else if(node->selector.operand_type->type == T_MODULE)
+			{
+				Assert(node->selector.operand_type->f_nullable);
+				Variable_Types var_type;
+				auto got = get_identifier(node->selector.operand_type->f_nullable, node->selector.identifier->identifier.name, &var_type); 
+				Assert(got);
+				Assert(var_type == ID_CONST_GLOBAL || var_type == ID_GLOBAL || var_type == ID_FUNCTION);
+				return load_got_identifier(got, var_type);
 			}
 			else
 			{
 				auto elem_ptr = generate_selector(f, node, func);
-				return llvm_load(&node->selector.selected_type, elem_ptr, "selected", &backend);
+				return llvm_load(node->selector.selected_type, elem_ptr, "selected", &backend);
 			}
 		} break;
 		case type_array_list:
@@ -1619,7 +1895,6 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			auto elem_ptr = generate_index(f, node, func, NULL, false, (Type_Info){});
 			return llvm_load(&node->index.idx_type, elem_ptr, "indexed_val", &backend);
 		} break;
-		
 		default:
 		{
 			LG_FATAL("Unhandled operand type %d", node->type);
@@ -1669,7 +1944,7 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 				one = create_cast(expr_type, one_type, one);
 
 				Variable_Types returned_type = ID_INVALID;
-				auto to_store = get_identifier(node->unary_expr.expression->identifier.name,
+				auto to_store = get_identifier(f, node->unary_expr.expression->identifier.name,
 						&returned_type);
 				Assert(returned_type == ID_LOCAL || returned_type == ID_GLOBAL);
 				Assert(to_store);
@@ -1944,7 +2219,7 @@ generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, 
 			else
 			{
 				Variable_Types id_type;
-				result = get_identifier(lhs->identifier.name, &id_type)->value;
+				result = get_identifier(f, lhs->identifier.name, &id_type)->value;
 				Assert(id_type != ID_INVALID);
 
 				// @TODO: compiler error for this

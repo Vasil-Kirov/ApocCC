@@ -9,7 +9,7 @@ fn main() -> i32 {
 
 
 fn not_main() -> f32 {
-      this_f :f32= 1.23;
+      this_f: f32= 1.23;
       other_function(@this_f);
       -> this_f;
 }

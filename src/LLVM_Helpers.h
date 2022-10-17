@@ -20,11 +20,11 @@ llvm::FunctionType *
 type_to_func_type(Type_Info type, Backend_State *backend);
 
 void
-write_type_info_to_llvm(Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_type,
+write_type_info_to_llvm(File_Contents *f, Type_Info to_write, llvm::Value *ptr, llvm::Type *llvm_type,
 		Backend_State *backend, llvm::Function *func);
 
 llvm::StructType *
-get_type_info_kind(const char *name, Backend_State *backend);
+get_type_info_kind(File_Contents *f, const char *name, Backend_State *backend);
 
 llvm::Value *
 bit_cast_llvm_type(llvm::Value *value, llvm::Type *to, Backend_State *backend);

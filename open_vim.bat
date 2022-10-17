@@ -6,4 +6,8 @@ FOR /R %%f in (*.cpp *.h *.apoc) do (
 	SET Files=!Files! %%f
 )
 
-start nvim-qt %Files%
+IF [%1] == [gui] (
+	start nvim-qt %Files%
+) ELSE (
+	nvim %Files%
+)

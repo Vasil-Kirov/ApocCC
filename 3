@@ -3,19 +3,37 @@
 #include <Memory.h>
 #include <platform/platform.h>
 
-static b32 reached_eof;
-static const char *expected;
+	static b32 reached_eof;
+	static const char *expected;
 
-Ast_Node *
-alloc_node()
-{
-	Ast_Node *result = (Ast_Node *)AllocateCompileMemory(sizeof(Ast_Node));
-	memset(result, 0, sizeof(Ast_Node));
-	return result;
-}
+#define parse_expect(func, str) \
+		func();                     \
+		expected = str
+#define tok_expect(token_id, exp_tok, expect)                 \
+		{                                                         \
+			if (token_id.type != exp_tok)                         \
+			{                                                     \
+				raise_parsing_unexpected_token(expect, token_id); \
+			}                                                     \
+		}
+#define tok_not_expect(token_id, nexp_tok, expect)           \
+		{                                                        \
+			if (token_id.type == nexp_tok)                       \
+			{                                                    \
+				raise_parsing_unexpected_token(expect, token_id) \
+			}                                                    \
+		}
 
-Ast_Node *
-ast_array_list(Token_Iden start_tok, Ast_Node **list)
+	Ast_Node *
+	alloc_node()
+	{
+		Ast_Node *result = (Ast_Node *)AllocateCompileMemory(sizeof(Ast_Node));
+		memset(result, 0, sizeof(Ast_Node));
+		return result;
+	}
+
+	Ast_Node *
+	ast_array_list(Token_Iden start_tok, Ast_Node **list)
 {
 	Ast_Node *result = alloc_node();
 	result->type = type_array_list;
@@ -48,7 +66,7 @@ ast_unary_expr(Token_Iden *token, Ast_Node *expr)
 Ast_Node *
 ast_identifier(File_Contents *f, Token_Iden *identifier_token)
 {
-	if(!identifier_token->identifier)
+	if(identifier_token->type != tok_identifier)
 		raise_parsing_unexpected_token("identifier", f);
 	
 	Ast_Node *result = alloc_node();
@@ -59,11 +77,8 @@ ast_identifier(File_Contents *f, Token_Iden *identifier_token)
 }
 
 Ast_Identifier
-pure_identifier(File_Contents *f, Token_Iden *token)
+pure_identifier(Token_Iden *token)
 {
-	if(!token->identifier)
-		raise_parsing_unexpected_token("identifier", f);
-
 	Ast_Identifier result = {
 		.token = token,
 		.name = token->identifier,
@@ -143,7 +158,6 @@ ast_enum(Ast_Identifier id, Ast_Node **members, Type_Info type, Token_Iden *erro
 	result->enumerator.type = type;
 	result->enumerator.members = members;
 	result->enumerator.token = error_token;
-	result->enumerator.type.enumerator.node = result;
 	return result;
 }
 
@@ -169,7 +183,7 @@ ast_selector(Token_Iden *dot_token, Ast_Node *operand, Ast_Node *identifier)
 	result->type = type_selector;
 	result->selector.dot_token = dot_token;
 	result->selector.operand = operand;
-	result->selector.identifier = identifier;
+	result->selector.selected = identifier;
 	return result;
 }
 
@@ -242,7 +256,7 @@ parse_import_module(File_Contents *f, Ast_Node *lhs_nullable)
 	Import_Module new_module;
 	new_module.module_path = (u8 *)absolute_path;
 	new_module.identifier_nullable = lhs_nullable;
-	new_module.f = NULL;
+	new_module.scopes = NULL;
 
 	return new_module;
 }
@@ -349,11 +363,9 @@ parse_file_level_statement(File_Contents *f)
 		} break;
 		case tok_import:
 		{
-			advance_token(f);
 			Import_Module new_module = parse_import_module(f, NULL);
 			SDPush(f->modules, new_module);
 			result = ast_dunn();
-			parser_eat(f, tok_semi_colon);
 		} break;
 		default:
 		{
@@ -430,18 +442,10 @@ parse_enum(File_Contents *f)
 		type = parse_type(f);
 	}
 
-	Ast_Identifier id = pure_identifier(f, identifier_token);
+	Ast_Identifier id = pure_identifier(identifier_token);
 	Ast_Node **members = delimited(f, '{', '}', ';', parse_enum_value);
-
 	type = add_primitive_type(f, (char *)id.name, type.primitive.size);
-
-	Type_Info *primitive_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-	memcpy(primitive_type, &type, sizeof(Type_Info));
-
-	Type_Info enum_type = {};
-	enum_type.type = T_ENUM;
-	enum_type.enumerator.type = primitive_type;
-	auto result = ast_enum(id, members, enum_type, tok);
+	auto result = ast_enum(id, members, type, tok);
 	return result;
 }
 
@@ -549,8 +553,6 @@ parse_identifier_statement(File_Contents *f, Token ends_with)
 				advance_token(f);
 				Import_Module new_module = parse_import_module(f, lhs);
 				SDPush(f->modules, new_module);
-				parser_eat(f, tok_semi_colon);
-				return ast_dunn();
 			}
 			else
 			{
@@ -624,18 +626,6 @@ parse_statement(File_Contents *f)
 		{
 			return parse_body(f, false, advance_token(f));
 		} break;
-		case tok_break:
-		{
-			result = alloc_node();
-			result->type = type_break;
-			result->brk.token = advance_token(f);
-		} break;
-		case tok_continue:
-		{
-			result = alloc_node();
-			result->type = type_continue;
-			result->cont.token = advance_token(f);
-		} break;
 		case tok_is_defined:
 		{
 			parse_is_defined(f);
@@ -685,6 +675,12 @@ parse_statement(File_Contents *f)
 			result->type = type_return;
 			result->ret.token = *f->curr_token;
 			result->ret.expression = parse_expression(f, (Token)';', false);
+		} break;
+		case tok_break:
+		{
+			advance_token(f);
+			result = alloc_node();
+			result->type = type_break;
 		} break;
 		case '}':
 		{
@@ -956,7 +952,7 @@ parse_var(File_Contents *f, Token_Iden *name_token)
 	}
 	
 	Assert(type_info.token->file != NULL);
-	Ast_Node *result = ast_variable(type_info, pure_identifier(f, name_token), false);
+	Ast_Node *result = ast_variable(type_info, pure_identifier(name_token), false);
 	return result;
 }
 
@@ -1006,7 +1002,7 @@ parse_func_call(File_Contents *f, Ast_Node *operand)
 Ast_Node *
 parse_struct_initialize(File_Contents *f, Ast_Node *operand)
 {
-	if (!operand || (operand->type != type_identifier && operand->type != type_selector))
+	if (!operand || operand->type != type_identifier)
 	{
 		raise_parsing_unexpected_token("identifier for struct initialization", f);
 	}
@@ -1072,12 +1068,8 @@ parse_atom_expression(File_Contents *f, Ast_Node *operand, char stop_at, b32 is_
 			{
 				Token_Iden *dot_token = advance_token(f);
 				Token_Iden *identifier_token = advance_token(f);
-				if(identifier_token->type != tok_identifier)
-				{
-					raise_parsing_unexpected_token("an identifier selected with .", f);
-				}
 				operand = ast_selector(dot_token, operand,
-						ast_identifier(f, identifier_token));
+						parse_unary_expression(f, stop_at, is_lhs));
 			} break;
 			case tok_plusplus:
 			case tok_minusminus:
@@ -1141,7 +1133,7 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 			}
 			result = alloc_node();
 			result->type = type_literal;
-			result->atom.identifier = pure_identifier(f, advance_token(f));
+			result->atom.identifier = pure_identifier(advance_token(f));
 			result->atom.type = LIT_NORMAL_NUMBER;
 		} break;
 		case tok_const_str:
@@ -1153,7 +1145,7 @@ parse_operand(File_Contents *f, char stop_at, b32 is_lhs)
 			}
 			result = alloc_node();
 			result->type = type_const_str;
-			result->atom.identifier = pure_identifier(f, advance_token(f));
+			result->atom.identifier = pure_identifier(advance_token(f));
 		} break;
 		case '(':
 		{
@@ -1332,38 +1324,11 @@ parse_type(File_Contents *f)
 	}
 	else if(pointer_or_type->type == tok_identifier)
 	{
-		// Type from a different module
-		if(f->next_token->type == '.')
-		{
-			Token_Iden *module_name = advance_token(f);
-			if(module_name->type != tok_identifier)
-			{
-				raise_parsing_unexpected_token("module name before [ . ]", f);
-			}
-			Token_Iden *selected_struct = advance_token(f);
-			if(selected_struct->type != tok_identifier)
-			{
-				raise_parsing_unexpected_token("struct name after [ . ]", f);
-			}
-			result.type = T_MODULE;
-			result.mod.selector_id = ast_identifier(f, module_name);
-			result.mod.selected_id = ast_identifier(f, selected_struct);
-		}
-		else
-		{
-			// @Note: Invalid types are checked in analyzer
-			Type_Info *got = get_type(f, pointer_or_type->identifier);
-			if(got)
-				result = *got;
-			else
-			{
-				result.type = T_INVALID;
-			}
-
-			if(!result.identifier)
-				result.identifier = pointer_or_type->identifier;
-			advance_token(f);
-		}
+		// @Note: Invalid types are checked in analyzer
+		result = *get_type(f, pointer_or_type->identifier);
+		if(!result.identifier)
+			result.identifier = pointer_or_type->identifier;
+		advance_token(f);
 	}
 	else if(pointer_or_type->type == '[')
 	{
@@ -1524,7 +1489,7 @@ parse_struct_type(File_Contents *f, b32 is_named)
 
 	if(struct_id)
 	{
-		result = ast_struct(pure_identifier(f, struct_id),
+		result = ast_struct(pure_identifier(struct_id),
 				members, SDCount(members), is_union, is_packed);
 	}
 	else
@@ -1550,7 +1515,7 @@ parse_func_arg(File_Contents *f)
 	Token_Iden *identifier_token = advance_token(f);
 	if(identifier_token->type == tok_var_args)
 	{
-		return ast_variable((Type_Info){.type = T_DETECT}, pure_identifier(f, identifier_token), true);
+		return ast_variable((Type_Info){.type = T_DETECT}, pure_identifier(identifier_token), true);
 	}
 	Ast_Node *result = parse_var(f, identifier_token);
 	if(result == NULL)
@@ -1753,7 +1718,7 @@ parse_func(File_Contents *f)
 		this_symbol.node = result;
 		this_symbol.identifier = this_func.identifier.name;
 		this_symbol.type = sym_type;
-		Symbol *maybe_overload = get_symbol_spot(f, *func_id->identifier.token, false, false);
+		Symbol *maybe_overload = get_symbol_spot(f, *func_id->identifier.token, false);
 		if(maybe_overload)
 		{
 			// @TODO: check why the tag it returns is S_NONE

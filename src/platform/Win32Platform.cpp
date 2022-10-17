@@ -311,7 +311,9 @@ char *
 platform_relative_to_absolute_path(char *path)
 {
 	char *full_path = (char *)AllocatePermanentMemory(MAX_PATH);
-	GetFullPathNameA(path, MAX_PATH, full_path, NULL);
+	if(GetFullPathNameA(path, MAX_PATH, full_path, NULL) == 0)
+		return NULL;
+
 	return full_path;
 }
 
@@ -331,7 +333,9 @@ wchar_t *
 platform_relative_to_absolute_pathw(wchar_t *path)
 {
 	wchar_t *full_path = (wchar_t *)AllocatePermanentMemory(MAX_PATH * sizeof(wchar_t));
-	GetFullPathNameW(path, MAX_PATH * sizeof(wchar_t), full_path, NULL);
+	if(GetFullPathNameW(path, MAX_PATH * sizeof(wchar_t), full_path, NULL) == 0)
+		return NULL;
+
 	return full_path;
 }
 

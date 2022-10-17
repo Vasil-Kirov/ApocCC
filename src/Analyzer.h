@@ -97,6 +97,13 @@ typedef struct
 	Compiler_Backend backend;
 } Build_Commands;
 
+typedef struct
+{
+	File_Contents *f;
+	Ast_Node *identifier_nullable;
+	u8 *module_path;
+} Import_Module;
+
 // @NOTE: this is poorly named, should probably be changed to something like `compile_state`
 typedef struct _File_Contents
 {
@@ -109,8 +116,14 @@ typedef struct _File_Contents
 	Ast_Node  **overloads;
 	Ast_Node  **defered;
 	Symbol    **functions;
+	Import_Module *modules;
 #if !defined(NOVM)
+	llvm::BasicBlock *continue_block;
+	llvm::BasicBlock *break_block;
 	llvm::Function  **overload_gens;
+	Struct_Table *struct_types;
+	Variable_Lookup_Table *func_table;
+	Variable_Lookup_Table *named_globals;
 #endif
 	Stack		scope_stack;
 	Scope_Info *scopes;
@@ -157,6 +170,9 @@ struct Expression_Context
 	Expression_Type kind;
 };
 
+void
+import_non_imported(File_Contents **files);
+
 Type_Info
 number_to_untyped_type(u8 *number);
 
@@ -175,8 +191,14 @@ push_scope(File_Contents *f, Scope_Info current_scope);
 void
 pop_scope(File_Contents *f, Token_Iden *scope_tok);
 
-void
+Ast_Node **
 analyze(File_Contents *f, Ast_Node *ast_tree);
+
+void
+analyze_functions_and_overloads(File_Contents *f, Ast_Node **functions);
+
+Import_Module *
+find_module(File_Contents *f, u8 *id);
 
 Type_Info
 add_primitive_type(File_Contents *f, const char *name, Var_Size size);
@@ -196,7 +218,7 @@ initialize_analyzer();
 Ast_Node *
 analyze_file_level_statement(File_Contents *f, Ast_Node *node);
 
-void
+Ast_Node **
 analyze_file_level_statement_list(File_Contents *f, Ast_Node *node);
 
 u8 *
@@ -206,7 +228,7 @@ u8 *
 var_type_to_name(Type_Info *type, b32 bracket = true);
 
 Symbol *
-get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out = true);
+get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out = true, b32 search_modules = true);
 
 void
 verify_enum(File_Contents *f, Ast_Node *node);

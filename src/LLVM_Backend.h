@@ -2,14 +2,13 @@
 #ifndef CODE_GEN_H
 #define CODE_GEN_H
 
-#include "llvm/IR/GlobalVariable.h"
 #include <Basic.h>
 #include <Lexer.h>
 #include <Parser.h>
 
 
 void
-llvm_backend_generate(File_Contents *f, Ast_Node *root, File_Contents **files);
+llvm_backend_generate(File_Contents **files);
 
 #include <llvm-c/Core.h>
 #include <llvm-c/TargetMachine.h>
@@ -84,10 +83,13 @@ struct Backend_State
 	IRBuilder<> *builder;
 	Module *module;
 	Variable_Lookup_Table *named_values;
-	Variable_Lookup_Table *named_globals;
-	Variable_Lookup_Table *func_table;
-	Struct_Table *struct_types;
 	//legacy::FunctionPassManager *func_pass;
+};
+
+struct Type_Info_Array
+{
+	Type_Info **ptr;
+	int count;
 };
 
 struct Symbol_Info
@@ -133,7 +135,7 @@ DISubroutineType *
 create_func_debug_type(Type_Info *func_type);
 
 Variable_Info *
-get_identifier(u8 *name, Variable_Types *returned_type);
+get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type);
 
 llvm::StructType *
 get_context_type();
@@ -149,7 +151,7 @@ void
 generate_struct_type(File_Contents *f, Type_Info type, llvm::StructType *opaque_struct);
 
 void
-generate_signatures(File_Contents *f);
+generate_signatures(File_Contents **files);
 
 llvm::Value *
 generate_expression(File_Contents *f, Ast_Node *node, Function *func);
@@ -185,5 +187,8 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 llvm::BasicBlock *
 generate_blocks_from_list(File_Contents *f, Ast_Node *list_node, Function *func,
 		BasicBlock *passed_block, const char *block_name, BasicBlock *to_go);
+
+void
+generate_if_global_var(File_Contents *f, Ast_Node *node);
 
 #endif

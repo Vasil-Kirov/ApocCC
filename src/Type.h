@@ -38,11 +38,12 @@ typedef enum : i32
 	T_POINTER         = 7 ,
 	T_VOID            = 8 ,
 	T_STRING          = 9 ,
-	T_BOOLEAN		  = 10,
+	T_BOOLEAN	  = 10,
 	T_FUNC            = 11,
 	T_ENUM            = 12,
 	T_DETECT          = 13,
 	T_INVALID         = 14,
+	T_MODULE          = 15,
 } Type_Type;
 
 typedef enum
@@ -55,6 +56,7 @@ typedef struct _Type_Info
 {
 	Type_Type type;
 	Token_Iden *token;
+	struct _File_Contents *f_nullable;
 	union
 	{
 		struct
@@ -96,6 +98,11 @@ typedef struct _Type_Info
 			struct _Type_Info *return_type;
 			int calling_convention;
 		} func;
+		struct
+		{
+			Ast_Node *selected_id;
+			Ast_Node *selector_id;
+		} mod;
 	};
 	u8 *identifier;
 	b32 is_const;

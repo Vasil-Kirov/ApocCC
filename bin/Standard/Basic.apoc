@@ -7,6 +7,10 @@ true  :: #bool  1;
 false :: #bool  0;
 null  :: #*void 0;
 
+fn return_true() -> bool {
+	-> false;
+}
+
 enum Call_Conv: i32
 {
 	CALL_APOC   = 1;

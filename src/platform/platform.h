@@ -85,7 +85,6 @@ platform_output_string(char *String, log_level Level);
 void
 platform_exit(i32 ExitCode);
 
-
 char *
 platform_relative_to_absolute_path(char *path);
 

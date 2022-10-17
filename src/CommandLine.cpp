@@ -183,7 +183,11 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 		}
 		else
 		{
-			(*files).push_back(arg);
+			char *absolute_path = platform_relative_to_absolute_path((char *)arg.c_str());
+			if(!absolute_path)
+				raise_build_error("File %s not found", arg.c_str());
+
+			files->push_back(std::string(absolute_path));
 		}
 	}
 

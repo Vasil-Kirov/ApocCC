@@ -56,13 +56,13 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "extern",     tok_extern);
 		shput(keyword_table, "struct",     tok_struct);
 		shput(keyword_table, "enum",       tok_enum);
-		shput(keyword_table, "import",     tok_import);
 		shput(keyword_table, "cast",       tok_cast);
 		shput(keyword_table, "if",         tok_if);
 		shput(keyword_table, "for",        tok_for);
 		shput(keyword_table, "switch",     tok_switch);
 		shput(keyword_table, "case",       tok_case);
 		shput(keyword_table, "as",         tok_as);
+		shput(keyword_table, "continue",   tok_continue);
 		shput(keyword_table, "break",      tok_break);
 		shput(keyword_table, "else",       tok_else);
 		
@@ -89,6 +89,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "<<=",        tok_lshift_equals);
 		shput(keyword_table, ">>=",        tok_rshift_equals);
 		shput(keyword_table, "...",        tok_var_args);
+		shput(keyword_table, "$import",    tok_import);
 		shput(keyword_table, "$run",       tok_run);
 		shput(keyword_table, "$interp",    tok_interp);
 		shput(keyword_table, "$size",      tok_size);
@@ -346,13 +347,13 @@ Token_Iden get_token(File_Contents *f)
 			}
 			advance_buffer(f);
 			string_start++;
-			u64 num_size = f->at - string_start;
-			u8 *number_string = (u8 *)AllocateCompileMemory(num_size);
-			memcpy(number_string, string_start, num_size);
-			number_string[num_size-1] = '\0';
+			u64 str_size = f->at - string_start;
+			u8 *string = (u8 *)AllocateCompileMemory(str_size);
+			memcpy(string, string_start, str_size);
+			string[str_size-1] = '\0';
 			
 
-			Token_Iden result = {number_string, (char *)f->path, f->file_data, tok_const_str,
+			Token_Iden result = {string, (char *)f->path, f->file_data, tok_const_str,
 									start_line, start_col};
 			return result;
 		}
@@ -398,8 +399,9 @@ Token_Iden get_token(File_Contents *f)
 			result.file = (char *)f->path;
 			if(result.type == KEYWORD_ERROR)
 			{
-				raise_token_syntax_error(f, "Incorrect compiler directive", 
-										 (char *)f->path, start_line, start_col);
+				char error[4096] = {};
+				vstd_sprintf(error, "Incorrect compiler directive [ %s ]", name); 
+				raise_token_syntax_error(f, error, (char *)f->path, start_line, start_col);
 			}
 			return result;
 		}

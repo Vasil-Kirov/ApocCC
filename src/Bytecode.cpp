@@ -680,8 +680,8 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 		{
 			result = allocate_register(ir);
 			b32 derefrence_pointer = true;
-			Type_Info *struct_type = &expr->selector.operand_type;
-			if(expr->selector.operand_type.type != T_POINTER) {
+			Type_Info *struct_type = expr->selector.operand_type;
+			if(expr->selector.operand_type->type != T_POINTER) {
 				derefrence_pointer = false;
 			}
 			else {
@@ -696,11 +696,11 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 			// put the starting address of the struct into the result register
 			instruction(result, struct_start, result, BC_MOVE_REG_TO_REG, block, type_64);
 			// offset the pointer (it's really just an add instruction)
-			instruction(result, offset_register, result, BC_OFFSET_POINTER, block, &expr->selector.selected_type);
+			instruction(result, offset_register, result, BC_OFFSET_POINTER, block, expr->selector.selected_type);
 			if(!get_pointer)
 			{
 				// derefrence the resulting pointer to get the member
-				instruction(result, -1, result, BC_DEREFRENCE, block, &expr->selector.selected_type);
+				instruction(result, -1, result, BC_DEREFRENCE, block, expr->selector.selected_type);
 			}
 		} break;
 		case type_const_str:

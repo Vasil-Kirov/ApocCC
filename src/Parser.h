@@ -21,6 +21,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_continue     = -70,
 	type_dunn         = -69,
 	type_defer        = -68,
 	type_overload     = -67,
@@ -85,6 +86,16 @@ typedef struct
 	Token_Iden *token;
 	Interp_Val ran_val;
 } Ast_Run;
+
+typedef struct
+{
+	Token_Iden *token;
+} Ast_Break;
+
+typedef struct
+{
+	Token_Iden *token;
+} Ast_Continue;
 
 typedef struct _Symbol Symbol;
 typedef struct _Ast_Identifier
@@ -300,6 +311,12 @@ typedef struct
 	Ast_Node *expression;
 	Type_Info expr_type;
 } Ast_Cast;
+
+typedef enum 
+{
+	SEL_NORMAL = 0,
+	SEL_MODULE = 1 << 0
+} Selector_Flags;
 	
 typedef struct
 {
@@ -307,8 +324,9 @@ typedef struct
 	Ast_Node *operand;
 	Ast_Node *identifier;
 	Token_Iden *dot_token;
-	Type_Info operand_type; // @NOTE: only available after analysis
-	Type_Info selected_type;
+	Type_Info *operand_type; // @NOTE: only available after analysis
+	Type_Info *selected_type;
+	u8 flags;
 } Ast_Selector;
 
 typedef struct
@@ -349,6 +367,8 @@ struct _abstract_syntax_tree
 	union
 	{
 		Ast_Overload overload;
+		Ast_Continue cont;
+		Ast_Break brk;
 		Ast_Interp_Val interp_val;
 		Ast_Enum enumerator;
 		Ast_Size size;
@@ -383,7 +403,7 @@ u8 *
 get_func_name(Ast_Node *func);
 
 Ast_Identifier
-pure_identifier(Token_Iden *token);
+pure_identifier(File_Contents *f, Token_Iden *token);
 
 Ast_Node *
 ast_union(File_Contents *f);
@@ -411,6 +431,9 @@ parse_statement(File_Contents *f);
 
 Ast_Node *
 parse_statement_list(File_Contents *f, b32 is_func);
+
+Ast_Node *
+parse_unary_expression(File_Contents *f, char stop_at, b32 is_lhs);
 
 Ast_Node *
 parse_expression(File_Contents *f, Token stop_at, b32 is_lhs);

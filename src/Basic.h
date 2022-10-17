@@ -60,7 +60,7 @@ typedef struct _entire_file
 #define Assert(expression)
 #endif
 
-#define ADD_LOGGER Assert(false)
+#define LOOP_FILES for(size_t file_idx = 0; file_idx < file_count; ++file_idx)
 
 #include <stdlib/std.h>
 #include <Log.h>

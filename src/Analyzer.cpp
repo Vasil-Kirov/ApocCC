@@ -16,6 +16,65 @@ initialize_analyzer(File_Contents *f)
 	f->to_add_next_scope = SDCreate(Symbol);
 }
 
+b32
+file_has_module_with_name(File_Contents *f, Import_Module *mod)
+{
+	size_t mod_count = SDCount(f->modules);
+	for(int mod_idx = 0; mod_idx < mod_count; ++mod_idx)
+	{
+		if(vstd_strcmp((char *)f->modules[mod_idx].module_path, (char *)mod->module_path))
+		{
+			if(f->modules[mod_idx].identifier_nullable == mod->identifier_nullable)
+				return true;
+
+			if(!f->modules[mod_idx].identifier_nullable || !mod->identifier_nullable)
+			{}
+			else if(vstd_strcmp((char *)f->modules[mod_idx].identifier_nullable->identifier.name, (char *)mod->identifier_nullable->identifier.name))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+b32
+sync_mod_imports_with_file(File_Contents *f, Import_Module *mod)
+{
+	b32 did_add = false;
+	int import_count = SDCount(mod->f->modules);
+	for(int import_idx = 0; import_idx < import_count; ++import_count)
+	{
+		if(!file_has_module_with_name(f, &mod->f->modules[import_idx]))
+		{
+			SDPush(f, mod->f->modules[import_idx]);
+			did_add = true;
+		}
+	}
+	return did_add;
+}
+
+void
+import_non_imported(File_Contents **files)
+{
+	b32 did_change;
+	do {
+		did_change = false;
+		size_t file_count = SDCount(files);
+		for(size_t file_idx = 0; file_idx < file_count; ++file_idx)
+		{
+			File_Contents *f = files[file_idx];
+			size_t mod_count = SDCount(f->modules);
+			for(int mod_idx = 0; mod_idx < mod_count; ++mod_idx)
+			{
+				Import_Module *mod = &f->modules[mod_idx];
+				if(sync_mod_imports_with_file(f, mod))
+					did_change = true;
+			}
+		}
+	} while(did_change);
+}
+
 Type_Info
 add_primitive_type(File_Contents *f, const char *name, Var_Size size)
 {
@@ -84,14 +143,61 @@ add_type(File_Contents *f, Ast_Node *structure)
 	shput(f->type_table, structure->structure.struct_id.name, type_info);
 }
 
+Import_Module *
+find_module(File_Contents *f, u8 *id)
+{
+	Assert(id);
+
+	size_t imported_count = SDCount(f->modules);
+	for(int i = 0; i < imported_count; ++i)
+	{
+		// Check if the module doesn't require a selector
+		auto mod = &f->modules[i];
+		if(mod->identifier_nullable)
+		{
+			if(vstd_strcmp((char *)mod->identifier_nullable, (char *)id))
+				return mod;
+		}
+	}
+	return NULL;
+}
+
 Type_Info *
 get_type(File_Contents *f, u8 *name)
 {
-	Type_Info got = shget(f->type_table, name);
-	got.identifier = name;
-	Type_Info *result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-	memcpy(result, &got, sizeof(Type_Info));
-	return result;
+	auto got_idx = shgeti(f->type_table, name);
+	if(got_idx == -1)
+	{
+		size_t imported_count = SDCount(f->modules);
+		for(int i = 0; i < imported_count; ++i)
+		{
+			// Check if the module doesn't require a selector
+			auto mod = f->modules[i];
+			if(!mod.identifier_nullable)
+			{
+				auto got = shgeti(mod.f->type_table, name);
+				if(got != -1)
+				{
+					Type_Info type = mod.f->type_table[got].value;
+					type.f_nullable = mod.f;
+					type.identifier = name;
+					Type_Info *result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+					memcpy(result, &type, sizeof(Type_Info));
+					return result;
+
+				}
+			}
+		}
+		return NULL;
+	}
+	else
+	{
+		Type_Info got = f->type_table[got_idx].value;
+		got.identifier = name;
+		Type_Info *result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		memcpy(result, &got, sizeof(Type_Info));
+		return result;
+	}
 }
 
 void
@@ -216,7 +322,7 @@ add_symbol(File_Contents *f, Symbol symbol)
 	}
 }
 
-void
+Ast_Node **
 analyze(File_Contents *f, Ast_Node *ast_tree)
 {
 	/*
@@ -230,8 +336,8 @@ analyze(File_Contents *f, Ast_Node *ast_tree)
 	scope_info.file = (const char *)f->path;
 	scope_info.start_line = 1;
 	push_scope(f, scope_info);
-	analyze_file_level_statement_list(f, ast_tree);
-	pop_scope(f, f->prev_token);
+	Ast_Node **result = analyze_file_level_statement_list(f, ast_tree);
+	return result;
 }
 
 u8 *
@@ -335,7 +441,7 @@ verify_overload(File_Contents *f, Ast_Node *overload)
 	verify_func_level_statement_list(f, func->function.body, func);
 }
 
-void
+Ast_Node **
 analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 {
 	Assert(node->type == type_statements);
@@ -381,6 +487,14 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 		else
 			Assert(false);
 	}
+
+	return functions;
+}
+
+void
+analyze_functions_and_overloads(File_Contents *f, Ast_Node **functions)
+{
+	size_t func_count = SDCount(functions);
 
 	for(size_t i = 0; i < func_count; ++i)
 	{
@@ -496,11 +610,13 @@ verify_enum(File_Contents *f, Ast_Node *node)
 	scope_info.file = node->enumerator.token->file;
 	push_scope(f, scope_info);
 
-	size_t type_id_len = vstd_strlen((char *)enumerator->type.identifier);
+	u8 *type_id_before = enumerator->type.enumerator.type->identifier;
+	size_t type_id_len = vstd_strlen((char *)type_id_before);
 	u8 *type_id = (u8 *)AllocatePermanentMemory(type_id_len + 1);
-	memcpy(type_id, enumerator->type.identifier, type_id_len);
-	enumerator->type.identifier = NULL;
-	enumerator->type.identifier = var_type_to_name(&enumerator->type, false);
+	memcpy(type_id, type_id_before, type_id_len);
+
+	enumerator->type.enumerator.type->identifier = NULL;
+	enumerator->type.enumerator.type->identifier = var_type_to_name(enumerator->type.enumerator.type, false);
 
 	for(size_t i = 0; i < member_count; ++i)
 	{
@@ -515,7 +631,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 			interp_add_symbol(member->lhs->identifier.name, mem_val);
 
 			Type_Info *symbol_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-			memcpy(symbol_type, &enumerator->type, sizeof(Type_Info));
+			memcpy(symbol_type, enumerator->type.enumerator.type, sizeof(Type_Info));
 
 			Symbol symbol;
 			symbol.identifier = member->lhs->identifier.name;
@@ -619,14 +735,14 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		else
 		{
 			Type_Info mem_type = get_expression_type(f, member.rhs, &member.token, NULL, NULL);
-			if(is_untyped(enumerator->type))
-				enumerator->type = mem_type;
-			else if(!check_type_compatibility(enumerator->type, mem_type))
+			if(is_untyped(*enumerator->type.enumerator.type))
+				*enumerator->type.enumerator.type = mem_type;
+			else if(!check_type_compatibility(*enumerator->type.enumerator.type, mem_type))
 				raise_formated_semantic_error(f, member.token, 
 						"Member %s in enum is of type %s which is incompatible "
 						"with the rest of the enum is of type %s",
 						member.lhs->identifier.name, var_type_to_name(&mem_type),
-						var_type_to_name(&enumerator->type));
+						var_type_to_name(enumerator->type.enumerator.type));
 			b32 failed = false;
 			enumerator->members[i]->interp_val.val = interpret_expression(member.rhs, &failed);
 			if(failed)
@@ -635,6 +751,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 						i + 1, node->enumerator.id.name);
 		}
 	}
+
 	enumerator->type.identifier = type_id;
 	// @TODO: make it so it doesn't error out if you have a
 	// global with the same name as enum member
@@ -974,6 +1091,22 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 			Scope_Info scope = stack_pop(f->scope_stack, Scope_Info);
 			scope.has_return = true;
 			stack_push(f->scope_stack, scope);
+
+		} break;
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		// @TODO: check them here instead of in the backend
+		case type_continue:
+		case type_break:
+		{
 
 		} break;
 		default:
@@ -1339,6 +1472,26 @@ is_bits_op(Token op)
 		op == tok_bits_and;
 }
 
+Import_Module *
+get_module(File_Contents *f, u8 *id)
+{
+	char *a0 = (char *)id;
+	size_t module_count = SDCount(f->modules);
+	for(size_t i = 0; i < module_count; ++i)
+	{
+		Import_Module *mod = &f->modules[i];
+		if(mod->identifier_nullable)
+		{
+			Assert(mod->identifier_nullable->type == type_identifier);
+			if(vstd_strcmp(a0, (char *)mod->identifier_nullable->identifier.name))
+			{
+				return mod;
+			}
+		}
+	}
+	return NULL;
+}
+
 Type_Info *
 verify_array_list(File_Contents *f, Ast_Node *node)
 {
@@ -1379,12 +1532,33 @@ verify_array_list(File_Contents *f, Ast_Node *node)
 Type_Info
 verify_selector(File_Contents *f, Ast_Node *expression)
 {
+	if(expression->selector.operand->type == type_identifier)
+	{
+		Import_Module *maybe_module = get_module(f, expression->selector.operand->identifier.name);
+		if(maybe_module)
+		{
+			auto sym = get_symbol_spot(maybe_module->f, *expression->selector.identifier->identifier.token);
+			expression->selector.identifier->type = type_identifier;
+			expression->selector.identifier->identifier.name = sym->identifier;
+			expression->selector.identifier->identifier.token = sym->token;
+			expression->selector.identifier->identifier.symbol_spot = sym;
+			expression->selector.flags |= SEL_MODULE;
+
+			expression->selector.operand_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			expression->selector.operand_type->f_nullable = maybe_module->f;
+			expression->selector.operand_type->type = T_MODULE;
+			expression->selector.operand_type->mod.selector_id = expression->selector.operand;
+			expression->selector.operand_type->mod.selected_id = expression->selector.identifier;
+			return *sym->type;
+		}
+	}
+
 	Type_Info *expr_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 	Type_Info expr_type_value = get_expression_type(f, expression->selector.operand, expression->selector.dot_token, NULL, NULL);
 	memcpy(expr_type, &expr_type_value, sizeof(Type_Info));
 
 	Type_Info *operand_type = fix_type(f, expr_type);
-	expression->selector.operand_type = *operand_type;
+	expression->selector.operand_type = operand_type;
 	if(!is_accessible(*operand_type))
 	{
 		raise_formated_semantic_error(f, *expression->selector.dot_token,
@@ -1401,7 +1575,7 @@ verify_selector(File_Contents *f, Ast_Node *expression)
 		{
 			if(vstd_strcmp((char *)name, (char *)operand_type->structure.member_names[i]))
 			{
-				expression->selector.selected_type = operand_type->structure.member_types[i];
+				expression->selector.selected_type = &operand_type->structure.member_types[i];
 				expression->selector.selected_index = i;
 				return operand_type->structure.member_types[i];
 			}
@@ -1420,7 +1594,7 @@ verify_selector(File_Contents *f, Ast_Node *expression)
 			u8 *mem_name = enumerator.members[i]->interp_val.id.name;
 			if(vstd_strcmp((char *)name, (char *)mem_name))
 			{
-				expression->selector.selected_type = *operand_type;
+				expression->selector.selected_type = operand_type;
 				expression->selector.selected_index = i;
 				return enumerator.type;
 			}
@@ -1706,7 +1880,11 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *prev
 		op_type.type = T_INVALID;
 		if(expression->size.operand->type == type_identifier)
 		{
-			op_type = *get_type(f, expression->size.operand->identifier.name);
+			auto got = get_type(f, expression->size.operand->identifier.name);
+			if(got)
+			{
+				op_type = *got;
+			}
 		}
 		if(type_is_invalid(&op_type))
 			op_type = get_expression_type(f, expression->size.operand,
@@ -2121,15 +2299,44 @@ FOUND_OVERLOAD:
 Type_Info
 verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 {
-	if(struct_init->struct_init.operand->type != type_identifier)
+	Ast_Node *operand = NULL;
+	u8 *struct_id = NULL;
+	Type_Info *struct_type = NULL;
+	if(struct_init->struct_init.operand->type == type_selector)
 	{
-		raise_semantic_error(f, "expected struct identifier", 
+		operand = struct_init->struct_init.operand;
+		Import_Module *maybe_module = get_module(f, operand->selector.operand->identifier.name);
+		if(maybe_module)
+		{
+			auto got_type = get_type(maybe_module->f, operand->selector.identifier->identifier.name);
+			got_type->f_nullable = maybe_module->f;
+			if(!got_type)
+				raise_formated_semantic_error(f, *operand->selector.dot_token, "Use of undeclared type %s, imported by module %s",
+						operand->selector.identifier->identifier.name, operand->selector.operand->identifier.name);
+			struct_id   = operand->selector.identifier->identifier.name;
+			struct_type = got_type;
+		}
+		else
+		{
+			raise_formated_semantic_error(f, *operand->selector.dot_token, "Use of undeclared module %s. Used to access type %s",
+					operand->selector.operand->identifier.name, operand->selector.identifier->identifier.name);
+		}
+	}
+	else
+	{
+		if(struct_init->struct_init.operand->type != type_identifier)
+			raise_semantic_error(f, "expected struct identifier", 
 							 struct_init->struct_init.token);
+
+		struct_id = struct_init->struct_init.operand->identifier.name;
+		struct_type = get_type(f, struct_id);
 	}
 	Token_Iden error_token = struct_init->struct_init.token;	
-	u8 *struct_id = struct_init->struct_init.operand->identifier.name;
 	Ast_Node **expressions = struct_init->struct_init.expressions;
-	Type_Info *struct_type = get_type(f, struct_id);
+	if(!struct_type)
+	{
+		raise_formated_semantic_error(f, error_token, "Struct name used for initialization is incorrect. Couldn't find %s", struct_id);
+	}
 
 	struct_init->struct_init.type = *struct_type;
 	
@@ -2161,7 +2368,7 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 		{
 			Ast_Node *result = alloc_node();
 			result->type = type_literal;
-			result->atom.identifier = pure_identifier(zero_tok);
+			result->atom.identifier = pure_identifier(f, zero_tok);
 			SDPush(struct_init->struct_init.expressions, result);
 			SDPush(struct_init->struct_init.expr_types, untyped_int);
 		}
@@ -2207,7 +2414,7 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 			zero_tok->identifier = (u8 *)"0";
 			Ast_Node *result = alloc_node();
 			result->type = type_literal;
-			result->atom.identifier = pure_identifier(zero_tok);
+			result->atom.identifier = pure_identifier(f, zero_tok);
 			SDPush(struct_init->struct_init.expressions, result);
 			SDPush(struct_init->struct_init.expr_types, untyped_int);
 		}
@@ -2216,7 +2423,7 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 }
 
 Symbol *
-get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out)
+get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out, b32 search_modules)
 {
 	Symbol *result = NULL;
 	u8 *identifier = token.identifier;
@@ -2270,6 +2477,23 @@ get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out)
 		}
 	}
 	EXIT_FUNC_SEARCH:
+
+	if(result == NULL && search_modules)
+	{
+		size_t module_count = SDCount(f->modules);
+		for(size_t i = 0; i < module_count; ++i)
+		{
+			// Only check those that don't require a selectable
+			Import_Module mod = f->modules[i];
+			if(!mod.identifier_nullable)
+			{
+				// Don't search deeper
+				result = get_symbol_spot(mod.f, token, false, false);
+				if(result)
+					break;
+			}
+		}
+	}
 
 	if(result == NULL && error_out)
 	{
@@ -2397,6 +2621,7 @@ verify_struct(File_Contents *f, Ast_Node *struct_node)
 	Ast_Variable *members = struct_node->structure.members;
 	int member_count = struct_node->structure.member_count;
 
+	// @TODO: does this really need a lookup?
 	Type_Info *struct_type = get_type(f, struct_node->structure.struct_id.name);
 	for(size_t i = 0; i < member_count; ++i)
 	{
@@ -2413,6 +2638,7 @@ verify_struct(File_Contents *f, Ast_Node *struct_node)
 					"Type of member %s in struct %s is not declared",
 					members[i].identifier.name, struct_node->structure.struct_id.name);
 	}
+	struct_type = fix_type(f, struct_type);
 	update_type(f, *struct_type, struct_node->structure.struct_id.name);
 }
 
