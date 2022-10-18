@@ -24,6 +24,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	build_commands.call_linker = true;
 	build_commands.linker_command = NULL;
 	build_commands.output_file = NULL;
+	build_commands.included_dirs = SDCreate(u8 *);
 #if !defined(NOVM)
 	build_commands.backend = LLVM_Backend;
 #else
@@ -37,6 +38,8 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 #error Unknown platform
 #endif
 	shdefault(build_commands.defines, 0);
+	const char *this_dir = ".";
+	SDPush(build_commands.included_dirs, this_dir);
 
 	std::string tmp_output_file;
 	std::string linker_command;
@@ -176,6 +179,16 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 					raise_build_error("Unknown backend %s.\nOptions:\n\tLLVM\n\tFast", backend.c_str());
 				}
 			}
+			else if(arg == "--include")
+			{
+				auto path = args[++i];
+				char *absolute_path = platform_relative_to_absolute_path((char *)path.c_str());
+				if(!absolute_path)
+				{
+					raise_build_error("Invalid included file path: %s", path.c_str());
+				}
+				SDPush(build_commands.included_dirs, absolute_path);
+			}
 			else
 			{
 				raise_build_error("Invalid command line option %s", arg.c_str());
@@ -191,13 +204,14 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 		}
 	}
 
-	if(build_commands.backend == LLVM_Backend)
-	{
-		char module_path[260] = {};
-		platform_get_absolute_path(module_path);
-		vstd_strcat(module_path, "Standard/Basic.apoc");
-		files->push_back(module_path);
-	}
+	u8 *module_path = (u8 *)AllocateCompileMemory(260);
+	platform_get_absolute_path((char *)module_path);
+	vstd_strcat((char *)module_path, "Standard");
+	u8 *std_dir = (u8 *)AllocateCompileMemory(vstd_strlen((char *)module_path) + 1);
+	strcpy((char *)std_dir, (char *)module_path);
+	SDPush(build_commands.included_dirs, std_dir);
+	vstd_strcat((char *)module_path, "/Basic.apoc");
+	files->push_back((char *)module_path);
 
 	if(build_commands.linker == LINK_EXE)
 		linker_command += "LINK -nologo ";

@@ -215,6 +215,7 @@ int main(int argc, char *argv[])
 			resolve_modules(f, files, file_idx);
 			char *uncompiled_file;
 			do {
+				File_Contents *f_initial = files[file_idx];
 				uncompiled_file = NULL;
 				int uncompiled_idx = check_for_uncompiled_includes(f);
 				if(uncompiled_idx != -1)
@@ -224,7 +225,7 @@ int main(int argc, char *argv[])
 					File_Contents *f = lex_and_parse_file(build_command, uncompiled_file, timers);
 					SDPush(files, f);
 					file_count++;
-					f->modules[uncompiled_idx].f = f;
+					f_initial->modules[uncompiled_idx].f = f;
 				}
 			} while(uncompiled_file);
 		}

@@ -14,6 +14,7 @@ initialize_analyzer(File_Contents *f)
 	f->scopes = SDCreate(Scope_Info);
 	f->scope_stack = stack_allocate(Scope_Info);
 	f->to_add_next_scope = SDCreate(Symbol);
+	f->modules = SDCreate(Import_Module);
 }
 
 b32
@@ -43,11 +44,11 @@ sync_mod_imports_with_file(File_Contents *f, Import_Module *mod)
 {
 	b32 did_add = false;
 	int import_count = SDCount(mod->f->modules);
-	for(int import_idx = 0; import_idx < import_count; ++import_count)
+	for(int import_idx = 0; import_idx < import_count; ++import_idx)
 	{
 		if(!file_has_module_with_name(f, &mod->f->modules[import_idx]))
 		{
-			SDPush(f, mod->f->modules[import_idx]);
+			SDPush(f->modules, mod->f->modules[import_idx]);
 			did_add = true;
 		}
 	}
@@ -610,13 +611,16 @@ verify_enum(File_Contents *f, Ast_Node *node)
 	scope_info.file = node->enumerator.token->file;
 	push_scope(f, scope_info);
 
-	u8 *type_id_before = enumerator->type.enumerator.type->identifier;
-	size_t type_id_len = vstd_strlen((char *)type_id_before);
+	size_t type_id_len = vstd_strlen((char *)enumerator->type.identifier);
 	u8 *type_id = (u8 *)AllocatePermanentMemory(type_id_len + 1);
-	memcpy(type_id, type_id_before, type_id_len);
 
-	enumerator->type.enumerator.type->identifier = NULL;
-	enumerator->type.enumerator.type->identifier = var_type_to_name(enumerator->type.enumerator.type, false);
+	memcpy(type_id, enumerator->type.identifier, type_id_len);
+
+	// Set the id to NULL so it doesn't use it, when we add the symbols for the enum scope
+	// we want to act like normal integers so that you can perform binary operations with
+	// other integers, since the enum doesn't exist yet and you can't cast to it
+	enumerator->type.identifier = NULL;
+	enumerator->type.identifier = var_type_to_name(&enumerator->type, false);
 
 	for(size_t i = 0; i < member_count; ++i)
 	{
@@ -631,7 +635,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 			interp_add_symbol(member->lhs->identifier.name, mem_val);
 
 			Type_Info *symbol_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-			memcpy(symbol_type, enumerator->type.enumerator.type, sizeof(Type_Info));
+			memcpy(symbol_type, &enumerator->type, sizeof(Type_Info));
 
 			Symbol symbol;
 			symbol.identifier = member->lhs->identifier.name;
@@ -735,14 +739,14 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		else
 		{
 			Type_Info mem_type = get_expression_type(f, member.rhs, &member.token, NULL, NULL);
-			if(is_untyped(*enumerator->type.enumerator.type))
-				*enumerator->type.enumerator.type = mem_type;
-			else if(!check_type_compatibility(*enumerator->type.enumerator.type, mem_type))
+			if(is_untyped(enumerator->type))
+				enumerator->type = mem_type;
+			else if(!check_type_compatibility(enumerator->type, mem_type))
 				raise_formated_semantic_error(f, member.token, 
 						"Member %s in enum is of type %s which is incompatible "
 						"with the rest of the enum is of type %s",
 						member.lhs->identifier.name, var_type_to_name(&mem_type),
-						var_type_to_name(enumerator->type.enumerator.type));
+						var_type_to_name(&enumerator->type));
 			b32 failed = false;
 			enumerator->members[i]->interp_val.val = interpret_expression(member.rhs, &failed);
 			if(failed)
@@ -760,6 +764,8 @@ verify_enum(File_Contents *f, Ast_Node *node)
 	
 	Type_Info *enum_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 	memcpy(enum_type, &node->enumerator.type, sizeof(Type_Info));
+
+
 	Type_Info *sym_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 	sym_type->type = T_ENUM;
 	sym_type->token = node->enumerator.token;
@@ -2423,7 +2429,7 @@ verify_struct_init(File_Contents *f, Ast_Node *struct_init)
 }
 
 Symbol *
-get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out, b32 search_modules)
+get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out, b32 search_modules, b32 is_module_search)
 {
 	Symbol *result = NULL;
 	u8 *identifier = token.identifier;
@@ -2467,7 +2473,7 @@ get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out, b32 search_mo
 				if(vstd_strcmp((char *)(scope.symbol_table[j].identifier), (char *)identifier))
 				{
 					result = &scope.symbol_table[j];
-					if(result->tag != S_FUNCTION && result->tag != S_GLOBAL_VAR)
+					if(!is_module_search && result->tag != S_FUNCTION && result->tag != S_GLOBAL_VAR)
 					{
 						result = NULL;
 					}
@@ -2488,7 +2494,7 @@ get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out, b32 search_mo
 			if(!mod.identifier_nullable)
 			{
 				// Don't search deeper
-				result = get_symbol_spot(mod.f, token, false, false);
+				result = get_symbol_spot(mod.f, token, false, false, true);
 				if(result)
 					break;
 			}

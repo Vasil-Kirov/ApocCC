@@ -1,4 +1,8 @@
 
+$if Windows
+$import "Windows.apoc";
+$end_if
+
 enum File_Access
 {
 	READ = 1;

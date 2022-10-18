@@ -143,7 +143,6 @@ ast_enum(Ast_Identifier id, Ast_Node **members, Type_Info type, Token_Iden *erro
 	result->enumerator.type = type;
 	result->enumerator.members = members;
 	result->enumerator.token = error_token;
-	result->enumerator.type.enumerator.node = result;
 	return result;
 }
 
@@ -208,6 +207,42 @@ node_to_ptr(Ast_Node node)
 	return result;
 }
 
+struct Iterate_Data
+{
+	u8 *file_name;
+	u8 **out_path;
+};
+
+b32
+iterator_function(char *path, void *data)
+{
+	Iterate_Data *casted = (Iterate_Data *)data;
+	b32 result = vstd_str_ends_with(path, (char *)casted->file_name);
+	if(result)
+	{
+		*casted->out_path = (u8 *)path;
+		return true;
+	}
+	return false;
+}
+
+u8 *
+find_file_in_includes(File_Contents *f, u8 *file_name)
+{
+	u8 *path = NULL;
+	Iterate_Data it_data = { file_name, &path };
+	
+	size_t include_count = SDCount(f->build_commands.included_dirs);
+	for(int i = 0; i < include_count; ++i)
+	{
+		if(platform_iterate_files_in_directory(f->build_commands.included_dirs[i], iterator_function, (void *)&it_data))
+		{
+			return path;
+		}
+	}
+	return NULL;
+}
+
 Import_Module
 parse_import_module(File_Contents *f, Ast_Node *lhs_nullable)
 {
@@ -221,26 +256,15 @@ parse_import_module(File_Contents *f, Ast_Node *lhs_nullable)
 	}
 	Token_Iden *path_tok = advance_token(f);
 
-	// @TODO: look for file in included paths
-	// @TODO: look for file in included paths
-	// @TODO: look for file in included paths
-	// @TODO: look for file in included paths
-	// @TODO: look for file in included paths
-	// @TODO: look for file in included paths
-	// @TODO: look for file in included paths
-	// @TODO: look for file in included paths
-	// @TODO: look for file in included paths
-
-	u8 *included_relative = path_tok->identifier;
-	char *absolute_path = platform_relative_to_absolute_path((char *)included_relative);
-	if(!absolute_path)
+	u8 *found = find_file_in_includes(f, path_tok->identifier);
+	if(!found)
 	{
 		char error[4096] = {};
-		vstd_sprintf(error, "a valid path. Couldn't find file \"%s\"", included_relative);
+		vstd_sprintf(error, "a valid path. Couldn't find file \"%s\"", path_tok->identifier);
 		raise_parsing_unexpected_token(error, f);
 	}
 	Import_Module new_module;
-	new_module.module_path = (u8 *)absolute_path;
+	new_module.module_path = found;
 	new_module.identifier_nullable = lhs_nullable;
 	new_module.f = NULL;
 
@@ -256,7 +280,6 @@ parse(File_Contents *f)
 	f->overloads = SDCreate(Ast_Node *);
 	f->defered   = SDCreate(Ast_Node *);
 	f->functions = SDCreate(Symbol *);
-	f->modules   = SDCreate(Import_Module);
 
 	Token_Iden *info_tok = f->curr_token;
 
@@ -428,6 +451,10 @@ parse_enum(File_Contents *f)
 	{
 		advance_token(f);
 		type = parse_type(f);
+		if(type.type != T_INTEGER && type.type != T_FLOAT)
+		{
+			raise_parsing_unexpected_token("integer or floating point type", f);
+		}
 	}
 
 	Ast_Identifier id = pure_identifier(f, identifier_token);
@@ -435,13 +462,7 @@ parse_enum(File_Contents *f)
 
 	type = add_primitive_type(f, (char *)id.name, type.primitive.size);
 
-	Type_Info *primitive_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-	memcpy(primitive_type, &type, sizeof(Type_Info));
-
-	Type_Info enum_type = {};
-	enum_type.type = T_ENUM;
-	enum_type.enumerator.type = primitive_type;
-	auto result = ast_enum(id, members, enum_type, tok);
+	auto result = ast_enum(id, members, type, tok);
 	return result;
 }
 
@@ -1351,17 +1372,13 @@ parse_type(File_Contents *f)
 		}
 		else
 		{
-			// @Note: Invalid types are checked in analyzer
-			Type_Info *got = get_type(f, pointer_or_type->identifier);
-			if(got)
-				result = *got;
-			else
+			// @Note: Invalid types are resolved in the analyzer
+			result = shget(f->type_table, pointer_or_type->identifier);
+			if (!result.identifier)
 			{
 				result.type = T_INVALID;
-			}
-
-			if(!result.identifier)
 				result.identifier = pointer_or_type->identifier;
+			}
 			advance_token(f);
 		}
 	}
@@ -1550,7 +1567,11 @@ parse_func_arg(File_Contents *f)
 	Token_Iden *identifier_token = advance_token(f);
 	if(identifier_token->type == tok_var_args)
 	{
-		return ast_variable((Type_Info){.type = T_DETECT}, pure_identifier(f, identifier_token), true);
+		Ast_Identifier id;
+		id.name = (u8 *)"...";
+		id.token = identifier_token;
+		
+		return ast_variable((Type_Info){.type = T_DETECT}, id, true);
 	}
 	Ast_Node *result = parse_var(f, identifier_token);
 	if(result == NULL)

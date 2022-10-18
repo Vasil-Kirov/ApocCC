@@ -1,9 +1,13 @@
+// 6
+
 mem :: $import "String.apoc";
 
 
 fn main() -> i32 {
 	first_arr: [4]i32  = { 1, 2, 3, 4 };
 	second_arr: [4]i32;
-	mem.copy(#*void second_arr,#*void first_arr, $size first_arr);
+	mem.copy(#*void second_arr, #*void first_arr, $size first_arr - $size i32);
 	-> second_arr[0] + second_arr[1] + second_arr[2] + second_arr[3];
 }
+
+

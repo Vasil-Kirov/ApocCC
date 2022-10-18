@@ -62,10 +62,63 @@ platform_get_absolute_path(char *Out)
 	}
 }
 
+b32
+platform_dose_dir_exist(char *path)
+{
+	DWORD dwAttrib = GetFileAttributesA(path);
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
 void
 platform_message_box(const char *Caption, const char *Text)
 {
 	MessageBoxA(Window, Text, Caption, MB_OK);
+}
+
+b32
+platform_iterate_files_in_directory(u8 *directory, Iterate_Func fn, void *pass_data)
+{
+	char *actual_dir = (char *)platform_relative_to_absolute_path((char *)directory);
+	vstd_strcat(actual_dir, "\\");
+	auto dir_len = vstd_strlen(actual_dir);
+
+	char *search = (char *)AllocateCompileMemory(vstd_strlen((char *)directory) + 4);
+	vstd_strcat(search, (char *)actual_dir);
+	vstd_strcat(search, "\\*");
+
+	WIN32_FIND_DATAA data = {};
+	HANDLE find_handle = FindFirstFileA(search, &data);
+	if(find_handle == INVALID_HANDLE_VALUE)
+		return false;
+
+	b32 result = fn(data.cFileName, pass_data);
+	if(result)
+	{
+		FindClose(find_handle);
+		return true;
+	}
+
+	while(true)
+	{
+		if(FindNextFileA(find_handle, &data))
+		{
+			vstd_strcat(actual_dir, data.cFileName);
+			b32 result = fn(actual_dir, pass_data);
+			if(result)
+			{
+				FindClose(find_handle);
+				return true;
+			}
+			actual_dir[dir_len] = 0;
+		}
+		else
+			break;
+	}
+
+	FindClose(find_handle);
+	return false;
 }
 
 b32

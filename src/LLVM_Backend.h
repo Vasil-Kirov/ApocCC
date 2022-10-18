@@ -135,7 +135,7 @@ DISubroutineType *
 create_func_debug_type(Type_Info *func_type);
 
 Variable_Info *
-get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type);
+get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type, b32 is_searching_modules = false);
 
 llvm::StructType *
 get_context_type();

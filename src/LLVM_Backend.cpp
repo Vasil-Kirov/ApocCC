@@ -1533,9 +1533,25 @@ generate_func(File_Contents *f, Ast_Node *node)
 		return func;
 }
 
-Variable_Info *
-get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type)
+b32
+has_f_been_checked(File_Contents *f, File_Contents **checked_fs, int check_count)
 {
+	for(int i = 0; i < check_count; ++i)
+	{
+		if(checked_fs[i] == f)
+			return true;
+	}
+	return false;
+}
+
+Variable_Info *
+get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type, b32 is_searching_modules)
+{
+	static File_Contents **checked_fs = (File_Contents **)AllocateCompileMemory(MB(1));
+	static int current_f = 0;
+	if(!is_searching_modules)
+		current_f = 0;
+
 	auto var_location = shget(backend.named_values, name);
 	if(var_location == NULL)
 	{
@@ -1546,6 +1562,7 @@ get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type)
 			if(function == NULL)
 			{
 				size_t modeul_count = SDCount(f->modules);
+				Variable_Info *result = NULL;
 				for(size_t module_idx = 0; module_idx < modeul_count; ++module_idx)
 				{
 					// @TODO: in the analyzer or somewhere make a way to check if on include there are
@@ -1560,17 +1577,18 @@ get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type)
 					// namespace conflictions
 					// @TODO: in the analyzer or somewhere make a way to check if on include there are
 					// namespace conflictions
-					Variable_Info *result;
 					Import_Module *mod = &f->modules[module_idx];
-					if(mod->identifier_nullable == NULL) {
+					if(mod->identifier_nullable == NULL && !has_f_been_checked(mod->f, checked_fs, current_f)) {
 						Assert(mod->f);
-						result = get_identifier(mod->f, name, returned_type);
+						checked_fs[current_f++] = mod->f;
+						result = get_identifier(mod->f, name, returned_type, true);
 						if(result)
+						{
 							return result;
+						}
 					}
-					return result;
-
 				}
+				return result;
 
 				*returned_type = ID_INVALID;
 				return NULL;

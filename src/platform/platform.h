@@ -18,6 +18,7 @@ typedef struct _platform_config
 typedef void *Platform_Thread;
 typedef void *Platform_State;
 typedef void *Platform_Object;
+typedef b32  (*Iterate_Func)(char *, void *);
 
 typedef struct _file_info
 {
@@ -46,6 +47,9 @@ typedef struct _Quad
 Platform_Thread
 platform_create_thread(void *Func, void *Args);
 
+b32
+platform_iterate_files_in_directory(u8 *directory, Iterate_Func fn, void *pass_data);
+
 void
 platform_join_threads(u32 count, Platform_Thread *threads);
 
@@ -54,6 +58,9 @@ platform_alert_semaphore(Platform_Object semaphore);
 
 void *
 platform_allocate_executable_memory(u64 size);
+
+b32
+platform_dose_dir_exist(char *path);
 
 Platform_Object
 platform_create_mutex();

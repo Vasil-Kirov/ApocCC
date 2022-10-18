@@ -88,6 +88,7 @@ typedef struct
 	u8 *output_file;
 	u8 *linker_command;
 	Define_Table *defines;
+	u8  **included_dirs;
 	b32 debug_info;
 	b32 call_linker;
 	b32 dump_symbols;
@@ -104,7 +105,6 @@ typedef struct
 	u8 *module_path;
 } Import_Module;
 
-// @NOTE: this is poorly named, should probably be changed to something like `compile_state`
 typedef struct _File_Contents
 {
 	Token_Iden *prev_token;
@@ -228,7 +228,7 @@ u8 *
 var_type_to_name(Type_Info *type, b32 bracket = true);
 
 Symbol *
-get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out = true, b32 search_modules = true);
+get_symbol_spot(File_Contents *f, Token_Iden token, b32 error_out = true, b32 search_modules = true, b32 is_module_search = false);
 
 void
 verify_enum(File_Contents *f, Ast_Node *node);

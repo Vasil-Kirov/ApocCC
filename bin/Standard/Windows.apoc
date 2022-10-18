@@ -1,5 +1,6 @@
-
 $if Windows
+$import "OS.apoc";
+$import "Basic.apoc";
 
 fn $call c_decl GetLastError() -> u32;
 
@@ -102,20 +103,20 @@ enum File_Permission
 	READ_ATTRIBUTES  = 0x0080;
 	WRITE_ATTRIBUTES = 0x0100;
 	GENERIC_READ     = READ_CONTROL     |
-					   READ_DATA        |
-					   READ_ATTRIBUTES  |
-					   READ_EA          |
-					   SYNCHRONIZE;
+					    READ_DATA        |
+					    READ_ATTRIBUTES  |
+					    READ_EA          |
+					    SYNCHRONIZE;
 	GENERIC_WRITE    = READ_CONTROL     |
-					   WRITE_DATA       |
-					   WRITE_ATTRIBUTES |
-					   WRITE_EA         |
-					   APPEND_DATA      |
-					   SYNCHRONIZE;
+					    WRITE_DATA       |
+					    WRITE_ATTRIBUTES |
+					    WRITE_EA         |
+					    APPEND_DATA      |
+					    SYNCHRONIZE;
 	GENERIC_EXECUTE  = READ_CONTROL     |
-					   READ_ATTRIBUTES  |
-					   EXECUTE          |
-					   SYNCHRONIZE;
+					    READ_ATTRIBUTES  |
+					    EXECUTE          |
+					    SYNCHRONIZE;
 }
 
 $end_if

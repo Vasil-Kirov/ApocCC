@@ -1,4 +1,8 @@
 
+$import "Basic.apoc";
+$import "C_Standard.apoc";
+$import "OS.apoc";
+
 fn $call c_decl strcmp(str1: *u8, str2: *u8) -> i32;
 
 STRING_BUFFER_SIZE :: 256;
@@ -321,7 +325,6 @@ fn print(format: string, ...)
 	write_file(stdout, #*u8 out.text, #u32 out.len);
 }
 
-
 fn copy(dst:* void, src:* void, size: u64)
 {
 	a0 := #*u8 dst;
@@ -338,3 +341,4 @@ fn len(text:* u8) -> i64
 	for result = 0; text[result] != 0; ++result {}
 	-> result;
 }
+

@@ -215,7 +215,8 @@ is_castable(Type_Info type, Type_Info cast)
 		return false;
 	}
 	if(type.type == T_ARRAY && cast.type == T_POINTER)
-		return is_castable(*type.array.type, *cast.pointer.type);
+		return true;
+		//return is_castable(*type.array.type, *cast.pointer.type);
 	if(is_integer(type) || is_float(type))
 	{
 		if(cast.type == T_POINTER && is_integer(type))
@@ -258,45 +259,64 @@ fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 	if(!type->f_nullable)
 		type->f_nullable = f;
 
-	if(type->type == T_POINTER)
+	switch(type->type)
 	{
-		result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-		memcpy(result, type, sizeof(Type_Info));
-		auto pointed = fix_type(f, type->pointer.type, is_fixing_struct);
-		result->pointer.type = pointed;
-		result->f_nullable = f;
-		return result;
-	}
-	else if(type->type == T_STRUCT && !is_fixing_struct)
-	{
-		result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-		memcpy(result, type, sizeof(Type_Info));
-		result->f_nullable = f;
-		size_t member_count = type->structure.member_count;
-		for(size_t i = 0; i < member_count; ++i)
+		case T_POINTER:
 		{
-			result->structure.member_types[i] = *fix_type(f, &result->structure.member_types[i], true);
-		}
-	}
-	else if(type->type == T_MODULE)
-	{
-		//result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-		auto mod = find_module(f, type->mod.selector_id->identifier.name);
-		if(!mod)
-			raise_formated_semantic_error(f, *type->mod.selector_id->identifier.token, "Couldn't find imported module %s", type->mod.selector_id->identifier.name);
-		result = get_type(mod->f, type->mod.selected_id->identifier.name);
-		if(!result->f_nullable)
-			result->f_nullable = mod->f;
+			result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			memcpy(result, type, sizeof(Type_Info));
+			auto pointed = fix_type(f, type->pointer.type, is_fixing_struct);
+			result->pointer.type = pointed;
+			result->f_nullable = f;
+			return result;
+		} break;
+		case T_STRUCT:
+		{
+			if(is_fixing_struct)
+				break;
+			result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			memcpy(result, type, sizeof(Type_Info));
+			result->f_nullable = f;
+			size_t member_count = type->structure.member_count;
+			for(size_t i = 0; i < member_count; ++i)
+			{
+				result->structure.member_types[i] = *fix_type(f, &result->structure.member_types[i], true);
+			}
+		} break;
+		case T_MODULE:
+		{
+			//result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			auto mod = find_module(f, type->mod.selector_id->identifier.name);
+			if(!mod)
+				raise_formated_semantic_error(f, *type->mod.selector_id->identifier.token, "Couldn't find imported module %s", type->mod.selector_id->identifier.name);
+			result = get_type(mod->f, type->mod.selected_id->identifier.name);
+			if(!result->f_nullable)
+				result->f_nullable = mod->f;
 
-		if(!result)
-			raise_formated_semantic_error(f, *type->mod.selected_id->identifier.token, "Couldn't find type %s, imported from module %s", type->mod.selected_id->identifier.name, type->mod.selector_id->identifier.name);
+			if(!result)
+				raise_formated_semantic_error(f, *type->mod.selected_id->identifier.token, "Couldn't find type %s, imported from module %s", type->mod.selected_id->identifier.name, type->mod.selector_id->identifier.name);
 
-		u8 *type_name = var_type_to_name(result, false);
-		result->identifier = (u8 *)AllocateCompileMemory(vstd_strlen((char *)type_name) + vstd_strlen((char *)type->mod.selector_id->identifier.name) + 10);
-		vstd_strcat((char *)result->identifier, (char *)type->mod.selector_id->identifier.name);
-		vstd_strcat((char *)result->identifier, "!");
-		vstd_strcat((char *)result->identifier, (char *)type_name);
-		return result;
+			u8 *type_name = var_type_to_name(result, false);
+			result->identifier = (u8 *)AllocateCompileMemory(vstd_strlen((char *)type_name) + vstd_strlen((char *)type->mod.selector_id->identifier.name) + 10);
+			vstd_strcat((char *)result->identifier, (char *)type->mod.selector_id->identifier.name);
+			vstd_strcat((char *)result->identifier, "!");
+			vstd_strcat((char *)result->identifier, (char *)type_name);
+			return result;
+		} break;
+		case T_ARRAY:
+		{
+			type->array.type = fix_type(f, type->array.type);
+		} break;
+		case T_FUNC:
+		{
+			type->func.return_type = fix_type(f, type->func.return_type);
+			int param_count = SDCount(type->func.param_types);
+			for(int i = 0; i < param_count; ++i)
+			{
+				type->func.param_types[i] = *fix_type(f, &type->func.param_types[i]);
+			}
+		} break;
+		default: break;
 	}
 
 	if(!type_is_invalid(type))
@@ -306,6 +326,9 @@ fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 	else if(type->identifier)
 	{
 		result = get_type(f, type->identifier);
+
+		if(!result)
+			raise_formated_semantic_error(f, *type->token, "Type %s is undefined", type->identifier);
 
 		if(!result->f_nullable)
 			result->f_nullable = f;
