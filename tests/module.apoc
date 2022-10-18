@@ -1,6 +1,6 @@
 // 6
 
-mem :: $import "String.apoc";
+mem :: $import "Memory.apoc";
 
 
 fn main() -> i32 {

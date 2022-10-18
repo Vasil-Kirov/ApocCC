@@ -2,6 +2,10 @@
 $import "Basic.apoc";
 $import "C_Standard.apoc";
 $import "OS.apoc";
+$import "Memory.apoc";
+$if Windows
+$import "Windows.apoc";
+$end_if
 
 fn $call c_decl strcmp(str1: *u8, str2: *u8) -> i32;
 
@@ -17,6 +21,11 @@ struct String_Builder
 	buffer:[256] u8;
 	len: i64;
 	next:* String_Builder;
+}
+
+struct Test_Struct
+{
+	list: Va_List;
 }
 
 struct Printable_Type_Info
@@ -323,16 +332,6 @@ fn print(format: string, ...)
 	var_arg_stop(@list);
 	stdout := get_stdout();
 	write_file(stdout, #*u8 out.text, #u32 out.len);
-}
-
-fn copy(dst:* void, src:* void, size: u64)
-{
-	a0 := #*u8 dst;
-	a1 := #*u8 src;
-	for i := 0; i < #i64 size; ++i
-	{
-		a0[i] = a1[i];
-	}
 }
 
 fn len(text:* u8) -> i64

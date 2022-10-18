@@ -58,6 +58,10 @@ sync_mod_imports_with_file(File_Contents *f, Import_Module *mod)
 void
 import_non_imported(File_Contents **files)
 {
+	// @NOTE: just removing this for now
+	// I am not sure if importing one file should import all
+	// files that it imports
+	return;
 	b32 did_change;
 	do {
 		did_change = false;
