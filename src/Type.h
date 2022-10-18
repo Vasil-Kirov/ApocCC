@@ -104,6 +104,8 @@ typedef struct _Type_Info
 			Ast_Node *selector_id;
 		} mod;
 	};
+	// @TODO: probably should remove this since it doesn't seem like it's that useful
+	struct _Type_Info *unencoded_type;
 	u8 *identifier;
 	b32 is_const;
 } Type_Info;
@@ -156,6 +158,9 @@ is_rhs_valid(Type_Info type);
 
 b32
 is_pointer_rhs_compatible(Type_Info type);
+
+b32
+is_user_defined(Type_Info *type);
 
 Type_Info *
 fix_type(struct _File_Contents *f, Type_Info *type, b32 is_fixing_struct = false);

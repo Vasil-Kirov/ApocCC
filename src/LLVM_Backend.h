@@ -137,6 +137,9 @@ create_func_debug_type(Type_Info *func_type);
 Variable_Info *
 get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type, b32 is_searching_modules = false);
 
+void
+generate_overloads(File_Contents *f);
+
 llvm::StructType *
 get_context_type();
 
@@ -166,7 +169,7 @@ Ast_Node *
 generate_statement(File_Contents *f, Ast_Node *root);
 
 llvm::Function *
-generate_func(File_Contents *f, Ast_Node *node);
+generate_func(File_Contents *f, Ast_Node *node, Function *passed_func = NULL);
 
 void
 generate_prototyes(File_Contents *f);

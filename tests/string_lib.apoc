@@ -1,0 +1,25 @@
+// s print Printable Struct: num1: 10 num2: 20
+str :: $import "String.apoc";
+
+
+fn main() -> i32 {
+	to_print := Printable_Struct { 10, 20 };
+	str.register_printable(print_printable_struct, "Printable_Struct");
+
+	m_str := str.init_builder("");
+	m_str += "print %";
+	print_txt := str.builder_to_string(@m_str);
+	str.print(print_txt, to_print);
+	-> 0;
+}
+
+fn print_printable_struct(the_struct: *void) -> str.string {
+	casted := #*Printable_Struct the_struct;
+	-> str.format_args("Printable Struct: num1: % num2: %", casted.num1, casted.num2);
+}
+
+struct Printable_Struct {
+	num1: i32;
+	num2: i32;
+}
+

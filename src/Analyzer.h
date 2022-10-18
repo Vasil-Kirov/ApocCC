@@ -180,7 +180,7 @@ void
 raise_formated_semantic_error(File_Contents *f, Token_Iden token, const char *format, ...);
 
 Ast_Node *
-get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, i32 *index);
+get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, i32 *index, b32 search_modules = false);
 
 void
 overload_overwrite(Token_Iden *token, Ast_Node *expression, Ast_Node *left_expr, Ast_Node *right_expr, Type_Info *left, Type_Info *right, Ast_Node *overload);

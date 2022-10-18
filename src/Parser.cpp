@@ -1361,6 +1361,7 @@ parse_type(File_Contents *f)
 			{
 				raise_parsing_unexpected_token("module name before [ . ]", f);
 			}
+			parser_eat(f, (Token)'.');
 			Token_Iden *selected_struct = advance_token(f);
 			if(selected_struct->type != tok_identifier)
 			{

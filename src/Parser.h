@@ -242,7 +242,8 @@ typedef struct
 	Token op;
 	Ast_Node *function;
 	Token_Iden *token;
-	i32 index;    // when a call happense the analyzer puts the index of this overload here
+	File_Contents *f;
+	u16 index;    // when a call happense the analyzer puts the index of this overload here
 } Ast_Overload;
 
 typedef enum

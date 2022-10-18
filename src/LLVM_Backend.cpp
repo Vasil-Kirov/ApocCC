@@ -322,6 +322,12 @@ llvm_backend_generate(File_Contents **files)
 		}
 	}
 
+	// Loop through all and generate overload signatures
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		generate_overloads(f);
+	}
+
 	// Loop through all files and generate the code
 	LOOP_FILES {
 		File_Contents *f = files[file_idx];
@@ -741,6 +747,19 @@ generate_statement(File_Contents *f, Ast_Node *node)
 	return NULL;
 }
 
+void
+generate_overloads(File_Contents *f)
+{
+	f->overload_gens = SDCreate(Function *);
+	size_t overload_count = SDCount(f->overloads);
+	for(size_t i = 0; i < overload_count; ++i)
+	{
+		auto func = generate_func_signature(f, f->overloads[i]->overload.function, true);
+		func->addFnAttr(Attribute::AlwaysInline);
+		SDPush(f->overload_gens, func);
+	}
+}
+
 llvm::Function **
 generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count)
 {
@@ -753,13 +772,10 @@ generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count)
 			SDPush(functions, maybe_func);
 	}
 	
-	f->overload_gens = SDCreate(Function *);
 	size_t overload_count = SDCount(f->overloads);
 	for(size_t i = 0; i < overload_count; ++i)
 	{	
-		auto func = generate_func(f, f->overloads[i]->overload.function);
-		func->addFnAttr(Attribute::AlwaysInline);
-		SDPush(f->overload_gens, func);
+		generate_func(f, f->overloads[i]->overload.function, f->overload_gens[i]);
 	}
 
 	// @NOTE: delay function generation so all global symbols can be declared
@@ -1062,10 +1078,19 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	Assert(call_node->func_call.operand_type.type == T_FUNC);
 	llvm::Value *operand = NULL;
 
+	File_Contents *search_f = f;
 	if(call_node->func_call.operand->type == type_overload)
 	{
 		auto overload = call_node->func_call.operand;
-		operand = f->overload_gens[overload->overload.index];
+		operand = overload->overload.f->overload_gens[overload->overload.index];
+		search_f = overload->overload.f;
+	}
+	else if(call_node->func_call.operand->type == type_selector)
+	{
+		if(call_node->func_call.operand->selector.flags & SEL_MODULE)
+		{
+			search_f = call_node->func_call.operand->selector.operand_type->f_nullable;
+		}
 	}
 
 	if(call_node->func_call.operand->type == type_identifier)
@@ -1094,7 +1119,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	if(call_node->func_call.operand_type.func.calling_convention == CALL_APOC)
 		is_apoc = true;
 
-	auto callee = get_callee_maybe_overloaded(f, operand, call_node);
+	auto callee = get_callee_maybe_overloaded(search_f, operand, call_node);
 	size_t arg_count = SDCount(call_node->func_call.arguments);
 	size_t i = 0;
 	size_t j = 0;
@@ -1403,9 +1428,13 @@ generate_index(File_Contents *f, Ast_Node *node, Function *func, llvm::Value *rh
 }
 
 llvm::Function *
-generate_func(File_Contents *f, Ast_Node *node)
+generate_func(File_Contents *f, Ast_Node *node, Function *passed_func)
 {
-	Function *func = generate_func_signature(f, node);
+	Function *func = NULL;
+	if(passed_func)
+		func = passed_func;
+	else
+		func = generate_func_signature(f, node);
 
 	DISubprogram *subprogram = NULL;
 	File_And_Unit debug_unit = {};

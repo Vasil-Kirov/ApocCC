@@ -156,7 +156,7 @@ find_module(File_Contents *f, u8 *id)
 		auto mod = &f->modules[i];
 		if(mod->identifier_nullable)
 		{
-			if(vstd_strcmp((char *)mod->identifier_nullable, (char *)id))
+			if(vstd_strcmp((char *)mod->identifier_nullable->identifier.name, (char *)id))
 				return mod;
 		}
 	}
@@ -405,6 +405,7 @@ overload_fix_types(File_Contents *f, Ast_Node *overload)
 void
 verify_overload(File_Contents *f, Ast_Node *overload)
 {
+	overload->overload.f = f;
 	Ast_Node *func = overload->overload.function;
 	size_t arg_count = SDCount(func->function.arguments);
 	for (size_t i = 0; i < arg_count; i++)
@@ -1932,7 +1933,7 @@ check_types_error(File_Contents *f, Token_Iden token, Type_Info a, Type_Info b)
 }
 
 Ast_Node *
-get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, i32 *index)
+get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, i32 *index, b32 searching_modules)
 {
 	auto overloads = f->overloads;
 	size_t overload_count = SDCount(overloads);
@@ -2009,6 +2010,19 @@ get_overload(File_Contents *f, Type_Info *left, Type_Info *right, Ast_Node *op, 
 							return overloads[i];
 				}
 			}
+		}
+	}
+
+	if(!searching_modules)
+	{
+		int module_count = SDCount(f->modules);
+		Ast_Node *result = NULL;
+
+		for(int i = 0; i < module_count; ++i)
+		{
+			result = get_overload(f->modules[i].f, left, right, op, index, true);
+			if(result)
+				return result;
 		}
 	}
 	return NULL;
@@ -2101,13 +2115,14 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden *desc_tok
 Type_Info
 verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden *expr_token, Ast_Node *previous)
 {
-
 	func_call->func_call.operand_type = get_expression_type(f, func_call->func_call.operand, func_call->func_call.token, previous, NULL);
 	Type_Info operand_type = func_call->func_call.operand_type;
 
 	b32 is_func = false;
 	if(operand_type.type == T_FUNC)
+	{
 		is_func = true;
+	}
 	else if(operand_type.type == T_POINTER && operand_type.pointer.type->type == T_FUNC)
 	{
 		is_func = true;
@@ -2121,7 +2136,6 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden *expr_token, 
 		raise_formated_semantic_error(f, *expr_token, "Operand of call is not a function. Tried to call %s", 
 				var_type_to_name(&operand_type));
 	}
-
 
 	if(func_call->func_call.operand->type == type_identifier)
 	{
@@ -2155,9 +2169,20 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden *expr_token, 
 		expr_type = *fix_type(f, &expr_type);
 		SDPush(func_call->func_call.expr_types, expr_type);
 	}
-	if(func_call->func_call.operand->type == type_identifier)
+
+	u8 *module_name = NULL;
+	File_Contents *saved_f = NULL;
+	auto operand = func_call->func_call.operand;
+	if(operand->type == type_selector && operand->selector.flags & SEL_MODULE)
 	{
-		auto func_sym = get_symbol_spot(f, *func_call->func_call.operand->identifier.token, false);
+		f = operand->selector.operand_type->f_nullable;
+		module_name = operand->selector.operand_type->mod.selector_id->identifier.name;
+		saved_f = f;
+		operand = operand->selector.identifier;
+	}
+	if(operand->type == type_identifier)
+	{
+		auto func_sym = get_symbol_spot(f, *operand->identifier.token, false);
 		if(func_sym && func_sym->tag == S_FUNCTION && func_sym->node->function.overloads)
 		{
 			size_t to_allocate = vstd_strlen((char *)func_sym->node->function.identifier.name);
@@ -2241,6 +2266,8 @@ FOUND_OVERLOAD:
 					vstd_strcat(error, (char *)overloads[i]->function.identifier.name);
 					vstd_strcat(error, "\n\t");
 				}
+				if(saved_f)
+					f = saved_f;
 				raise_formated_semantic_error(f, *func_call->func_call.token, "No overload found for function call: \n\t%s", error);
 			}
 			Token_Iden *custom_token = func_call->func_call.token;
@@ -2251,6 +2278,9 @@ FOUND_OVERLOAD:
 			func_call->func_call.overload_name = found_overload->function.identifier.name;
 		}
 	}
+
+	if(saved_f)
+		f = saved_f;
 
 	Type_Info *param_types = operand_type.func.param_types;
 	size_t param_count = SDCount(param_types);
@@ -2299,6 +2329,7 @@ FOUND_OVERLOAD:
 		if(!found_var_args)
 			j++;
 	}
+
 	return *operand_type.func.return_type;
 }
 
@@ -2553,6 +2584,12 @@ compare_structs_by_fields(Type_Info *a, Type_Info *b)
 b32
 check_type_compatibility(Type_Info a, Type_Info b)
 {
+	if(a.f_nullable && b.f_nullable)
+	{
+		if(is_user_defined(&a) && a.f_nullable != b.f_nullable)
+			return false;
+	}
+
 	if(a.type == T_UNTYPED_INTEGER && b.type == T_POINTER)
 		return true;
 	if(a.type == T_POINTER && b.type == T_UNTYPED_INTEGER)

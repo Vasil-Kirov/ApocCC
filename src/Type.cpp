@@ -298,8 +298,8 @@ fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 
 			u8 *type_name = var_type_to_name(result, false);
 			result->identifier = (u8 *)AllocateCompileMemory(vstd_strlen((char *)type_name) + vstd_strlen((char *)type->mod.selector_id->identifier.name) + 10);
-			vstd_strcat((char *)result->identifier, (char *)type->mod.selector_id->identifier.name);
-			vstd_strcat((char *)result->identifier, "!");
+			//vstd_strcat((char *)result->identifier, (char *)type->mod.selector_id->identifier.name);
+			//vstd_strcat((char *)result->identifier, "!");
 			vstd_strcat((char *)result->identifier, (char *)type_name);
 			return result;
 		} break;
@@ -337,6 +337,13 @@ fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 			result->token = type->token;
 	}
 	return result;
+}
+
+b32
+is_user_defined(Type_Info *type)
+{
+	Type_Type kind = type->type;
+	return kind == T_STRUCT || kind == T_ENUM || kind == T_MODULE;
 }
 
 b32
