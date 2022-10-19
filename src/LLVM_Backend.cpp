@@ -101,7 +101,6 @@ llvm_initialize(File_Contents **files)
 	backend.module = new Module(platform_path_to_file_name((char *)files[0]->path), *backend.context);
 	backend.builder = new IRBuilder<>(*backend.context);
 
-
 	size_t file_count = SDCount(files);
 	LOOP_FILES
 	{
@@ -270,6 +269,8 @@ generate_obj(File_Contents* f)
 	}
 
 	const char* cpu = "generic";
+	if(f->build_commands.target == TG_X64)
+		cpu = "x86-64-v2";
 
 	TargetOptions opt;
 	auto rm = Optional<Reloc::Model>();
@@ -989,7 +990,8 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 		backend.builder->SetInsertPoint(aftr);
 		size_t count = SDCount(list);
 		for(; *idx < count; *idx += 1)
-			generate_block(f, list[*idx], func, aftr, "for.aftr", NULL, statements, idx);
+			generate_block(f, list[*idx], func, aftr, "for.aftr", to_go, statements, idx);
+		create_branch(aftr, to_go, &backend);
 	}
 
 
@@ -1518,17 +1520,6 @@ generate_func(File_Contents *f, Ast_Node *node, Function *passed_func)
 				arg_string = (u8 *)AllocateCompileMemory(arg.getName().size() + 1);
 				memcpy(arg_string, arg.getName().str().c_str(), arg.getName().size());
 				variable = allocate_variable(func, arg_string, apoc_arg->variable.type, &backend);
-				if(f->build_commands.debug_info)
-				{
-						DILocalVariable *debug_var = debug.builder->createParameterVariable(subprogram, arg.getName().str(),
-							arg_index, debug_unit.file,
-							apoc_arg->variable.identifier.token->line, to_debug_type(apoc_arg->variable.type, &debug));
-						debug.builder->insertDeclare(variable, debug_var, debug.builder->createExpression(),
-							DILocation::get(subprogram->getContext(), apoc_arg->variable.identifier.token->line, 0, subprogram),
-							backend.builder->GetInsertBlock());
-				}
-
-
 				if((apoc_arg->variable.type.type == T_STRUCT || apoc_arg->variable.type.type == T_ARRAY) && !is_standard_size(&apoc_arg->variable.type))
 				{
 					//variable = llvm_load(&apoc_arg->variable.type, &arg, (const char *)apoc_arg->variable.identifier.name, &backend);
@@ -1539,6 +1530,17 @@ generate_func(File_Contents *f, Ast_Node *node, Function *passed_func)
 				}
 				else
 					llvm_store(&apoc_arg->variable.type, variable, &arg, &backend);
+
+				if(f->build_commands.debug_info)
+				{
+						DILocalVariable *debug_var = debug.builder->createParameterVariable(subprogram, arg.getName().str(),
+							arg_index, debug_unit.file,
+							apoc_arg->variable.identifier.token->line, to_debug_type(apoc_arg->variable.type, &debug));
+						debug.builder->insertDeclare(variable, debug_var, debug.builder->createExpression(),
+							DILocation::get(subprogram->getContext(), apoc_arg->variable.identifier.token->line, 0, subprogram),
+							backend.builder->GetInsertBlock());
+				}
+
 			}
 			arg_index++;
 			Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
@@ -2081,7 +2083,7 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 			case '+':
 			{
 				if(node->binary_expr.left.type == T_POINTER) {
-					auto type = apoc_type_to_llvm(node->binary_expr.left,
+					auto type = apoc_type_to_llvm(*node->binary_expr.left.pointer.type,
 							&backend);
 					llvm::Value *idx_list[] = {
 						right

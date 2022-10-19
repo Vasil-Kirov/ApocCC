@@ -55,6 +55,7 @@ get_type_alignment(Type_Info type)
 		{
 			return primitive_size_to_alignment(type.primitive.size);
 		} break;
+		case T_STRING:
 		case T_FUNC:
 		case T_POINTER:
 		return sizeof(size_t);

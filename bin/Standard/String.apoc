@@ -23,11 +23,6 @@ struct String_Builder
 	next:* String_Builder;
 }
 
-struct Test_Struct
-{
-	list: Va_List;
-}
-
 struct Printable_Type_Info
 {
       function: fn(*void) -> string;
