@@ -1130,6 +1130,9 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		++i;
 		arg_count++;
 	}
+	llvm::Attribute attribs[arg_count];
+	for(int i = 0; i < arg_count; ++i)
+		attribs[i] = llvm::Attribute::get(*backend.context, Attribute::AttrKind::None);
 	llvm::Value *arg_exprs[arg_count];
 	llvm::Value *ret = NULL;
 	if(is_apoc)
@@ -1165,7 +1168,8 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 
 		if((expr_types[expr_i].type == T_STRUCT || expr_types[expr_i].type == T_ARRAY) && !is_standard_size(&expr_types[expr_i]))
 		{
-			arg_exprs[i] = copy_argument_to_ptr(arg_exprs[i], func, expr_types[expr_i]);
+			//arg_exprs[i] = copy_argument_to_ptr(arg_exprs[i], func, expr_types[expr_i]);
+			attribs[i] = llvm::Attribute::get(*backend.context, Attribute::AttrKind::ByVal, apoc_type_to_llvm(expr_types[expr_i], &backend));
 		}
 		else if(!found_var_args && expr_types[expr_i].type == T_STRUCT && is_standard_size(&expr_types[expr_i]))
 		{
@@ -1190,7 +1194,10 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	if(ret_ptr)
 	{
 		*call_node->func_call.operand_type.func.return_type = saved_ret;
-		backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+		auto call = backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+		for(int i = 0; i < arg_count; ++i)
+			if(!attribs[i].hasAttribute(Attribute::AttrKind::None))
+				call->addAttributeAtIndex(i + 1, attribs[i]);
 #if 0
 		auto ret_type = apoc_type_to_llvm(saved_ret,
 				backend);
@@ -1201,7 +1208,12 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 	}
 	else
 	{
-		auto ret = (llvm::Value *)backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+		auto call = backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
+		auto ret = (llvm::Value *)call;
+		for(int i = 0; i < arg_count; ++i)
+			if(!attribs[i].hasAttribute(Attribute::AttrKind::None))
+				call->addAttributeAtIndex(i + 1, attribs[i]);
+
 		if(call_node->func_call.operand_type.func.return_type->type == T_STRUCT)
 		{
 			auto ptr = allocate_variable(func, (u8 *)"", *call_node->func_call.operand_type.func.return_type, &backend);
@@ -1519,17 +1531,20 @@ generate_func(File_Contents *f, Ast_Node *node, Function *passed_func)
 				type = &apoc_arg->variable.type;
 				arg_string = (u8 *)AllocateCompileMemory(arg.getName().size() + 1);
 				memcpy(arg_string, arg.getName().str().c_str(), arg.getName().size());
-				variable = allocate_variable(func, arg_string, apoc_arg->variable.type, &backend);
+
 				if((apoc_arg->variable.type.type == T_STRUCT || apoc_arg->variable.type.type == T_ARRAY) && !is_standard_size(&apoc_arg->variable.type))
 				{
-					//variable = llvm_load(&apoc_arg->variable.type, &arg, (const char *)apoc_arg->variable.identifier.name, &backend);
-					//auto pointer_type = llvm::PointerType::get(, 0);
-					auto derefrence = backend.builder->CreateLoad(apoc_type_to_llvm(apoc_arg->variable.type, &backend), &arg);
-					derefrence->setAlignment(Align(get_type_alignment(apoc_arg->variable.type)));
-					llvm_store(&apoc_arg->variable.type, variable, derefrence, &backend);
+					//auto derefrence = backend.builder->CreateLoad(apoc_type_to_llvm(apoc_arg->variable.type, &backend), &arg);
+					//derefrence->setAlignment(Align(get_type_alignment(apoc_arg->variable.type)));
+					//llvm_store(&apoc_arg->variable.type, variable, derefrence, &backend);
+					func->addAttributeAtIndex(arg_index + 1, Attribute::get(*backend.context, Attribute::AttrKind::ByVal));
+					variable = &arg;
 				}
 				else
+				{
+					variable = allocate_variable(func, arg_string, apoc_arg->variable.type, &backend);
 					llvm_store(&apoc_arg->variable.type, variable, &arg, &backend);
+				}
 
 				if(f->build_commands.debug_info)
 				{

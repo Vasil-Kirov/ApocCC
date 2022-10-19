@@ -545,8 +545,9 @@ type_to_func_type(Type_Info type, Backend_State *backend)
 	}
 	auto args = makeArrayRef((llvm::Type **)param_types, has_var_args ?
 			param_count - 1 : param_count);
-	return FunctionType::get(apoc_type_to_llvm(*type.func.return_type, backend),
+	auto result = FunctionType::get(apoc_type_to_llvm(*type.func.return_type, backend),
 			args, has_var_args);
+	return result;
 }
 
 llvm::Value *
