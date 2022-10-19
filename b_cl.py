@@ -56,6 +56,10 @@ if include_llvm:
     compiler_args += ' ' + os.popen('llvm-config.exe --cppflags --cxxflags').read()
     linker_args   += ' ' + os.popen('llvm-config.exe --libs all').read()
 
+if 'bounds' in sys.argv:
+    linker_args = linker_args.replace('E:\\GitClone\\llvm-project\\llvm\\build\\Release\\lib\\LLVMDemangle.lib', '');
+    print(linker_args.split(' '))
+
 compiler_args += ' -c'
 
 c_command = ['clang-cl', '-oapoc.o', '../src/Main.cpp']

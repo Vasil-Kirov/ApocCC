@@ -1130,9 +1130,11 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		++i;
 		arg_count++;
 	}
+
+	b32 has_attribute[arg_count];
 	llvm::Attribute attribs[arg_count];
 	for(int i = 0; i < arg_count; ++i)
-		attribs[i] = llvm::Attribute::get(*backend.context, Attribute::AttrKind::None);
+		has_attribute[i] = false;
 	llvm::Value *arg_exprs[arg_count];
 	llvm::Value *ret = NULL;
 	if(is_apoc)
@@ -1169,7 +1171,11 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		if((expr_types[expr_i].type == T_STRUCT || expr_types[expr_i].type == T_ARRAY) && !is_standard_size(&expr_types[expr_i]))
 		{
 			//arg_exprs[i] = copy_argument_to_ptr(arg_exprs[i], func, expr_types[expr_i]);
-			attribs[i] = llvm::Attribute::get(*backend.context, Attribute::AttrKind::ByVal, apoc_type_to_llvm(expr_types[expr_i], &backend));
+
+			auto llvm_type = apoc_type_to_llvm(expr_types[expr_i], &backend);
+			Assert(llvm_type->isSized());
+			attribs[i] = llvm::Attribute::get(*backend.context, Attribute::AttrKind::ByVal, llvm_type);
+			has_attribute[i] = true;
 		}
 		else if(!found_var_args && expr_types[expr_i].type == T_STRUCT && is_standard_size(&expr_types[expr_i]))
 		{
@@ -1196,7 +1202,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		*call_node->func_call.operand_type.func.return_type = saved_ret;
 		auto call = backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
 		for(int i = 0; i < arg_count; ++i)
-			if(!attribs[i].hasAttribute(Attribute::AttrKind::None))
+			if(has_attribute[i])
 				call->addAttributeAtIndex(i + 1, attribs[i]);
 #if 0
 		auto ret_type = apoc_type_to_llvm(saved_ret,
@@ -1211,7 +1217,7 @@ generate_func_call(File_Contents *f, Ast_Node *call_node, Function *func)
 		auto call = backend.builder->CreateCall(callee, makeArrayRef((llvm::Value **)arg_exprs, arg_count));
 		auto ret = (llvm::Value *)call;
 		for(int i = 0; i < arg_count; ++i)
-			if(!attribs[i].hasAttribute(Attribute::AttrKind::None))
+			if(has_attribute[i])
 				call->addAttributeAtIndex(i + 1, attribs[i]);
 
 		if(call_node->func_call.operand_type.func.return_type->type == T_STRUCT)
@@ -1537,7 +1543,8 @@ generate_func(File_Contents *f, Ast_Node *node, Function *passed_func)
 					//auto derefrence = backend.builder->CreateLoad(apoc_type_to_llvm(apoc_arg->variable.type, &backend), &arg);
 					//derefrence->setAlignment(Align(get_type_alignment(apoc_arg->variable.type)));
 					//llvm_store(&apoc_arg->variable.type, variable, derefrence, &backend);
-					func->addAttributeAtIndex(arg_index + 1, Attribute::get(*backend.context, Attribute::AttrKind::ByVal));
+					auto llvm_type = apoc_type_to_llvm(*type, &backend);
+					func->addAttributeAtIndex(arg_index + 1, Attribute::get(*backend.context, Attribute::AttrKind::ByVal, llvm_type));
 					variable = &arg;
 				}
 				else

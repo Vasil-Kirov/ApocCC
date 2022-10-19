@@ -4,6 +4,9 @@
 #include <LLVM_Backend.h>
 #include <llvm-c/DebugInfo.h>
 
+void
+set_genned();
+
 LoadInst *
 llvm_load(Type_Info *type, llvm::Value *ptr, const char *name, Backend_State *backend);
 

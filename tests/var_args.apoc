@@ -1,0 +1,18 @@
+// 1 + 2 + 3 + 4 + 5
+$import "Basic.apoc";
+
+
+fn main() -> i32 {
+	-> add_passed(5, 1, 2, 3, 4, 5);
+}
+
+fn add_passed(count: i32, ...) -> i32 {
+	result: i32;
+	list:* Any;
+	var_arg_start(@list);
+	for i := #i32 0; i < count; ++i {
+		result += *#*i32 list[i].value;
+	}
+	-> result;
+}
+
