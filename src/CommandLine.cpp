@@ -5,6 +5,34 @@
 #include <stdlib/std.h>
 #include <platform/platform.h>
 
+const char *command_line_args = R"del(apoc [source files/args]
+
+args:
+    --target [platform]
+        x64 (default)
+	x32
+	wasm
+   --define DEFINE_NAME=VALUE
+   --optimize [level]
+       none (default)
+       some
+       max
+    --linker [linker]
+        link.exe (windows default)
+	ld (linux default)
+	wasm-ld (wasm default)
+    --link [linker arguments]
+        linker dependent
+    --dump-symbols
+    --debug
+    --out [output file name]
+    --no-link
+    --backend [backend]
+        llvm
+	custom
+    --include [path]
+)del";
+
 void
 raise_build_error(const char *error_msg, ...)
 {
@@ -14,6 +42,8 @@ raise_build_error(const char *error_msg, ...)
 	va_start(args, error_msg);
 	vstd_vsnsprintf(error, vstd_strlen((char *)error_msg), error_msg, args);
 	va_end(args);
+	vstd_strcat(error, "\n\n");
+	vstd_strcat(error, command_line_args);
 	LG_FATAL(error);
 }
 
@@ -71,6 +101,8 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 				auto target = args[++i];
 				if(target == "x64")
 					build_commands.target = TG_X64;
+				else if(target == "x32")
+					build_commands.target = TG_X32;
 				else if(target == "wasm")
 				{
 					build_commands.target = TG_WASM;

@@ -556,10 +556,6 @@ bit_cast_llvm_type(llvm::Value *value, llvm::Type *to, Backend_State *backend)
 	return backend->builder->CreateCast(Instruction::CastOps::BitCast, value, to, "bit_cast"); 
 }
 
-static b32 has_genned = false;
-void
-set_genned() { has_genned = true; }
-
 llvm::Type *
 apoc_type_to_llvm(Type_Info type, Backend_State *backend)
 {
@@ -611,8 +607,6 @@ apoc_type_to_llvm(Type_Info type, Backend_State *backend)
 			struct_type = StructType::get(*backend->context, type.structure.is_packed);
 			generate_struct_type(NULL, type, struct_type);
 		}
-		if(has_genned)
-			Assert(((StructType *)struct_type)->isSized());
 		return struct_type;
 	}
 	else if (type.type == T_ARRAY)
