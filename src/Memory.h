@@ -8,6 +8,7 @@ enum AllocIndex
 {
 	PERM_INDEX = 0,
 	COMP_INDEX = 1,
+	INTERP_INDEX = 2,
 };
 
 void
@@ -22,5 +23,6 @@ ResetCompileMemory();
 
 #define AllocatePermanentMemory(SIZE) AllocateMemory(SIZE, PERM_INDEX)
 #define AllocateCompileMemory(SIZE)   AllocateMemory(SIZE, COMP_INDEX)
+#define AllocateInterpMemory(SIZE)    AllocateMemory(SIZE, INTERP_INDEX)
 
 #endif //_MEMORY_H

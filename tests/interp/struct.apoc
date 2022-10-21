@@ -1,0 +1,19 @@
+// 6
+
+fn interp() -> i64 {
+	struct_a := Test_Struct { 1, 2, 3.43 };
+	struct_b := struct_a;
+	-> struct_b.a + struct_b.b + #i64 struct_b.c;
+}
+
+fn main() -> i32 {
+	-> #i32 $run interp();
+}
+
+
+struct Test_Struct {
+	a: i64;
+	b: i64;
+	c: f64;
+}
+

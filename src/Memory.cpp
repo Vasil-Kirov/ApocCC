@@ -15,12 +15,14 @@ typedef struct _ap_memory
 
 
 
-static ap_memory MemoryAllocators[2];
+static ap_memory MemoryAllocators[3];
 
 
+#define INTERP_SIZE GB(4)
 #define PERM_SIZE GB(16)
 #define COMP_SIZE GB(256)
 
+#define INTERP_CHUNK MB(128)
 #define COMP_CHUNK MB(512)
 #define PERM_CHUNK MB(256)
 
@@ -44,6 +46,7 @@ initialize_memory()
 {
 	InitAPMem(&MemoryAllocators[PERM_INDEX], PERM_SIZE, PERM_CHUNK);
 	InitAPMem(&MemoryAllocators[COMP_INDEX], COMP_SIZE, COMP_CHUNK);
+	InitAPMem(&MemoryAllocators[INTERP_INDEX], INTERP_SIZE, INTERP_CHUNK);
 }
 
 void *

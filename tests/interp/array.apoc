@@ -1,0 +1,13 @@
+// 10
+
+fn interp() -> i64 {
+	array_a: [4]i64 = {1, 2, 3, 4};
+	array_b := array_a;
+	-> array_b[0] + array_b[1] + array_b[2] + array_b[3];
+}
+
+fn main() -> i32 {
+	-> #i32 $run interp();
+}
+
+

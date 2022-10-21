@@ -24,7 +24,7 @@ typedef enum : signed short
 	tok_extern = -3,
 	tok_arrow = -4,
 	tok_struct = -5,
-	tok_cast = -6, // #type
+	//tok_cast = -6, // #type
 	tok_if = -7,   // if
 	tok_for = -8,  // for
 	
@@ -98,6 +98,7 @@ typedef enum : signed short
 	tok_overload  = -55,
 	tok_defer     = -56,
 	tok_continue  = -57,
+	tok_type      = -58,
 } Token;
 
 typedef struct _str_hash_table

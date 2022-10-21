@@ -116,6 +116,7 @@ typedef struct _File_Contents
 	Ast_Node  **overloads;
 	Ast_Node  **defered;
 	Symbol    **functions;
+	struct _Data_Segment_Table *global_table;
 	Import_Module *modules;
 #if !defined(NOVM)
 	llvm::BasicBlock *continue_block;

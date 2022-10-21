@@ -1,4 +1,5 @@
 import os
+import sys
 from os.path import isdir
 import subprocess
 from time import time
@@ -27,15 +28,20 @@ files = get_absolute_paths('..')
 
 os.system('')
 
+backend = 'LLVM'
+if 'custom' in sys.argv or 'Custom' in sys.argv:
+    backend = 'Fast'
+
+only_suite = False
+if 'suite' in sys.argv:
+    only_suite = True
+
+# This loop doesn't do anything now
 for idx in range(0, 1):
-    backend = '';
-    if idx == 0:
-        backend = 'LLVM'
-        print("LLVM Backend:")
-    else:
-        backend = 'Fast'
-        print("Custom Backend:")
     for file in files:
+        if only_suite and 'c_test_translate' not in file:
+            continue
+
         expecting_str = False
         expected_output = str()
         with open(file) as f:

@@ -157,7 +157,7 @@ typedef struct {
 	i32 virtual_register;
 } Data_Segment;
 
-typedef struct {
+typedef struct _Data_Segment_Table {
 	u8 *key;
 	i32 value;
 } Data_Segment_Table;
@@ -190,14 +190,14 @@ typedef struct {
 	i32 current_virtual_register;
 } Register_Allocation_Tracker;
 
-IR *
-ast_to_bytecode(File_Contents *f, Ast_Node *node);
+IR **
+ast_to_bytecode(File_Contents **files);
 
 void
-ast_to_bc_file_level_list(Ast_Node **list, IR *ir);
+ast_to_bc_file_level_list(File_Contents *f, Ast_Node **list, IR *ir);
 
 i32
-load_pointer(u8 *id, IR *ir, IR_Block *block, Type_Info *type);
+load_pointer(File_Contents *f, u8 *id, IR *ir, IR_Block *block, Type_Info *type);
 
 i32
 allocate_stack_space(IR *ir, size_t size);
@@ -206,7 +206,7 @@ void
 do_store_instruction(i32 idx, i32 right, i32 result, IR_Block *block, Type_Info *type, b32 is_removable);
 
 void
-ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func);
+ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func);
 
 void
 do_register_allocation(IR *ir, IR_Block *block, Virtual_Register_Tracker *v_regs);
@@ -218,22 +218,22 @@ void
 print_bytecode(IR *ir, IR_Block *block);
 
 IR_Block *
-ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *optional_block, u8 *id, IR *ir, IR_Block *to_go);
+ast_to_bc_func_level_list(File_Contents *f, Ast_Node **list, i32 *optional_index, IR_Block *optional_block, u8 *id, IR *ir, IR_Block *to_go);
 
 void
-assign_to_bc(Ast_Node *node, IR_Block *block, IR *ir);
+assign_to_bc(File_Contents *f, Ast_Node *node, IR_Block *block, IR *ir);
 
 IR
-ast_to_bc_function(Ast_Node **list, Ast_Node *function);
+ast_to_bc_function(File_Contents *f, Ast_Node **list, Ast_Node *function);
 
 IR_Block *
-ast_to_bc_func_level(Ast_Node *node, IR_Block *current_block, Ast_Node **list, i32 *optional_index, IR *ir, IR_Block *to_go);
+ast_to_bc_func_level(File_Contents *f, Ast_Node *node, IR_Block *current_block, Ast_Node **list, i32 *optional_index, IR *ir, IR_Block *to_go);
 
 i32
 do_cast(i32 source, Type_Info *from, Type_Info *to, IR *ir, IR_Block *block);
 
 i32
-expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer);
+expression_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer);
 
 #endif // _BYTECODE_H
 

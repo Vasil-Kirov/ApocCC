@@ -56,7 +56,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "extern",     tok_extern);
 		shput(keyword_table, "struct",     tok_struct);
 		shput(keyword_table, "enum",       tok_enum);
-		shput(keyword_table, "cast",       tok_cast);
+		//shput(keyword_table, "cast",       tok_cast);
 		shput(keyword_table, "if",         tok_if);
 		shput(keyword_table, "for",        tok_for);
 		shput(keyword_table, "switch",     tok_switch);
@@ -65,6 +65,8 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "continue",   tok_continue);
 		shput(keyword_table, "break",      tok_break);
 		shput(keyword_table, "else",       tok_else);
+		shput(keyword_table, "overload",   tok_overload);
+		shput(keyword_table, "defer",      tok_defer);
 		
 		shput(keyword_table, "->",         tok_arrow);
 		shput(keyword_table, "--",         tok_minusminus);
@@ -90,6 +92,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, ">>=",        tok_rshift_equals);
 		shput(keyword_table, "...",        tok_var_args);
 		shput(keyword_table, "$import",    tok_import);
+		shput(keyword_table, "$type",      tok_type);
 		shput(keyword_table, "$run",       tok_run);
 		shput(keyword_table, "$interp",    tok_interp);
 		shput(keyword_table, "$size",      tok_size);
@@ -100,8 +103,6 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "$call",      tok_call_conv);
 		shput(keyword_table, "$if",        tok_is_defined);
 		shput(keyword_table, "$end_if",    tok_end_is);
-		shput(keyword_table, "overload",   tok_overload);
-		shput(keyword_table, "defer",      tok_defer);
 	}
 	
 	// NOTE(Vasko): Add basic types to string hash table
@@ -120,6 +121,16 @@ initialize_compiler(File_Contents *f)
 
 	add_primitive_type(f, "void", empty_void);
 	add_primitive_type(f, "bool", logical_bit);
+}
+
+Type_Info *
+get_primitive_type_lexer(File_Contents *f, u8 *id)
+{
+	auto got = shgeti(f->type_table, id);
+	if(got == -1)
+		return NULL;
+	else
+		return &f->type_table[got].value;
 }
 
 void
@@ -403,6 +414,26 @@ Token_Iden get_token(File_Contents *f)
 				vstd_sprintf(error, "Incorrect compiler directive [ %s ]", name); 
 				raise_token_syntax_error(f, error, (char *)f->path, start_line, start_col);
 			}
+			else if(result.type == tok_type)
+			{
+				Token_Iden alias = get_token(f);
+				if(alias.type != tok_identifier)
+					raise_token_syntax_error(f, "Expected type alias after $type", (char *)f->path, start_line, start_col);
+
+				Token_Iden type_id = get_token(f);
+				if(type_id.type != tok_identifier)
+					raise_token_syntax_error(f, "Expected type identifier after alias", (char *)f->path, start_line, start_col);
+
+				Type_Info *type = get_primitive_type_lexer(f, type_id.identifier);
+				if(!type)
+				{
+					char error[4096] = {};
+					vstd_sprintf(error, "Expected valid type, couldn't find [ %s ]", type_id.identifier); 
+					raise_token_syntax_error(f, error, (char *)f->path, start_line, start_col);
+				}
+				add_primitive_type(f, (char *)alias.identifier, type->primitive.size);
+				return get_token(f);
+			}
 			return result;
 		}
 		else
@@ -511,7 +542,7 @@ u8 *token_to_str(Token token)
 		case tok_extern: return (u8 *)"[ tok_extern ]"; break;
 		case tok_arrow: return (u8 *)"[ tok_arrow ]"; break;
 		case tok_struct: return (u8 *)"[ tok_struct ]"; break;
-		case tok_cast: return (u8 *)"[ tok_cast ]"; break;
+		//case tok_cast: return (u8 *)"[ tok_cast ]"; break;
 		case tok_if: return (u8 *)"[ tok_if ]"; break;
 		case tok_for: return (u8 *)"[ tok_for ]"; break;
 		case tok_identifier: return (u8 *)"[ tok_identifier ]"; break;

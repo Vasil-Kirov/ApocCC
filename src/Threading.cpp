@@ -15,8 +15,11 @@ do_job(Job_Posting *posting)
 	{
 		case JOB_GENERATE_CODE:
 		{
+			Assert(false);
+#if 0
 			Generate_Code_Args *args = (Generate_Code_Args *)posting->args;
 			x64_gen_ir(args->ir, args->buffer, args->relocs, args->global_ds, args->buffer_index, args->fixable_arr);
+#endif
 		} break;
 		default:
 		{

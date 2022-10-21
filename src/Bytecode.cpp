@@ -8,8 +8,7 @@ static Type_Info *type_32;
 static Type_Info *type_16;
 static Type_Info *type_u8;
 static Type_Info *str_type;
-static Data_Segment_Table *global_lookup;
-static BC_Function_Table *func_table;
+//static Data_Segment_Table *global_lookup;
 static i32 *overload_table;
 static Type_Info *ptr_type;
 static i32 CALL_MEMCPY_INTRIN;
@@ -48,23 +47,22 @@ set_terminator(IR_Block *block)
 	block->has_terminator = true;
 }
 
-IR *
-ast_to_bytecode(File_Contents *f, Ast_Node *node)
+IR **
+ast_to_bytecode(File_Contents **files)
 {
-	i32 func_count = SDCount(f->functions);
-	shdefault(func_table, -1);
-	for(size_t i = 0; i < func_count; ++i)
-	{
-		shput(func_table, f->functions[i]->identifier, i);
+	i32 func_count = 0;
+	i32 overload_count = 0;
+	auto file_count = SDCount(files);
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		func_count += SDCount(f->functions);
 	}
 
-	overload_table = SDCreate(i32);
-	size_t overload_count = SDCount(f->overloads);
-	for(size_t i = func_count; i < overload_count + func_count; ++i)
-	{	
-		SDPush(overload_table, i);
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		func_count += SDCount(f->overloads);
 	}
-	
+
 	CALL_MEMCPY_INTRIN = func_count + overload_count;
 
 	type_64 = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
@@ -96,9 +94,7 @@ ast_to_bytecode(File_Contents *f, Ast_Node *node)
 	ptr_type->type = T_POINTER;
 	ptr_type->pointer.type = type_64;
 
-	shdefault(global_lookup, -1);
-
-	IR *result = SDCreate(IR);
+	IR **result = SDCreate(IR *);
 	IR first = {};
 	first.allocated = SDCreate(Data_Segment);
 	first.reg_count = reg_invalid + 1; // starting from here so we know that
@@ -107,28 +103,32 @@ ast_to_bytecode(File_Contents *f, Ast_Node *node)
 	alloc_block("global_block", &first);
 	// @NOTE: maybe not needed since we are at global scope?
 	SDPush(result, first);
-	if(node->type == type_statements)
-		ast_to_bc_file_level_list(node->statements.list, result);
-	else
-		Assert(false); //@TODO: maybe parse one statement?
+
+	LOOP_FILES {
+		File_Contents *f = files[file_idx];
+		auto ir = SDCreate(IR);
+		ast_to_bc_file_level_list(f, f->ast_root->statements.list, ir);
+		SDPush(result, ir);
+	}
+	
 	return result;
 }
 
 void
-ast_to_bc_file_level_list(Ast_Node **list, IR *ir)
+ast_to_bc_file_level_list(File_Contents *f, Ast_Node **list, IR *ir)
 {
 	size_t count = SDCount(list);
 	for(size_t i = 0; i < count; ++i) {
-		ast_to_bc_file_level(list[i], &ir[0], false);
+		ast_to_bc_file_level(f, list[i], &ir[0], false);
 	}
 
 	for(size_t i = 0; i < count; ++i) {
-		ast_to_bc_file_level(list[i], ir, true);
+		ast_to_bc_file_level(f, list[i], ir, true);
 	}
 }
 
 void
-ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func)
+ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func)
 {
 	switch((int)node->type)
 	{
@@ -162,8 +162,9 @@ ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func)
 				if(node->function.body)
 				{
 					next = ast_to_bc_function(
-						node->function.body->scope_desc.body->statements.list,
-						node);
+							f, node->function.body->scope_desc.body->statements.list,
+							node
+						);
 				}
 				else
 				{
@@ -178,7 +179,7 @@ ast_to_bc_file_level(Ast_Node *node, IR *ir, b32 gen_func)
 			if(gen_func) {
 				IR next;
 				Assert(node->overload.function->function.body);
-				next = ast_to_bc_function(
+				next = ast_to_bc_function(f,
 						node->overload.function->function.body->scope_desc.body->statements.list,
 						node->overload.function);
 				SDPush(ir, next);
@@ -296,16 +297,16 @@ copy_memory(IR *ir, IR_Block *block, i32 src_register, i32 size)
 }
 
 i32
-bc_get_callee_maybe_overloaded(Ast_Node *call_node, IR_Block *block, IR *ir)
+bc_get_callee_maybe_overloaded(File_Contents *f, Ast_Node *call_node, IR_Block *block, IR *ir)
 {
 	if(call_node->func_call.overload_name)
 	{
-		i32 function = load_pointer(call_node->func_call.overload_name, ir, block, &call_node->func_call.operand_type);
+		i32 function = load_pointer(f, call_node->func_call.overload_name, ir, block, &call_node->func_call.operand_type);
 		return function;
 	}
 	else
 	{
-		i32 function = expression_to_bc(call_node->func_call.operand, block, ir, true);
+		i32 function = expression_to_bc(f, call_node->func_call.operand, block, ir, true);
 		return function;
 	}
 
@@ -337,7 +338,7 @@ size_to_type(int size)
 }
 
 i32
-call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
+call_function(File_Contents *f, IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 {
 	i32 expr_count = SDCount(node->func_call.arguments);
 	// + 1 incase we need to pass the context
@@ -381,7 +382,7 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 			{
 				if(!is_standard_size(&node->func_call.expr_types[i]))
 				{
-					expressions[i + 1] = copy_memory(ir, block, expression_to_bc(node->func_call.arguments[i], block, ir, true),
+					expressions[i + 1] = copy_memory(ir, block, expression_to_bc(f, node->func_call.arguments[i], block, ir, true),
 							get_type_size(node->func_call.expr_types[i]));
 					expr_types[i + 1] = ptr_type;
 				}
@@ -392,14 +393,14 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 					Type_Info *fake_type = size_to_type(type_size);
 					i32 address_register = allocate_register(ir);
 					expressions[i + 1] = allocate_register(ir);
-					address_register = expression_to_bc(node->func_call.arguments[i], block, ir, true);
+					address_register = expression_to_bc(f, node->func_call.arguments[i], block, ir, true);
 					instruction(address_register, -1, expressions[i + 1], BC_DEREFRENCE, block, fake_type);
 					expr_types[i + 1] = fake_type;
 				}
 			}
 			else
 			{
-				expressions[i + 1] = expression_to_bc(node->func_call.arguments[i], block, ir, false);
+				expressions[i + 1] = expression_to_bc(f, node->func_call.arguments[i], block, ir, false);
 				expr_types[i + 1] = &node->func_call.expr_types[i];
 			}
 		}
@@ -413,7 +414,7 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 			{
 				if(!is_standard_size(&node->func_call.expr_types[i]))
 				{
-					expressions[i] = copy_memory(ir, block, expression_to_bc(node->func_call.arguments[i], block, ir, true),
+					expressions[i] = copy_memory(ir, block, expression_to_bc(f, node->func_call.arguments[i], block, ir, true),
 							get_type_size(node->func_call.expr_types[i]));
 					expr_types[i] = ptr_type;
 				}
@@ -424,14 +425,14 @@ call_function(IR *ir, IR_Block *block, Ast_Node *node, Call_Conv conv)
 					Type_Info *fake_type = size_to_type(type_size);
 					i32 address_register = allocate_register(ir);
 					expressions[i] = allocate_register(ir);
-					address_register = expression_to_bc(node->func_call.arguments[i], block, ir, true);
+					address_register = expression_to_bc(f, node->func_call.arguments[i], block, ir, true);
 					instruction(address_register, -1, expressions[i], BC_DEREFRENCE, block, fake_type);
 					expr_types[i] = fake_type;
 				}
 			}
 			else
 			{
-				expressions[i] = expression_to_bc(node->func_call.arguments[i], block, ir, false);
+				expressions[i] = expression_to_bc(f, node->func_call.arguments[i], block, ir, false);
 				expr_types[i] = &node->func_call.expr_types[i];
 			}
 		}
@@ -536,7 +537,19 @@ load_variable(u8 *id, IR *ir, IR_Block *block, Type_Info *type)
 }
 
 i32
-load_pointer(u8 *id, IR *ir, IR_Block *block, Type_Info *type)
+find_function_index(File_Contents *f, u8 *id)
+{
+	i32 count = SDCount(f->functions);
+	for(int i = 0; i < count; ++i)
+	{
+		if(vstd_strcmp((char *)id, (char *)f->functions[i]->identifier))
+			return i;
+	}
+	return -1;
+}
+
+i32
+load_pointer(File_Contents *f, u8 *id, IR *ir, IR_Block *block, Type_Info *type)
 {
 	BC_OP op = BC_LOAD_ADDRESS;
 	auto got = shget(ir->lookup, id);
@@ -599,7 +612,7 @@ struct_get_offset_to_element_in_bytes(Type_Info *type, i32 index)
 }
 
 i32
-atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
+atom_expr_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 {
 	i32 result;
 	switch((int)expr->type)
@@ -607,9 +620,9 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 		case type_identifier:
 		{
 			if(get_pointer)
-				result = load_pointer(expr->identifier.name, ir, block, expr->identifier.symbol_spot->type);
+				result = load_pointer(f, expr->identifier.name, ir, block, expr->identifier.symbol_spot->type);
 			else
-				result = load_variable(expr->identifier.name, ir, block, expr->identifier.symbol_spot->type);
+				result = load_variable(f, expr->identifier.name, ir, block, expr->identifier.symbol_spot->type);
 		} break;
 		case type_overload:
 		{
@@ -623,7 +636,7 @@ atom_expr_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 		case type_func_call:
 		{
 			Assert(expr->func_call.operand_type.type == T_FUNC);
-			result = call_function(ir, block, expr, (Call_Conv)expr->func_call.operand_type.func.calling_convention);
+			result = call_function(f, ir, block, expr, (Call_Conv)expr->func_call.operand_type.func.calling_convention);
 		} break;
 		case type_index:
 		{
@@ -1164,7 +1177,7 @@ assign_to_bc(Ast_Node *node, IR_Block *block, IR *ir)
 }
 
 IR_Block *
-ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *optional_block, u8 *id, IR *ir, IR_Block *to_go)
+ast_to_bc_func_level_list(File_Contents *f, Ast_Node **list, i32 *optional_index, IR_Block *optional_block, u8 *id, IR *ir, IR_Block *to_go)
 {
 	IR_Block *block = NULL;
 	if(optional_block)
@@ -1181,7 +1194,7 @@ ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *option
 		i32 i = *optional_index;
 		for(; i < statement_count; ++i)
 		{
-			ast_to_bc_func_level(list[i], block, list, &i, ir, to_go);
+			ast_to_bc_func_level(f, list[i], block, list, &i, ir, to_go);
 			*optional_index = i;
 		}
 	}
@@ -1189,7 +1202,7 @@ ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *option
 	{
 		for(i32 i = 0; i < statement_count; ++i)
 		{
-			ast_to_bc_func_level(list[i], block, list, &i, ir, to_go);
+			ast_to_bc_func_level(f, list[i], block, list, &i, ir, to_go);
 		}
 	}
 	return block;
@@ -1275,7 +1288,7 @@ get_function_arguments(Ast_Node *function, IR *ir, IR_Block *block)
 }
 
 IR
-ast_to_bc_function(Ast_Node **list, Ast_Node *function)
+ast_to_bc_function(File_Contents *f, Ast_Node **list, Ast_Node *function)
 {
 	IR result = {};
 	result.blocks = SDCreate(IR_Block*);
@@ -1290,7 +1303,7 @@ ast_to_bc_function(Ast_Node **list, Ast_Node *function)
 	instruction(reg_bp, -1, -1, BC_PUSH_REG, entry, type_64);
 	instruction(reg_bp, reg_sp, reg_bp, BC_MOVE_REG_TO_REG, entry, type_64);
 	get_function_arguments(function, &result, entry);
-	ast_to_bc_func_level_list(list, NULL, entry, "entry", &result, NULL);
+	ast_to_bc_func_level_list(f, list, NULL, entry, "entry", &result, NULL);
 
 	u8 func_signature[1024] = {};
 	i32 signature_size = vstd_sprintf((char *)func_signature, "\nfn %s -> %s:\n", function->function.identifier.name,
@@ -1396,18 +1409,18 @@ if_to_bc(IR *ir, IR_Block *block, Ast_Node *node, i32 *idx, Ast_Node **list, IR_
 }
 
 IR_Block *
-ast_to_bc_func_level(Ast_Node *node, IR_Block *current_block, Ast_Node **list, i32 *optional_index, IR *ir, IR_Block *to_go)
+ast_to_bc_func_level(File_Contents *f, Ast_Node *node, IR_Block *current_block, Ast_Node **list, i32 *optional_index, IR *ir, IR_Block *to_go)
 {
 	IR_Block *result = NULL;
 	switch((int)node->type)
 	{
 		case type_func_call:
 		{
-			call_function(ir, current_block, node, (Call_Conv)node->func_call.operand_type.func.calling_convention);
+			call_function(f, ir, current_block, node, (Call_Conv)node->func_call.operand_type.func.calling_convention);
 		} break;
 		case type_assignment:
 		{
-			assign_to_bc(node, current_block, ir);
+			assign_to_bc(f, node, current_block, ir);
 		} break;
 		case type_if:
 		{

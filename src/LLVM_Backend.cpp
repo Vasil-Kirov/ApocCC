@@ -962,6 +962,8 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 
 	auto after_body = node->for_loop.expr3 ? incr : cond;
 
+	auto break_block = f->break_block;
+	auto continue_block = f->continue_block;
 	f->break_block = aftr;
 	f->continue_block = after_body;
 
@@ -971,8 +973,8 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	generate_blocks_from_list(f, list[*idx]->scope_desc.body, func, body, "for.body",
 			after_body);
 
-	f->break_block = NULL;
-	f->continue_block = NULL;
+	f->break_block = break_block;
+	f->continue_block = continue_block;
 
 	*idx += 1;
 	if(body->getTerminator() == NULL)

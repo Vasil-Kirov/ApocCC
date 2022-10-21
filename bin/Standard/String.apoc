@@ -277,6 +277,13 @@ fn parse_format(format: string, list:* Any) -> string
 				float_to_str(to_parse, @builder);
 			} else if type == Type_Type.STRUCT {
 				find_printable_type(@item, @builder);
+			} else if type == Type_Type.POINTER {
+				pointed := item.type.pointer.pointed;
+				if pointed.kind == Type_Type.INTEGER && pointed.primitive.size == Var_Size.byte1 || pointed.primitive.size == Var_Size.ubyte1 {
+					builder += *#**u8 item.value;
+				} else {
+					int_to_str(*#*i64 item.value, @builder);
+				}
 			} else {
 				builder += format[i];
 			}

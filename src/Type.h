@@ -110,6 +110,8 @@ typedef struct _Type_Info
 	b32 is_const;
 } Type_Info;
 
+i32
+struct_get_offset_to_element_in_bytes(Type_Info *type, i32 index);
 
 Type_Info
 union_get_biggest_type(Type_Info type);

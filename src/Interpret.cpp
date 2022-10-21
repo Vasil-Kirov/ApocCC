@@ -21,19 +21,57 @@ destroy_scope()
 	shfree(old_table);
 }
 
+#define COMPARE_CAST(VALUE, CAST, SMALLER, BIGGER) \
+	if(VALUE.type.primitive.size > CAST.primitive.size) \
+	    VALUE._ ## SMALLER = (SMALLER)VALUE._ ## BIGGER; \
+	else if(VALUE.type.primitive.size < CAST.primitive.size) \
+            VALUE._ ## BIGGER = (BIGGER)VALUE._ ## SMALLER;
+
 Interp_Val
 perform_cast(Interp_Val operand, Type_Info cast)
 {
+	if(is_untyped(operand.type))
+	{
+		if(is_integer(operand.type))
+		{
+			operand.type.primitive.size = byte8;
+		}
+		else if(is_float(operand.type))
+		{
+			operand.type.primitive.size = real64;
+		}
+	}
+	if(is_untyped(cast))
+	{
+		if(is_integer(cast))
+		{
+			cast.primitive.size = byte8;
+		}
+		else if(is_float(cast))
+		{
+			cast.primitive.size = real64;
+		}
+	}
+
 	if(is_float(operand.type))
 	{
-		Assert(is_integer(cast));
-		if(is_signed(cast))
+		if(is_float(cast))
 		{
-			operand._i64 = (i64)operand._f64;
+			COMPARE_CAST(operand, cast, f32, f64);
+		}
+		else if(is_signed(cast))
+		{
+			if(operand.type.primitive.size == real32)
+				operand._i64 = (i64)operand._f32;
+			else
+				operand._i64 = (i64)operand._f64;
 		}
 		else 
 		{
-			operand._u64 = (u64)operand._f64;
+			if(operand.type.primitive.size == real32)
+				operand._u64 = (u64)operand._f32;
+			else
+				operand._u64 = (u64)operand._f64;
 		}
 	}
 	else if(is_integer(operand.type))
@@ -213,52 +251,48 @@ interpret_lhs(Ast_Node *lhs)
 	return NULL;
 }
 
+Interp_Val
+copy_struct(Interp_Val *_struct)
+{
+	Assert(_struct->type.type == T_STRUCT);
+	int struct_size = _struct->type.structure.member_count * sizeof(Interp_Val);
+	Interp_Val result = {};
+	result.type = _struct->type;
+	result.pointed = AllocateInterpMemory(struct_size);
+	memcpy(result.pointed, _struct->pointed, struct_size);
+	return result;
+}
+
+Interp_Val
+copy_array(Interp_Val *_array)
+{
+	Assert(_array->type.type == T_ARRAY);
+	int struct_size = _array->type.array.elem_count * sizeof(Interp_Val);
+	Interp_Val result = {};
+	result.type = _array->type;
+	result.pointed = AllocateInterpMemory(struct_size);
+	memcpy(result.pointed, _array->pointed, struct_size);
+	return result;
+}
+
 void
 interpret_assignment(Ast_Node *node, b32 *failed)
 {
 	Interp_Val result = interpret_expression(node->assignment.rhs, failed);
-	void *result_loc = result.location;
-	if(!result_loc)
-		result_loc = &result;
+
+	// Make a copy so when we do 
+	// _my_struct = _my_other_struct
+	// we don't make them point to the same piece
+	// of memory
+	if(node->assignment.decl_type.type == T_STRUCT)
+		result = copy_struct(&result);
+	if(node->assignment.decl_type.type == T_ARRAY)
+		result = copy_array(&result);
+
 	if(node->assignment.is_declaration)
 	{
 		Assert(node->assignment.lhs->type == type_identifier);
-		size_t type_size = 1 * sizeof(Interp_Val);
-		if(node->assignment.decl_type.type == T_ARRAY)
-			type_size = (node->assignment.decl_type.array.elem_count + 1) * sizeof(Interp_Val);
-
-		Interp_Val *location = (Interp_Val *)AllocateCompileMemory(type_size);
-
-		size_t expr_size = 1 * sizeof(Interp_Val);
-		if(result.type.type == T_ARRAY)
-			expr_size = result.type.array.elem_count * sizeof(Interp_Val);
-
-		Assert(type_size >= expr_size);
-		if(!is_float(result.type) && !is_integer(result.type))
-		{
-			memcpy(location, &result, sizeof(Interp_Val));
-			location->location = location;
-			location->type = node->assignment.decl_type;
-			location->pointed = (Interp_Val *)location->location + 1;
-			memcpy(location->pointed, result.pointed, expr_size);
-			Interp_Val *fill = (Interp_Val *)((u8 *)location->pointed + expr_size);
-			size_t to_fill = (type_size - expr_size) / sizeof(Interp_Val);
-			Interp_Val integer = {};
-			integer.type.type = T_UNTYPED_INTEGER;
-			integer._i64 = 0;
-			for (size_t i = 0; i < to_fill; ++i)
-			{
-				fill[i] = integer;
-			}
-		}
-		else
-		{
-			memcpy(location, result_loc, expr_size);
-			location->location = location;
-			location->type = node->assignment.decl_type;
-		}
-
-		interp_add_symbol(node->assignment.lhs->identifier.name, *location);
+		interp_add_symbol(node->assignment.lhs->identifier.name, result);
 	}
 	else
 	{
@@ -430,7 +464,7 @@ interpret_function(Interp_Val func, Ast_Call call, b32 *failed)
 	{
 		Ast_Variable arg = args[i]->variable;
 		// @TODO: Do a heap allocator
-		void *location = AllocatePermanentMemory((get_type_size(arg.type) + 1)
+		void *location = AllocateInterpMemory((get_type_size(arg.type) + 1)
 				* sizeof(Interp_Val));
 		Interp_Val *the_arg = (Interp_Val *)location;
 		the_arg->type = arg.type;
@@ -524,25 +558,27 @@ interpret_operand(Ast_Node *node, b32 *failed)
 		{
 			result = interpret_func_call(node, failed);
 		} break;
+		case type_selector:
+		{
+			Interp_Val val = interpret_expression(node->selector.operand, failed);
+			if(*failed) {
+				return result;
+			}
+			Interp_Val *struct_ptr = (Interp_Val *)val.pointed;
+			result = struct_ptr[node->selector.selected_index];
+		} break;
 		case type_index:
 		{
-			Assert(result.location);
-			Interp_Val *ptr = (Interp_Val *)result.location;
-			Interp_Val operand = interpret_operand(node->index.operand, failed);
+			Interp_Val operand = interpret_expression(node->index.operand, failed);
+			if(*failed)
+				return result;
+			Interp_Val index = interpret_expression(node->index.expression, failed);
+			if(*failed)
+				return result;
 
-			Assert(is_integer(operand.type));
-			void *pointed = NULL;
-			if(is_signed(operand.type))
-			{
-				pointed = ptr + operand._i64;
-			}
-			else
-			{
-				pointed = ptr + operand._i64;
-			}
-			result = *(Interp_Val *)pointed;
-			// @NOTE: not sure if it's needed
-			result.location = pointed;
+			Assert(is_integer(index.type));
+			auto array_loc = (Interp_Val *)operand.pointed;
+			result = array_loc[index._u64];
 		} break;
 		case type_postfix:
 		{
@@ -569,26 +605,68 @@ interpret_operand(Ast_Node *node, b32 *failed)
 
 			// @NOTE: put the temp variable back in
 			location->_u64 = tmp._u64;
-		}
+		} break;
 		case type_array_list:
 		{
-			size_t elem_count = SDCount(node->array_list.list);
-			Interp_Val *array = (Interp_Val *)AllocatePermanentMemory(sizeof(Interp_Val)
-					* (elem_count + 1));
-			array->location = array;
-			array->pointed = array + 1;
-			Type_Info type = {T_ARRAY};
-			type.identifier = (u8 *)"array_list";
-			type.array.elem_count = elem_count;
-			type.array.type = node->array_list.type.array.type;
-			array->type = type;
-			for(size_t i = 0; i < elem_count; ++i)
+			int type_size = node->array_list.type.array.elem_count * sizeof(Interp_Val);
+			Interp_Val *array_loc = (Interp_Val *)AllocateInterpMemory(type_size);
+
+			auto list = node->array_list.list;
+			size_t list_count = SDCount(list);
+			for(size_t i = 0; i < list_count; ++i)
 			{
-				Interp_Val element = interpret_expression(node->array_list.list[i], failed);
-				element.type = *node->array_list.type.array.type;
-				*(array + i + 1) = element;
+				array_loc[i] = interpret_expression(list[i], failed);
+				if(*failed)
+					return result;
 			}
-			result = *array;
+
+			for(size_t i = 0; i < list_count; ++i)
+			{
+				auto elem_ptr = array_loc + i;
+				*elem_ptr = perform_cast(*elem_ptr, *node->array_list.type.array.type);
+			}
+			result.type = node->array_list.type;
+			result.pointed = array_loc;
+		} break;
+		case type_struct_init:
+		{
+			Assert(node->struct_init.type.type == T_STRUCT);
+			auto member_count = node->struct_init.type.structure.member_count;
+			auto type_size = member_count * sizeof(Interp_Val);//get_type_size(node->struct_init.type);
+			Interp_Val *struct_loc = (Interp_Val *)AllocateInterpMemory(type_size);
+			
+			result.type = node->struct_init.type;
+			result.pointed = struct_loc;
+			for(int i = 0; i < member_count; ++i) {
+				struct_loc[i].type = node->struct_init.type.structure.member_types[i];
+			}
+
+			// @NOTE: fast path
+			if(node->struct_init.is_empty_init)
+			{
+				// @NOTE: Memory is already cleared to zero on allocation so we don't
+				// need to do anything
+			}
+			else
+			{
+				size_t expr_count = SDCount(node->struct_init.expressions);
+				auto expressions = node->struct_init.expressions;
+
+				// @NOTE: Memory is already cleared to zero on allocation so we don't
+				// need to do preset values that are not in the initialization list
+
+				for(i64 i = expr_count - 1; i >= 0; --i)
+				{
+					auto expr_val = interpret_expression(expressions[i], failed);
+					if(*failed)
+						return result;
+
+					expr_val = perform_cast(expr_val, node->struct_init.type.structure.member_types[i]);
+					Interp_Val *member_ptr = struct_loc + i;
+					// Just copy the value, doesn't matter what it actually is
+					member_ptr->_u64 = expr_val._u64;
+				}
+			}
 		} break;
 		default:
 		{

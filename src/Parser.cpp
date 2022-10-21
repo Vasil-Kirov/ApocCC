@@ -599,8 +599,17 @@ parse_identifier_statement(File_Contents *f, Token ends_with)
 		{
 			if(f->curr_token->type == tok_identifier)
 			{
-				raise_parsing_unexpected_token("an assignment or declaration.\n\tSince you put 2 identifiers one after another you might be doing a C-style declaration.\n\t"
+				if(vstd_strcmp((char *)identifier_token->identifier, (char *)"return"))
+				{
+					raise_parsing_unexpected_token("an assignment or declaration.\n\t"
+							"Since you used the identiifer [ return ] you might be trying to do a return statement.\n\t"
+							"The return statement in this language is [ -> ]", f);
+				}
+				else
+				{
+					raise_parsing_unexpected_token("an assignment or declaration.\n\tSince you put 2 identifiers one after another you might be doing a C-style declaration.\n\t"
 						"The syntax for a declaration in this language is: [ name: Type; ]", f);
+				}
 			}
 			parser_eat(f, ends_with);
 			return lhs;
@@ -1260,7 +1269,6 @@ parse_unary_expression(File_Contents *f, char stop_at, b32 is_lhs)
 }
 
 
-
 Ast_Node *
 parse_binary_expression(File_Contents *f, Token stop_at, int min_bp, b32 is_lhs)
 {
@@ -1269,6 +1277,16 @@ parse_binary_expression(File_Contents *f, Token stop_at, int min_bp, b32 is_lhs)
 	while(true)
 	{
 		current = *f->curr_token;
+		if(current.type == tok_as)
+		{
+			Token_Iden *token = advance_token(f);
+			if(is_lhs)
+			{
+				raise_parsing_unexpected_token("left-hand side of statement, not cast", f);
+			}
+			Type_Info type = parse_type(f);
+			result = ast_cast(token, type, result);
+		}
 		
 		int l_bp = get_precedence(current.type, true, is_lhs);
 		int r_bp = get_precedence(current.type, false, is_lhs);

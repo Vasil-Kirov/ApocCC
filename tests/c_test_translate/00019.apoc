@@ -1,0 +1,16 @@
+// 0
+
+
+fn main() -> i32 {
+	s: S;
+	
+	s.x = 0;
+	s.p = @s;
+	-> s.p.p.p.p.p.x;
+}
+
+struct S {
+	p: *S;
+	x: i32;
+}
+

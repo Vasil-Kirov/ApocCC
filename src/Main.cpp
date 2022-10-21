@@ -13,9 +13,11 @@
 #include <Interpret.h>
 #include <CommandLine.h>
 #include <DumpInfo.h>
+#if 0
 #include <Bytecode.h>
 #include <x64_Gen.h>
 #include <ObjDumper.h>
+#endif
 #include <Threading.h>
 
 #include <platform/platform.h>
@@ -32,9 +34,11 @@
 #include <Interpret.cpp>
 #include <CommandLine.cpp>
 #include <DumpInfo.cpp>
+#if 0
 #include <Bytecode.cpp>
 #include <x64_Gen.cpp>
 #include <ObjDumper.cpp>
+#endif
 #include <Threading.cpp>
 
 #if !defined(NOVM)
@@ -261,12 +265,11 @@ int main(int argc, char *argv[])
 #endif
 
 #if 0
-	File_Contents *f = files[file_idx];
 	if(f->build_commands.backend == Fast_Backend)
 	{
 		Relocation *relocations = NULL;
 		u32 relocation_count = 0;
-		TIME_FUNC(timers, IR *ir = ast_to_bytecode(f, f->ast_root), codegen_clock, codegen);
+		TIME_FUNC(timers, IR *ir = ast_to_bytecode(files), codegen_clock, codegen);
 		TIME_FUNC(timers, Code_Buffer code = x64_generate_code(f, ir, &relocations, &relocation_count), codegen_clock, codegen);
 		TIME_FUNC(timers, dump_obj(f, code, relocations, relocation_count, obj_symbols), codegen_clock, codegen);
 	}
