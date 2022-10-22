@@ -259,6 +259,7 @@ generate_obj(File_Contents* f)
 	else if (f->build_commands.target == TG_WASM)
 	{
 		backend.module->setTargetTriple(std::string("wasm32"));
+		target_triple = "wasm32";
 	}
 
 	std::string error;
@@ -867,6 +868,12 @@ generate_func_signature(File_Contents *f, Ast_Node *node, b32 is_overload)
 		arg_index++;
 	}
 	
+	if(node->function.flags & FF_WASM_IMPORT)
+		func->addFnAttr( llvm::Attribute::get(*backend.context, "wasm-import-name", func->getName()) );
+	if(node->function.flags & FF_WASM_EXPORT)
+		func->addFnAttr( llvm::Attribute::get(*backend.context, "wasm-export-name", func->getName()) );
+
+
 	return func;
 }
 
@@ -1035,6 +1042,50 @@ generate_intrinsic(File_Contents *f, Symbol *intrinsic_sym, Ast_Node *call_node,
 	{
 		Assert(call_node->func_call.expr_types[0].type == T_POINTER);
 		return generate_type_info(*call_node->func_call.expr_types[0].pointer.type, func);
+	}
+	else if(vstd_strcmp(name, (char *)"get_f128"))
+	{
+		auto args  = call_node->func_call.arguments;
+		auto types = call_node->func_call.expr_types;
+		size_t arg_count = SDCount(args);
+		Type_Info *type = get_type(f, (u8 *)"f128");
+		auto llvm_type = apoc_type_to_llvm(*type, &backend);
+		Type_Info *_f32 = get_type(f, (u8 *)"f32");
+		Value *vec = NULL;
+
+		switch(arg_count)
+		{
+			case 1:
+			{
+				auto elem1 = generate_expression(f, args[0], func);
+				elem1 = create_cast(*_f32, types[0], elem1);
+				vec = backend.builder->CreateInsertElement(llvm_type, elem1, (u64)0);
+				vec = backend.builder->CreateInsertElement(vec, elem1, (u64)1);
+				vec = backend.builder->CreateInsertElement(vec, elem1, (u64)2);
+				vec = backend.builder->CreateInsertElement(vec, elem1, (u64)3);
+			} break;
+			case 4:
+			{
+				auto elem1 = generate_expression(f, args[0], func);
+				auto elem2 = generate_expression(f, args[1], func);
+				auto elem3 = generate_expression(f, args[2], func);
+				auto elem4 = generate_expression(f, args[3], func);
+				elem1 = create_cast(*_f32, types[0], elem1);
+				elem2 = create_cast(*_f32, types[1], elem2);
+				elem3 = create_cast(*_f32, types[2], elem3);
+				elem4 = create_cast(*_f32, types[3], elem4);
+				vec = backend.builder->CreateInsertElement(llvm_type, elem1, (u64)0);
+				vec = backend.builder->CreateInsertElement(vec, elem2, (u64)1);
+				vec = backend.builder->CreateInsertElement(vec, elem3, (u64)2);
+				vec = backend.builder->CreateInsertElement(vec, elem4, (u64)3);
+			} break;
+			default:
+			{
+				raise_semantic_error(f, "Please do not redefine intrinsics... set_f must have 1 or 4 arguments", *call_node->func_call.token);
+			} break;
+		}
+		
+		return vec;
 	}
 	else
 		raise_semantic_error(f, "Function marked as intrinsic is not an intrinsic", *intrinsic_sym->token);
@@ -1438,11 +1489,22 @@ generate_index(File_Contents *f, Ast_Node *node, Function *func, llvm::Value *rh
 		llvm::Value *idx_list[] = {
 			idx
 		};
-		auto elem_ptr = apoc_type_to_llvm(*node->index.operand_type.pointer.type, &backend);
+		auto elem_type = apoc_type_to_llvm(*node->index.operand_type.pointer.type, &backend);
 		array = generate_lhs(f, func, node->index.operand, rhs, is_decl, decl_type); 
 		array = llvm_load(&node->index.operand_type, array, "ptr_load", &backend);
 		//array = backend.builder->CreateLoad(array_type, array, "ptr_load");
-		return backend.builder->CreateGEP(elem_ptr, array, idx_list, "elem_ptr");
+		return backend.builder->CreateGEP(elem_type, array, idx_list, "elem_ptr");
+	}
+	else if(node->index.operand_type.type == T_STRING)
+	{
+		llvm::Value *idx_list[] = {
+			idx
+		};
+		auto elem_type = apoc_type_to_llvm(*get_type(f, (u8 *)"u8"), &backend);
+		array = generate_lhs(f, func, node->index.operand, rhs, is_decl, decl_type); 
+		array = llvm_load(&node->index.operand_type, array, "ptr_load", &backend);
+		//array = backend.builder->CreateLoad(array_type, array, "ptr_load");
+		return backend.builder->CreateGEP(elem_type, array, idx_list, "elem_ptr");
 	}
 	else
 		Assert(false);
@@ -1474,9 +1536,6 @@ generate_func(File_Contents *f, Ast_Node *node, Function *passed_func)
 			stack_push(debug.scope, subprogram);
 			emit_location(f, (Token_Iden){});
 	}
-
-	if(f->build_commands.target == TG_WASM)
-		func->addFnAttr( llvm::Attribute::get(*backend.context, "wasm-export-name", func->getName()) );
 
 	// @TODO: put source info in the function
 	BasicBlock *body_block = BasicBlock::Create(*backend.context, "entry", func);
@@ -1683,11 +1742,13 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 		auto struct_type = apoc_type_to_llvm(*op_type, &backend);
 		if(!operand)
 		{
+			Variable_Types var_type = ID_LOCAL;
 			if(node->selector.operand->type == type_identifier)
-				operand = shget(backend.named_values, node->selector.operand->identifier.name)->value;
+				operand = get_identifier(f, node->selector.operand->identifier.name, &var_type)->value;
 			else
 				operand = generate_lhs(f, func, node->selector.operand,
 						NULL, false, (Type_Info){});
+			Assert(var_type != ID_INVALID);
 		}
 		if(op_type->structure.is_union)
 		{
@@ -1759,6 +1820,30 @@ load_got_identifier(Variable_Info *variable, Variable_Types type)
 }
 
 llvm::Value *
+perform_casting_operand(File_Contents *f, llvm::Function *func, Ast_Node *node)
+{
+	Type_Info cast_type = node->cast.type;
+	Type_Info casted = node->cast.expr_type;
+	if(node->cast.expr_type.type == T_ARRAY && node->cast.type.type == T_POINTER)
+	{
+		auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
+		llvm::Value *idx_list[] = {
+			zero,
+		};
+		auto ptr_type = apoc_type_to_llvm(node->cast.expr_type, &backend);
+		auto ptr = generate_lhs(f, func, node->cast.expression, NULL, false, (Type_Info){}); 
+		return backend.builder->CreateGEP(ptr_type, ptr, idx_list, "elem_ptr");
+	}
+	else
+	{
+		llvm::Value *cast_expr = generate_expression(f, node->cast.expression, func);
+
+		cast_expr = create_cast(cast_type, casted, cast_expr);
+		return cast_expr;
+	}
+}
+
+llvm::Value *
 generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 {
 	switch (node->type)
@@ -1820,6 +1905,39 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		case type_func_call:
 		{
 			return generate_func_call(f, node, func);
+		} break;
+		case type_cast:
+		{
+			return perform_casting_operand(f, func, node);
+		} break;
+		case type_postfix:
+		{
+			llvm::Value *one = backend.builder->getInt64(1);
+			Type_Info one_type = {};
+			one_type.type = T_INTEGER;
+			one_type.primitive.size = byte8;
+			Type_Info *type = node->postfix.postfix_type;
+			one = create_cast(*type, one_type, one);
+
+			auto ptr = generate_lhs(f, func, node->postfix.operand, NULL, false, {});
+			Assert(ptr);
+			
+			auto result = llvm_load(node->postfix.postfix_type, ptr, "preload", &backend);
+			if(node->postfix.token->type == tok_plusplus)
+			{
+				if(is_float(*node->postfix.postfix_type))
+					llvm_store(ptr, backend.builder->CreateFAdd(result, one), &backend, get_type_alignment(*type));
+				else
+					llvm_store(ptr, backend.builder->CreateAdd(result, one), &backend, get_type_alignment(*type));
+			}
+			else
+			{
+				if(is_float(*node->postfix.postfix_type))
+					llvm_store(ptr, backend.builder->CreateFSub(result, one), &backend, get_type_alignment(*type));
+				else
+					llvm_store(ptr, backend.builder->CreateSub(result, one), &backend, get_type_alignment(*type));
+			}
+			return result;
 		} break;
 		case type_const_str:
 		{
@@ -2016,16 +2134,13 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 				one_type.primitive.size = byte8;
 				one = create_cast(expr_type, one_type, one);
 
-				Variable_Types returned_type = ID_INVALID;
-				auto to_store = get_identifier(f, node->unary_expr.expression->identifier.name,
-						&returned_type);
-				Assert(returned_type == ID_LOCAL || returned_type == ID_GLOBAL);
+				auto to_store = generate_lhs(f, func, node->unary_expr.expression, NULL, false, {});
 				Assert(to_store);
 				if(is_float(expr_type))
 					result = backend.builder->CreateFAdd(expr, one);
 				else
 					result = backend.builder->CreateAdd(expr, one);
-				llvm_store(&expr_type, to_store->value, result, &backend);
+				llvm_store(&expr_type, to_store, result, &backend);
 			} break;
 			case tok_minusminus:
 			{
@@ -2057,27 +2172,35 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 	}
 	else if(node->type == type_cast)
 	{
-		Type_Info cast_type = node->cast.type;
-		Type_Info casted = node->cast.expr_type;
-		if(node->cast.expr_type.type == T_ARRAY && node->cast.type.type == T_POINTER)
-		{
-			auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
-			llvm::Value *idx_list[] = {
-				zero,
-			};
-			auto ptr_type = apoc_type_to_llvm(node->cast.expr_type, &backend);
-			auto ptr = generate_lhs(f, func, node->cast.expression, NULL, false, (Type_Info){}); 
-			return backend.builder->CreateGEP(ptr_type, ptr, idx_list, "elem_ptr");
-		}
-		else
-		{
-			llvm::Value *cast_expr = generate_expression(f, node->cast.expression, func);
-
-			cast_expr = create_cast(cast_type, casted, cast_expr);
-			return cast_expr;
-		}
+		return perform_casting_operand(f, func, node);
 	}
 	else return generate_operand(f, node, func);
+}
+
+inline llvm::Value *
+cast_if_float_vector(File_Contents *f, llvm::Value *in, Type_Info *type)
+{
+	if(type->type == T_FLOAT)
+	{
+		Assert(type->primitive.size == real128);
+		Type_Info *to   = get_type(f, (u8 *)"i128");
+		auto llvm_type = apoc_type_to_llvm(*to, &backend);
+		return backend.builder->CreateBitCast(in, llvm_type);
+	}
+
+	return in;
+}
+
+inline llvm::Value *
+cast_back_if_bitwise_float_vector(File_Contents *f, llvm::Value *result, Type_Info *type)
+{
+	if(type->type == T_FLOAT)
+	{
+		auto llvm_type = apoc_type_to_llvm(*type, &backend);
+		return backend.builder->CreateBitCast(result, llvm_type);
+	}
+
+	return result;
 }
 
 llvm::Value *
@@ -2231,15 +2354,24 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 			} break;
 			case tok_bits_and:
 			{
+				left  = cast_if_float_vector(f, left,  &node->binary_expr.left);
+				right = cast_if_float_vector(f, right, &node->binary_expr.right);
 				result = backend.builder->CreateAnd(left, right);
+				result = cast_back_if_bitwise_float_vector(f, result, &node->binary_expr.left);
 			} break;
 			case tok_bits_xor:
 			{
+				left  = cast_if_float_vector(f, left,  &node->binary_expr.left);
+				right = cast_if_float_vector(f, right, &node->binary_expr.right);
 				result = backend.builder->CreateXor(left, right);
+				result = cast_back_if_bitwise_float_vector(f, result, &node->binary_expr.left);
 			} break;
 			case tok_bits_or:
 			{
+				left  = cast_if_float_vector(f, left,  &node->binary_expr.left);
+				right = cast_if_float_vector(f, right, &node->binary_expr.right);
 				result = backend.builder->CreateOr(left, right);
+				result = cast_back_if_bitwise_float_vector(f, result, &node->binary_expr.left);
 			} break;	
 			default:
 			{
@@ -2381,7 +2513,7 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 		shput(backend.named_values, node->assignment.token.identifier, var_info);
 	}
 	else if(expression_value->getType()->isPointerTy() == NULL ||
-			node->assignment.decl_type.type == T_POINTER)
+			node->assignment.decl_type.type == T_POINTER || node->assignment.decl_type.type == T_STRING)
 	{
 		// @NOTE: structs and arrays are handled in their initialization
 		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type, &identifier);

@@ -24,6 +24,8 @@ typedef enum : i32
 	real64 = 10,
 	empty_void  = 11,
 	logical_bit = 12,
+	real128 = 13,
+	byte128  = 14,
 	detect // @TODO: Remove
 } Var_Size;
 

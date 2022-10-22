@@ -25,6 +25,9 @@ void
 strcpy_secure(char *destination, size_t max_size, const char *source);
 
 u64
+bin_to_num(u8 *bin_str, size_t len);
+
+u64
 hex_to_num(u8 *hex_str, size_t len);
 
 u64
@@ -47,6 +50,9 @@ is_whitespace(u8 c);
 
 b32
 is_non_special_char(u8 c);
+
+b32
+is_bin(u8 c);
 
 b32
 is_hex(u8 c);

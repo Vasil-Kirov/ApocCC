@@ -164,7 +164,9 @@ typedef enum
 	FF_HAS_VAR_ARGS   = 1 << 0,
 	FF_IS_INTERP_ONLY = 1 << 1,
 	FF_IS_INTRINSIC   = 1 << 2,
-	FF_PASS_RETURN_PTR= 1 << 3
+	FF_PASS_RETURN_PTR= 1 << 3,
+	FF_WASM_IMPORT    = 1 << 4,
+	FF_WASM_EXPORT    = 1 << 5,
 } Func_Flags;
 
 typedef enum
@@ -289,6 +291,7 @@ typedef struct
 {
 	Ast_Node *operand;
 	Token_Iden *token;
+	Type_Info *postfix_type; // @NOTE: after analyzer
 } Ast_Postfix;
 
 typedef struct

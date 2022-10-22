@@ -1109,6 +1109,16 @@ parse_atom_expression(File_Contents *f, Ast_Node *operand, char stop_at, b32 is_
 				operand = ast_selector(dot_token, operand,
 						ast_identifier(f, identifier_token));
 			} break;
+			case tok_as:
+			{
+				Token_Iden *token = advance_token(f);
+				if(is_lhs)
+				{
+					raise_parsing_unexpected_token("left-hand side of statement, not cast", f);
+				}
+				Type_Info type = parse_type(f);
+				operand = ast_cast(token, type, operand);
+			} break;
 			case tok_plusplus:
 			case tok_minusminus:
 			{
@@ -1268,7 +1278,6 @@ parse_unary_expression(File_Contents *f, char stop_at, b32 is_lhs)
 	return result;
 }
 
-
 Ast_Node *
 parse_binary_expression(File_Contents *f, Token stop_at, int min_bp, b32 is_lhs)
 {
@@ -1277,22 +1286,12 @@ parse_binary_expression(File_Contents *f, Token stop_at, int min_bp, b32 is_lhs)
 	while(true)
 	{
 		current = *f->curr_token;
-		if(current.type == tok_as)
-		{
-			Token_Iden *token = advance_token(f);
-			if(is_lhs)
-			{
-				raise_parsing_unexpected_token("left-hand side of statement, not cast", f);
-			}
-			Type_Info type = parse_type(f);
-			result = ast_cast(token, type, result);
-		}
-		
 		int l_bp = get_precedence(current.type, true, is_lhs);
 		int r_bp = get_precedence(current.type, false, is_lhs);
 
 		if(current.type == stop_at || l_bp < min_bp)
 			break;		
+
 		advance_token(f);
 		
 		if(is_lhs)
@@ -1714,7 +1713,7 @@ parse_func(File_Contents *f)
 {
 	parser_eat(f, tok_func);
 	Ast_Func this_func = {};
-	while(f->curr_token->type == tok_interp || f->curr_token->type == tok_intrinsic || f->curr_token->type == tok_call_conv)
+	while(f->curr_token->type == tok_interp || f->curr_token->type == tok_intrinsic || f->curr_token->type == tok_call_conv || f->curr_token->type == tok_wasm_import || f->curr_token->type == tok_wasm_export)
 	{
 		switch((int)f->curr_token->type)
 		{
@@ -1725,6 +1724,14 @@ parse_func(File_Contents *f)
 			case tok_intrinsic:
 			{
 				this_func.flags |= FF_IS_INTRINSIC;
+			} break;
+			case tok_wasm_import:
+			{
+				this_func.flags |= FF_WASM_IMPORT;
+			} break;
+			case tok_wasm_export:
+			{
+				this_func.flags |= FF_WASM_EXPORT;
 			} break;
 			case tok_call_conv:
 			{
@@ -1737,6 +1744,9 @@ parse_func(File_Contents *f)
 
 	if(this_func.conv == 0)
 		this_func.conv = CALL_APOC;
+	
+	if(this_func.flags & FF_WASM_EXPORT || this_func.flags & FF_WASM_IMPORT)
+		this_func.conv = CALL_C_DECL;
 
 	Ast_Node *func_id = ast_identifier(f, advance_token(f));
 	this_func.identifier = func_id->identifier;

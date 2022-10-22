@@ -1,0 +1,13 @@
+// 4 + 5 + 6 + 7
+$import "Basic.apoc";
+
+
+fn main() -> i32 {
+	x := get_f128(1);
+	y := get_f128(3, 4, 5, 6);
+	z := x + y;
+	z = z ^ get_f128(-0.0);
+	elems := (@z) as *f32;
+	-> (elems[0] + elems[1] + elems[2] + elems[3]) as i32 * -1;
+}
+

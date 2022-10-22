@@ -2,6 +2,8 @@
 fn $intrinsic var_arg_start(list: **Any);
 fn $intrinsic var_arg_stop(list: **Any);
 fn $intrinsic get_type(ptr:*void) -> Type_Info;
+fn $intrinsic get_f128(e1: f32) -> f128;
+fn $intrinsic get_f128(e1: f32, e2: f32, e3: f32, e4: f32) -> f128;
 
 true  :: #bool  1;
 false :: #bool  0;

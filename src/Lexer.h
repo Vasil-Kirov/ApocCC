@@ -99,6 +99,8 @@ typedef enum : signed short
 	tok_defer     = -56,
 	tok_continue  = -57,
 	tok_type      = -58,
+	tok_wasm_import = -59,
+	tok_wasm_export = -60,
 } Token;
 
 typedef struct _str_hash_table

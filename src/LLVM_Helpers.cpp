@@ -8,7 +8,8 @@ typedef IntegerType *(*LLVM_Integer_Types)(LLVMContext &);
 static const LLVM_Integer_Types llvm_int_types[] = {NULL, llvm::Type::getInt8Ty, llvm::Type::getInt16Ty,
 												llvm::Type::getInt32Ty, llvm::Type::getInt64Ty,
 												llvm::Type::getInt8Ty, llvm::Type::getInt16Ty,
-												llvm::Type::getInt32Ty, llvm::Type::getInt64Ty};
+												llvm::Type::getInt32Ty, llvm::Type::getInt64Ty,
+												NULL, NULL, NULL, NULL, NULL, NULL};
 
 static const DIType *debug_types[16] = {};
 
@@ -16,7 +17,8 @@ static const char *type_names[] = {"", "i8", "i16",
 									"i32", "i64",
 									"u8", "u16",
 									"u32", "u64",
-									"f32", "f64"};
+									"f32", "f64",
+									"f128", "i128"};
 
 void
 llvm_zero_out_memory(llvm::Value *ptr, u64 size, llvm::Align alignment, IRBuilder<> *builder)
@@ -573,13 +575,19 @@ apoc_type_to_llvm(Type_Info type, Backend_State *backend)
 	if (is_integer(type))
 	{
 		Assert(type.primitive.size != 0);
-		return llvm_int_types[type.primitive.size](*backend->context);
+		if(type.primitive.size == byte128)
+		{
+			return VectorType::get(Type::getInt32Ty(*backend->context), 4, false);
+		}
+		else
+			return llvm_int_types[type.primitive.size](*backend->context);
 	}
 	else if (is_float(type))
 	{
 		Assert(type.primitive.size != 0);
 		if(type.primitive.size == real32) return llvm::Type::getFloatTy(*backend->context);
 		else if(type.primitive.size == real64) return llvm::Type::getDoubleTy(*backend->context);
+		else if(type.primitive.size == real128) return VectorType::get(Type::getFloatTy(*backend->context), 4, false);
 		Assert(false);
 	}
 	else if (type.type == T_BOOLEAN)
@@ -708,6 +716,12 @@ to_debug_type(Type_Info type, Debug_Info *debug)
 		else if(type.primitive.size == real64) 
 		{
 			result = debug->builder->createBasicType(type_names[type.primitive.size], 64, dwarf::DW_ATE_float);
+			debug_types[type.primitive.size] = result;
+			return result;
+		}
+		else if(type.primitive.size == real128) 
+		{
+			result = debug->builder->createBasicType(type_names[type.primitive.size], 128, dwarf::DW_ATE_float);
 			debug_types[type.primitive.size] = result;
 			return result;
 		}

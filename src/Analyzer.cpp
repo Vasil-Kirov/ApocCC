@@ -84,9 +84,9 @@ Type_Info
 add_primitive_type(File_Contents *f, const char *name, Var_Size size)
 {
 	Type_Type type = T_INVALID;
-	if(size < real32)
+	if(size < real32 || size == byte128)
 		type = T_INTEGER;
-	else if(size < empty_void)
+	else if(size < empty_void || size == real128)
 		type = T_FLOAT;
 	else if(size == empty_void)
 		type = T_VOID;
@@ -854,6 +854,7 @@ func_fix_types(File_Contents *f, Ast_Node *node)
 			SDPush(func_param_types, fixed_value_type);
 		}
 	}
+	func_sym->type->func.param_types = func_param_types;
 	func_sym->type->identifier = var_type_to_name(func_sym->type, false);
 	node->function.type = func_sym->type;
 }
@@ -876,6 +877,23 @@ verify_func(File_Contents *f, Ast_Node *node)
 				"Function [ %s ] returns an array which is illegal.\n\t"
 				"This function can only be executed at compile time using $run\n\t"
 				"and as such should be marked with $interp", node->function.identifier.name);
+	}
+	
+	if(node->function.body)
+	{
+		if(node->function.flags & FF_WASM_IMPORT ? true : false)
+		{
+			raise_formated_semantic_error(f, *type_error_token,
+					"Function specified as a wasm import cannot have a body");
+		}
+	}
+	else
+	{
+		if(node->function.flags & FF_WASM_EXPORT ? true : false)
+		{
+			raise_formated_semantic_error(f, *type_error_token,
+					"Function specified as a wasm export must have a body");
+		}
 	}
 	
 	for (size_t i = 0; i < arg_count; i++)
@@ -1690,7 +1708,7 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 				raise_semantic_error(f, "Indexing expression is invalid", *expression->index.token);
 			}
 			expression->index.operand_type = *operand_type;
-			if(operand_type->type != T_ARRAY && operand_type->type != T_POINTER)
+			if(operand_type->type != T_ARRAY && operand_type->type != T_POINTER && operand_type->type != T_STRING)
 			{
 				i32 index = 0;
 				auto overload = get_overload(f, operand_type, index_type, expression, &index);
@@ -1718,11 +1736,17 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 				expression->index.idx_type = *operand_type->array.type;
 				return *operand_type->array.type;
 			}
-			else
+			else if(operand_type->type == T_POINTER)
 			{
 				expression->index.idx_type = *operand_type->pointer.type;
 				return  *operand_type->pointer.type;
 			}
+			else if(operand_type->type == T_STRING)
+			{
+				expression->index.idx_type = *get_type(f, (u8 *)"u8");
+				return *get_type(f, (u8 *)"u8");
+			}
+			else Assert(false);
 		} break;
 		case type_func_call:
 		{
@@ -1745,6 +1769,7 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 						"Cannot apply postfix operator to expression of type %s",
 						var_type_to_name(expr_type));
 			}
+			expression->postfix.postfix_type = expr_type;
 			return *expr_type;
 		} break;
 		case type_literal:
@@ -1768,7 +1793,6 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 			result.token = &expression->array_list.token;
 			result.array.elem_count = SDCount(expression->array_list.list);
 			result.array.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-			result.identifier = (u8 *)"array_list";
 			expression->array_list.expr_types = verify_array_list(f, expression);
 
 			if(array_type->type == T_DETECT)
@@ -1790,6 +1814,7 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 			}
 			else 
 				memcpy(&result, array_type, sizeof(Type_Info));
+			result.identifier = var_type_to_name(&result, false);
 			expression->array_list.type = result;
 			return result;
 		}
@@ -2100,7 +2125,7 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden *desc_tok
 
 	if(is_bits_op(expression->binary_expr.op))
 	{
-		if(is_float(left) || is_float(right))
+		if((is_float(left) || is_float(right)) && left.primitive.size != real128)
 		{
 			raise_semantic_error(f, "Cannot use the bitwise operators with floating point numbers",
 					expression->binary_expr.token);
@@ -2114,6 +2139,26 @@ get_expression_type(File_Contents *f, Ast_Node *expression, Token_Iden *desc_tok
 	}
 
 	return *fix_type(f, &left);
+}
+
+b32
+does_overload_call_match(Ast_Node *call, Ast_Node *overload)
+{
+	auto args = overload->function.arguments;
+	auto expr_types = call->func_call.expr_types;
+	auto expr_count = SDCount(expr_types);
+	auto arg_count  = SDCount(args);
+	if( (expr_count != arg_count) && !(overload->function.flags & FF_HAS_VAR_ARGS) )
+		return false;
+	
+	for (int i = 0; i < arg_count; ++i) {
+		if (args[i]->variable.type.type == T_DETECT) {
+			return true;
+		}
+		if (!check_type_compatibility(args[i]->variable.type, expr_types[i]))
+			return false;
+	}
+	return true;
 }
 
 Type_Info
@@ -2189,78 +2234,17 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden *expr_token, 
 		auto func_sym = get_symbol_spot(f, *operand->identifier.token, false);
 		if(func_sym && func_sym->tag == S_FUNCTION && func_sym->node->function.overloads)
 		{
-			size_t to_allocate = vstd_strlen((char *)func_sym->node->function.identifier.name);
-			size_t id_len = to_allocate;
-			to_allocate += 128 * SDCount(func_sym->node->function.arguments);
-			u8 *out = (u8 *)AllocatePermanentMemory(to_allocate * 1.5f);
-			u8 *non_overloaded = get_non_overloaded_name(func_sym->node->function.identifier.name);
-			vstd_strcat((char *)out, (char *)non_overloaded);
-			vstd_strcat((char *)out, "!@");
-			for(size_t i = 0; i < expr_count; ++i)
-			{
-				vstd_strcat((char *)out,
-						(char *)var_type_to_name(&func_call->func_call.expr_types[i], false));
-				if(i + 1 != expr_count)
-				{
-					vstd_strcat((char *)out, "!@");
-				}
-			}
-			size_t out_len = vstd_strlen((char *)out);
 			auto overload_count = SDCount(func_sym->node->function.overloads);
 			Ast_Node *found_overload = NULL;
 			for(size_t i = 0; i < overload_count; ++i)
 			{
-				char *overload_name = (char *)func_sym->node->function.overloads[i]->function.identifier.name;
-				size_t len = vstd_strlen(overload_name);
-				if(out_len == len && memcmp(out, overload_name, len) == 0)
+				auto overload = func_sym->node->function.overloads[i];
+				if(does_overload_call_match(func_call, overload))
 				{
-					found_overload = func_sym->node->function.overloads[i];
-					goto FOUND_OVERLOAD;
-				}
-
-				int found_ex = 0;
-				for(size_t j = 0; j < len; ++j)
-				{
-					if(overload_name[j] == '!')
-						found_ex++;
-					else if(overload_name[j] == '-')
-					{
-						if(found_ex < 2)
-						{
-							// @NOTE: if it's not an empty call
-							if(out_len != id_len + 2)
-							{
-								found_overload = func_sym->node->function.overloads[i];
-								goto FOUND_OVERLOAD;
-							}
-							else
-								continue;
-						}
-						size_t removed_index = j - 2;
-						u8 removed_char = overload_name[removed_index];
-						overload_name[removed_index] = 0;
-						u8 saved_out;
-						for(size_t k = 0; k < out_len; ++k)
-						{
-							if(out[k] == '!')
-							{
-								saved_out = out[k];
-								out[k] = 0;
-								if(k == removed_index && memcmp(overload_name, out, k) == 0)
-								{
-									out[k] = saved_out;
-									overload_name[removed_index] = removed_char;
-									found_overload = func_sym->node->function.overloads[i];
-									goto FOUND_OVERLOAD;
-								}
-								out[k] = saved_out;
-							}
-						}
-						overload_name[removed_index] = removed_char;
-					}
+					found_overload = overload;
+					break;
 				}
 			}
-FOUND_OVERLOAD:
 			if(!found_overload)
 			{
 				char *error = (char *)AllocatePermanentMemory(512 * overload_count);			
@@ -2722,6 +2706,8 @@ var_type_to_name(Type_Info *type, b32 bracket)
 			case ubyte8: vstd_strcat(result, "u64"); break;
 			case real32: vstd_strcat(result, "r32"); break;
 			case real64: vstd_strcat(result, "r64"); break;
+			case byte128: vstd_strcat(result, "i128"); break;
+			case real128: vstd_strcat(result, "r128"); break;
 			case detect: vstd_strcat(result, "detect"); break;
 			case empty_void: vstd_strcat(result, "void"); break;
 			case logical_bit: vstd_strcat(result, "b32"); break;
@@ -2795,6 +2781,15 @@ var_type_to_name(Type_Info *type, b32 bracket)
 	else if(type->type == T_STRING)
 	{
 		vstd_strcat(result, "* u8");
+	}
+	else if(type->type == T_ARRAY)
+	{
+		vstd_strcat(result, "[");
+		char num[256] = {};
+		_vstd_U64ToStr(type->array.elem_count, num);
+		vstd_strcat(result, num);
+		vstd_strcat(result, "]");
+		vstd_strcat(result, (const char *)var_type_to_name(type->array.type, false));
 	}
 	else
 	{

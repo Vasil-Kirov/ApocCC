@@ -18,6 +18,8 @@ primitive_size_to_alignment(i64 size)
 		case real64:
 		case ubyte8:
 		case byte8: return 8;
+		case byte128:
+		case real128: return 16;
 		default: Assert(false); return 0;
 	}
 }

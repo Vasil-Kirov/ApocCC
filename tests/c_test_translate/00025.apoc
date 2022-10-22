@@ -1,0 +1,11 @@
+// 0
+$import "C_Standard.apoc";
+
+
+fn main() -> i32 {
+	p := "hello";
+
+	-> #i32 (strlen(p) - 5);
+}
+
+

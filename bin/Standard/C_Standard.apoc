@@ -8,6 +8,7 @@ fn $call c_decl rand() -> i32;
 fn $call c_decl puts(str:* u8) -> i32;
 fn $call c_decl putchar(c: u8) -> i32;
 fn $call c_decl free(ptr: *void);
+fn $call c_decl strlen(ptr: *u8) -> i64;
 
 fn mem_alloc(size: u64) ->* void
 {

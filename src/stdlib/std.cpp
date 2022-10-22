@@ -150,6 +150,19 @@ c_to_lower(u8 c)
 }
 
 u64
+bin_to_num(u8 *bin_str, size_t len)
+{
+	u64 result = 0;
+	int pow = 1;
+	for(int i = len - 1; i >= 0; --i)
+	{
+		result += (bin_str[i] - '0') * pow;
+		pow *= 2;
+	}
+	return result;
+}
+
+u64
 hex_to_num(u8 *hex_str, size_t len)
 {
 	u64 result = 0;
@@ -169,6 +182,12 @@ hex_to_num(u8 *hex_str, size_t len)
 			result += map[c_to_lower(c)] * do_pow(16, len - i - 1);
 	}
 	return result;
+}
+
+inline b32
+is_bin(u8 c)
+{
+	return c == '0' || c == '1';
 }
 
 inline b32

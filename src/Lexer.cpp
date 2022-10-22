@@ -95,6 +95,8 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "$type",      tok_type);
 		shput(keyword_table, "$run",       tok_run);
 		shput(keyword_table, "$interp",    tok_interp);
+		shput(keyword_table, "$wasm_in",   tok_wasm_import);
+		shput(keyword_table, "$wasm_out",  tok_wasm_export);
 		shput(keyword_table, "$size",      tok_size);
 		shput(keyword_table, "$default",   tok_default);
 		shput(keyword_table, "$union",     tok_union);
@@ -118,6 +120,9 @@ initialize_compiler(File_Contents *f)
 
 	add_primitive_type(f, "f32",  real32);
 	add_primitive_type(f, "f64",  real64);
+
+	add_primitive_type(f, "f128", real128);
+	add_primitive_type(f, "i128", byte128);
 
 	add_primitive_type(f, "void", empty_void);
 	add_primitive_type(f, "bool", logical_bit);
@@ -272,17 +277,69 @@ Token_Iden get_token(File_Contents *f)
 			advance_buffer(f);
 			advance_buffer(f);
 			if(!is_hex(*f->at))
-						raise_token_syntax_error(f, "Expected hex characters after 0x",
-								(char *)f->path, start_line,
-								start_col);
-			while (is_hex(*f->at)) {
+				raise_token_syntax_error(f, "Expected hex characters after 0x",
+						(char *)f->path, start_line,
+						start_col);
+			while (is_hex(*f->at) || *f->at == '_') {
 				advance_buffer(f);
 			}
 			u8 *hex_start = (string_start + 2);
 			size_t len = f->at - hex_start;
-			u8 hex_num[len];
-			memcpy(hex_num, hex_start, len);
-			u64 num = hex_to_num(hex_num, len);
+			u8 hex_num[len + 1];
+			int copy_i = 0;
+			for(int i = 0; i < len; ++i)
+			{
+				if(hex_start[i] != '_')
+				{
+					hex_num[copy_i++] = hex_start[i];
+				}
+			}
+			hex_num[copy_i] = '\0';
+			u64 num = hex_to_num(hex_num, copy_i);
+			u64 copy_num = num;
+			u64 num_len = 0;
+			while(copy_num)
+			{
+				num_len++;
+				copy_num /= 10;
+			}
+			u8 *number_string = (u8 *)AllocateCompileMemory(num_len + 1);
+			_vstd_U64ToStr(num, (char *)number_string);
+
+			Token_Iden result = {};
+			result.identifier = number_string;
+			result.file = (char *)f->path;
+			result.f_start = f->file_data;
+			result.line = start_line;
+			result.column = start_col;
+			result.type = tok_number;
+			return result;
+		}
+		else if(last_char == '0' && f->at[1] == 'b')
+		{
+			advance_buffer(f);
+			advance_buffer(f);
+			if(!is_bin(*f->at))
+				raise_token_syntax_error(f, "Expected binary characters after 0b",
+						(char *)f->path, start_line,
+						start_col);
+
+			while(is_bin(*f->at) || *f->at == '_') {
+				advance_buffer(f);
+			}
+			u8 *bin_start = (string_start + 2);
+			size_t len = f->at - bin_start;
+			u8 bin_num[len + 1];
+			int copy_i = 0;
+			for(int i = 0; i < len; ++i)
+			{
+				if(bin_start[i] != '_')
+				{
+					bin_num[copy_i++] = bin_start[i];
+				}
+			}
+			bin_num[copy_i] = '\0';
+			u64 num = bin_to_num(bin_num, copy_i);
 			u64 copy_num = num;
 			u64 num_len = 0;
 			while(copy_num)
@@ -317,12 +374,18 @@ Token_Iden get_token(File_Contents *f)
 					}
 					found_dot = true;
 				}
-			} while (is_number(*f->at) || *f->at == '.');
+			} while (is_number(*f->at) || *f->at == '.' || *f->at == '_');
 			u64 num_size = f->at - string_start;
-
 			u8 *number_string = (u8 *)AllocateCompileMemory(num_size+1);
-			memcpy(number_string, string_start, num_size);
-			number_string[num_size] = '\0';
+			int copy_i = 0;
+			for(int i = 0; i < num_size; ++i)
+			{
+				if(string_start[i] != '_')
+				{
+					number_string[copy_i++] = string_start[i];
+				}
+			}
+			number_string[copy_i] = '\0';
 
 			Token_Iden result = {number_string, (char *)f->path, f->file_data, tok_number,
 				start_line, start_col};
