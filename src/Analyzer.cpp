@@ -485,6 +485,7 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 				auto val = interpret_expression(functions[i]->assignment.rhs, &failed);
 				if(failed)
 					raise_semantic_error(f, "Global expression couldn't be interpreted at compile time", functions[i]->assignment.token);
+				val.type = functions[i]->assignment.decl_type;
 				interp_add_symbol(functions[i]->assignment.token.identifier, val);
 			}
 			else

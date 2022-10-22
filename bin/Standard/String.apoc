@@ -9,20 +9,6 @@ $end_if
 
 fn $call c_decl strcmp(str1: *u8, str2: *u8) -> i32;
 
-STRING_BUFFER_SIZE :: 256;
-struct string
-{
-	text:* u8;
-	len:   i64;
-}
-
-struct String_Builder
-{
-	buffer:[256] u8;
-	len: i64;
-	next:* String_Builder;
-}
-
 struct Printable_Type_Info
 {
       function: fn(*void) -> string;

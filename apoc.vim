@@ -16,7 +16,7 @@ endif
 set cino=L2
 
 
-syn keyword   apocConditional match if else
+syn keyword   apocConditional if else
 syn keyword   apocRepeat for
 syn keyword   apocStructure struct enum nextgroup=apocIdentifier skipwhite skipempty
 syn keyword   apocDefer defer
@@ -37,8 +37,8 @@ syn region    apocBoxPlacementBalance start="\[" end="\]" containedin=apocBoxPla
 
 " Built-in types {{{2
 syn keyword   apocType        bool u8 u16 u32 u64 u128 f32
-syn keyword   apocType        f64 i8 i16 i32 i64 i128 string
-syn keyword   apocType        Type_Info Any String_Builder
+syn keyword   apocType        f64 f128 i8 i16 i32 i64 i128
+syn keyword   apocType        string Type_Info Any String_Builder
 
 syn keyword   apocBoolean     true false
 syn keyword   apocNull        null
@@ -75,9 +75,9 @@ syn match     apocBinNumber   display "\<0b[01_]\+\%([iu]\%(size\|8\|16\|32\|64\
 " or by another ".", which makes them integer literals followed by the ".." token.
 " (This must go first so the others take precedence.)
 syn match     apocFloat       display "\<[0-9][0-9_]*\.\%([^[:cntrl:][:space:][:punct:][:digit:]]\|_\|\.\)\@!"
-syn match     apocFloat       display "\<[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\%([eE][+-]\=[0-9_]\+\)\=\(f32\|f64\)\="
-syn match     apocFloat       display "\<[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\=\%([eE][+-]\=[0-9_]\+\)\(f32\|f64\)\="
-syn match     apocFloat       display "\<[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\=\%([eE][+-]\=[0-9_]\+\)\=\(f32\|f64\)"
+syn match     apocFloat       display "\<[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\%([eE][+-]\=[0-9_]\+\)\=\(f32\|f64|f128\)\="
+syn match     apocFloat       display "\<[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\=\%([eE][+-]\=[0-9_]\+\)\(f32\|f64|f128\)\="
+syn match     apocFloat       display "\<[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\=\%([eE][+-]\=[0-9_]\+\)\=\(f32\|f64|f128\)"
 
 " The groups negated here add up to 0-255 but nothing else (they do not seem to go beyond ASCII).
 syn match   apocCharacterInvalidUnicode   display contained /b'\zs[^[:cntrl:][:graph:][:alnum:][:space:]]\ze'/
@@ -91,10 +91,12 @@ syn region apocCommentBlockDocError     matchgroup=apocCommentBlockDocError star
 syn region apocCommentBlockNest         matchgroup=apocCommentBlock         start="/\*"                     end="\*/" contains=apocTodo,apocCommentBlockNest,@Spell contained transparent
 syn region apocCommentBlockDocNest      matchgroup=apocCommentBlockDoc      start="/\*"                     end="\*/" contains=apocTodo,apocCommentBlockDocNest,@Spell contained transparent
 syn region apocCommentBlockDocNestError matchgroup=apocCommentBlockDocError start="/\*"                     end="\*/" contains=apocTodo,apocCommentBlockDocNestError,@Spell contained transparent
+syn region apocCommentLine                                                  start="//"                      end="$"   contains=apocTodo,@Spell
 
-syn match apocCompilerArg "\$" nextgroup=apocIdentifierPrime
+syn region apocCompilerArg                                                  start="\$"                      end=" "
+" nextgroup=apocIdentifierPrime
 
-syn keyword apocTodo contained @TODO @FIXME @XXX @NB @NOTE @CLEANUP @OPTIMIZE
+syn keyword apocTodo contained @TODO @FIXME @XXX @NB @NOTE @CLEANUP @OPTIMIZE @VOLITAILE
 
 " Folding rules {{{2
 " Trivial folding rules to begin with.

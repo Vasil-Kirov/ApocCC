@@ -9,6 +9,21 @@ true  :: #bool  1;
 false :: #bool  0;
 null  :: #*void 0;
 
+STRING_BUFFER_SIZE :: 256;
+struct string
+{
+	text:* u8;
+	len:   i64;
+}
+
+struct String_Builder
+{
+	buffer:[256] u8;
+	len: i64;
+	next:* String_Builder;
+}
+
+
 fn return_true() -> bool {
 	-> false;
 }

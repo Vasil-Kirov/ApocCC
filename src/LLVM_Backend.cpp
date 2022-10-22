@@ -681,7 +681,7 @@ generate_if_global_var(File_Contents *f, Ast_Node *node)
 			const_val = llvm::Constant::getNullValue(apoc_type_to_llvm(node->assignment.decl_type, &backend));
 		}
 
-		Type_Info from = node->assignment.decl_type;
+		Type_Info from = node->assignment.rhs ? node->assignment.rhs_type  : node->assignment.decl_type;
 		if(is_integer(from))
 		{
 			if(is_signed(from))
@@ -1724,11 +1724,8 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 	Type_Info *op_type = node->selector.operand_type;
 	if(op_type->type == T_POINTER)
 	{
-		if(node->selector.operand->type != type_identifier)
-			operand = generate_lhs(f, func, node->selector.operand,
-					NULL, false, (Type_Info){});
-		else
-			operand = shget(backend.named_values, node->selector.operand->identifier.name)->value;
+		operand = generate_lhs(f, func, node->selector.operand,
+				NULL, false, (Type_Info){});
 	}
 
 	while(op_type->type == T_POINTER)
@@ -2244,7 +2241,16 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 			} break;
 			case '-':
 			{
-				if(is_float(node->binary_expr.left))
+				if (node->binary_expr.left.type == T_POINTER) {
+					right = backend.builder->CreateNeg(right);
+					auto type = apoc_type_to_llvm(*node->binary_expr.left.pointer.type,
+						&backend);
+					llvm::Value *idx_list[] = {
+						right
+					};
+					result = backend.builder->CreateGEP(type, left, idx_list);
+				}
+				else if(is_float(node->binary_expr.left))
 					result = backend.builder->CreateFSub(left, right);
 				else
 					result = backend.builder->CreateSub(left, right);
@@ -2375,7 +2381,8 @@ generate_expression(File_Contents *f, Ast_Node *node, Function *func)
 			} break;	
 			default:
 			{
-				LG_FATAL("Unimplemented binary operator %c", node->binary_expr.op);
+				LG_FATAL("--- COMPILER BUG ---\nUnimplemented binary operator %c! Used in file %s at line %d character %d", node->binary_expr.op,
+					node->binary_expr.token.file, node->binary_expr.token.line, node->binary_expr.token.column);
 			} break;
 		}
 		Assert(result);
