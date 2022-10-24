@@ -2170,7 +2170,8 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 			case tok_not:
 			{
 				auto zero = ConstantInt::get(apoc_type_to_llvm(expr_type, &backend), 0);
-				result = backend.builder->CreateICmpNE(expr, zero);
+				result = backend.builder->CreateICmpEQ(expr, zero);
+				result = backend.builder->CreateZExt(result, Type::getInt8Ty(*backend.context));
 			} break;
 			case tok_plusplus:
 			{

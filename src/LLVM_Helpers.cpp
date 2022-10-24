@@ -284,6 +284,10 @@ write_type_info_to_llvm(File_Contents *f, Type_Info to_write, llvm::Value *ptr, 
 			auto casted = bit_cast_llvm_type(ptr, PointerType::get(array_type, 0), backend);
 			write_array_to_llvm(f, to_write, casted, backend, func, array_type);
 		} break;
+		case T_VOID:
+		{
+
+		} break;
 		default:
 		{
 			Assert(false);
