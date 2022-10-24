@@ -1,0 +1,7 @@
+[FATAL] W:\W4\jam\src\renderer.apoc (7, 33):
+	Semantic error: Cannot perform a binary operation with types [* u8] and [i32].
+
+fn draw_sprite(pos: v2, sprite: *Bitmap) {
+>   	start_draw_pos :: (FRAMEBUFFER + (pos.x / 2) as i32) + (PITCH * pos.y as i64);
+	row := 
+	                               ^^^

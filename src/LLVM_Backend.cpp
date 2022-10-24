@@ -2019,6 +2019,8 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			else
 			{
 				auto elem_ptr = generate_selector(f, node, func);
+				if(node->selector.selected_type->type == T_STRUCT || node->selector.selected_type->type == T_ARRAY)
+					return elem_ptr;
 				return llvm_load(node->selector.selected_type, elem_ptr, "selected", &backend);
 			}
 		} break;

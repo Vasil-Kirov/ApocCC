@@ -2647,7 +2647,9 @@ check_type_compatibility(Type_Info a, Type_Info b)
 			if(a.pointer.type->type == T_VOID || b.pointer.type->type == T_VOID)
 				return true;
 		}
-		else if(b.type == T_UNTYPED_INTEGER || b.type == T_INTEGER)
+		else if(b.type == T_UNTYPED_INTEGER)
+			return true;
+		else if(b.type == T_INTEGER && (b.primitive.size == byte8 || b.primitive.size == ubyte8))
 			return true;
 		else if(b.type == T_FUNC)
 		{

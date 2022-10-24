@@ -1,0 +1,24 @@
+// 59
+
+
+fn main() -> i32 {
+	ss: SS;
+	ss.my_s.x = 10;
+	ss.my_s.y = 49;
+	-> get_num(ss.my_s);
+}
+
+fn get_num(my_s: S) -> i32 {
+	-> my_s.x + my_s.y;
+}
+
+struct SS {
+	my_s: S;
+}
+
+struct S {
+	x: i32;
+	y: i32;
+}
+
+
