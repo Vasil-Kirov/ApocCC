@@ -236,6 +236,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 		}
 	}
 
+	// @CleanUp
 	u8 *module_path = (u8 *)AllocateCompileMemory(260);
 	platform_get_absolute_path((char *)module_path);
 	vstd_strcat((char *)module_path, "Standard");
@@ -243,7 +244,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	strcpy((char *)std_dir, (char *)module_path);
 	SDPush(build_commands.included_dirs, std_dir);
 	vstd_strcat((char *)module_path, "/Basic.apoc");
-	files->push_back((char *)module_path);
+	// @CleanUp
 
 	if(build_commands.linker == LINK_EXE)
 		linker_command += "LINK -nologo ";

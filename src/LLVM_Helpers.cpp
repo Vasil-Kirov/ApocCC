@@ -296,27 +296,27 @@ llvm::Constant *
 interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 {
 	llvm::Constant *result = NULL;
-	switch((int)val.type.type)
+	switch((int)val.type->type)
 	{
 		case T_UNTYPED_INTEGER:
 		case T_INTEGER:
 		{
-			if(is_signed(val.type))
-				result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val._i64, true);
+			if(is_signed(*val.type))
+				result = ConstantInt::get(apoc_type_to_llvm(*val.type, backend), val._i64, true);
 			else
-				result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val._u64, false);
+				result = ConstantInt::get(apoc_type_to_llvm(*val.type, backend), val._u64, false);
 		} break;
 		case T_UNTYPED_FLOAT:
 		case T_FLOAT:
 		{
 			auto ap = APFloat(val._f64);
-			result = ConstantFP::get(apoc_type_to_llvm(val.type, backend), ap);
+			result = ConstantFP::get(apoc_type_to_llvm(*val.type, backend), ap);
 		} break;
 		case T_ARRAY:
 		{
-			auto array_type = apoc_type_to_llvm(val.type, backend);
+			auto array_type = apoc_type_to_llvm(*val.type, backend);
 
-			size_t elem_count = val.type.array.elem_count;
+			size_t elem_count = val.type->array.elem_count;
 			Constant *array[elem_count];
 			for(size_t i = 0 ; i < elem_count; ++i)
 			{
@@ -327,7 +327,7 @@ interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 		} break;
 		case T_BOOLEAN:
 		{
-			result = ConstantInt::get(apoc_type_to_llvm(val.type, backend), val._i64, false);
+			result = ConstantInt::get(apoc_type_to_llvm(*val.type, backend), val._i64, false);
 		} break;
 		case T_POINTER:
 		{
@@ -335,7 +335,7 @@ interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 			Type_Info int_type = {};
 			int_type.type = T_INTEGER;
 			int_type.primitive.size = ubyte8;
-			result = (Constant *)create_cast(val.type, int_type, result);
+			result = (Constant *)create_cast(*val.type, int_type, result);
 			//result = ConstantExpr::getIntToPtr(result, PointerType::get(*backend->context, 0));
 		} break;
 		default:

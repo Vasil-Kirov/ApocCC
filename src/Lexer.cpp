@@ -104,6 +104,7 @@ initialize_compiler(File_Contents *f)
 		shput(keyword_table, "$intrinsic", tok_intrinsic);
 		shput(keyword_table, "$call",      tok_call_conv);
 		shput(keyword_table, "$if",        tok_is_defined);
+		shput(keyword_table, "$else",      tok_else_def);
 		shput(keyword_table, "$end_if",    tok_end_is);
 	}
 	

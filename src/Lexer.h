@@ -93,14 +93,15 @@ typedef enum : signed short
 	tok_intrinsic = -51, // declare compiler intrinsic
 	tok_call_conv = -52,
 	tok_is_defined= -53, // checks define
-	tok_end_is    = -54, // end if of is_defined
+	tok_else_def  = -54,
+	tok_end_is    = -55, // end if of is_defined
 
-	tok_overload  = -55,
-	tok_defer     = -56,
-	tok_continue  = -57,
-	tok_type      = -58,
-	tok_wasm_import = -59,
-	tok_wasm_export = -60,
+	tok_overload  = -56,
+	tok_defer     = -57,
+	tok_continue  = -58,
+	tok_type      = -59,
+	tok_wasm_import = -60,
+	tok_wasm_export = -61,
 } Token;
 
 typedef struct _str_hash_table

@@ -180,7 +180,7 @@ emit_global_var(File_Contents *f, Ast_Node *node, u8 *identifier, GlobalVariable
 	DEBUG_INFO (
 			auto desc  = shget(debug.file_map, node->assignment.token.file);
 			return debug.builder->createGlobalVariableExpression(desc.file, StringRef((char *)identifier), StringRef(), desc.file,
-				node->assignment.token.line, to_debug_type(node->assignment.decl_type, &debug), true);
+				node->assignment.token.line, to_debug_type(*node->assignment.decl_type, &debug), true);
 
 			)
 		return NULL;
@@ -195,8 +195,8 @@ emit_assignment(File_Contents *f, Ast_Node *node, llvm::Value *location, u8 *ide
 		auto scope = stack_peek(debug.scope, DIScope *);
 		auto desc  = shget(debug.file_map, node->assignment.token.file);
 		DILocalVariable *debug_var = debug.builder->createAutoVariable(scope, StringRef((char *)identifier),
-			desc.file, node->assignment.token.line, to_debug_type(node->assignment.decl_type, &debug),
-			false, DINode::FlagZero, get_type_alignment(node->assignment.decl_type) * 8);
+			desc.file, node->assignment.token.line, to_debug_type(*node->assignment.decl_type, &debug),
+			false, DINode::FlagZero, get_type_alignment(*node->assignment.decl_type) * 8);
 
 		debug.builder->insertDeclare(location, debug_var, debug.builder->createExpression(), 
 			DILocation::get(*backend.context, node->assignment.token.line, node->assignment.token.column, scope),
@@ -678,42 +678,39 @@ generate_if_global_var(File_Contents *f, Ast_Node *node)
 		}
 		if(!const_val)
 		{
-			const_val = llvm::Constant::getNullValue(apoc_type_to_llvm(node->assignment.decl_type, &backend));
+			const_val = llvm::Constant::getNullValue(apoc_type_to_llvm(*node->assignment.decl_type, &backend));
 		}
 
-		Type_Info from = node->assignment.rhs ? node->assignment.rhs_type  : node->assignment.decl_type;
-		if(is_integer(from))
+		Type_Info *from = node->assignment.rhs ? &node->assignment.rhs_type  : node->assignment.decl_type;
+		if(is_integer(*from))
 		{
-			if(is_signed(from))
+			if(is_signed(*from))
 			{
-				from.primitive.size = byte8;
-				from.identifier = (u8 *)"i64";
+				from->primitive.size = byte8;
+				from->identifier = (u8 *)"i64";
 			}
 			else
 			{
-				from.primitive.size = ubyte8;
-				from.identifier = (u8 *)"u64";
+				from->primitive.size = ubyte8;
+				from->identifier = (u8 *)"u64";
 			}
 		}
-		else if(is_float(from))
+		else if(is_float(*from))
 		{
-			from.primitive.size = real64;
-			from.identifier = (u8 *)"f64";
+			from->primitive.size = real64;
+			from->identifier = (u8 *)"f64";
 		}
-		const_val = (Constant *)create_cast(node->assignment.decl_type, from, const_val);
+		const_val = (Constant *)create_cast(*node->assignment.decl_type, *from, const_val);
 
-		auto global_type = apoc_type_to_llvm(node->assignment.decl_type, &backend);
+		auto global_type = apoc_type_to_llvm(*node->assignment.decl_type, &backend);
 		auto global_var = new GlobalVariable(
 				*backend.module, global_type, node->assignment.is_const,
 				GlobalValue::LinkageTypes::ExternalLinkage,
 				const_val, "global_var");
 
-		Type_Info *type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-		memcpy(type, &node->assignment.decl_type, sizeof(Type_Info));
-
 		Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
 		var_info->value = global_var;
-		var_info->type  = type;
+		var_info->type  = node->assignment.decl_type;
 		shput(f->named_globals, node->assignment.token.identifier, var_info);
 		if (f->build_commands.debug_info) {
 			auto d_info = emit_global_var(f, node,
@@ -1081,12 +1078,57 @@ generate_intrinsic(File_Contents *f, Symbol *intrinsic_sym, Ast_Node *call_node,
 			} break;
 			default:
 			{
-				raise_semantic_error(f, "Please do not redefine intrinsics... set_f must have 1 or 4 arguments", *call_node->func_call.token);
+				raise_semantic_error(f, "Please do not redefine intrinsics... getf_128 must have 1 or 4 arguments", *call_node->func_call.token);
 			} break;
 		}
 		
 		return vec;
 	}
+	else if (vstd_strcmp(name, (char *)"get_i128"))
+	{
+		auto args = call_node->func_call.arguments;
+		auto types = call_node->func_call.expr_types;
+		size_t arg_count = SDCount(args);
+		Type_Info *type = get_type(f, (u8 *)"i128");
+		auto llvm_type = apoc_type_to_llvm(*type, &backend);
+		Type_Info *_i32 = get_type(f, (u8 *)"i32");
+		Value *vec = NULL;
+
+		switch (arg_count)
+		{
+			case 1:
+			{
+				auto elem1 = generate_expression(f, args[0], func);
+				elem1 = create_cast(*_i32, types[0], elem1);
+				vec = backend.builder->CreateInsertElement(llvm_type, elem1, (u64)0);
+				vec = backend.builder->CreateInsertElement(vec, elem1, (u64)1);
+				vec = backend.builder->CreateInsertElement(vec, elem1, (u64)2);
+				vec = backend.builder->CreateInsertElement(vec, elem1, (u64)3);
+			} break;
+			case 4:
+			{
+				auto elem1 = generate_expression(f, args[0], func);
+				auto elem2 = generate_expression(f, args[1], func);
+				auto elem3 = generate_expression(f, args[2], func);
+				auto elem4 = generate_expression(f, args[3], func);
+				elem1 = create_cast(*_i32, types[0], elem1);
+				elem2 = create_cast(*_i32, types[1], elem2);
+				elem3 = create_cast(*_i32, types[2], elem3);
+				elem4 = create_cast(*_i32, types[3], elem4);
+				vec = backend.builder->CreateInsertElement(llvm_type, elem1, (u64)0);
+				vec = backend.builder->CreateInsertElement(vec, elem2, (u64)1);
+				vec = backend.builder->CreateInsertElement(vec, elem3, (u64)2);
+				vec = backend.builder->CreateInsertElement(vec, elem4, (u64)3);
+			} break;
+			default:
+			{
+				raise_semantic_error(f, "Please do not redefine intrinsics... get_i128 must have 1 or 4 arguments", *call_node->func_call.token);
+			} break;
+		}
+
+		return vec;
+	}
+
 	else
 		raise_semantic_error(f, "Function marked as intrinsic is not an intrinsic", *intrinsic_sym->token);
 	return NULL;
@@ -1595,11 +1637,11 @@ generate_func(File_Contents *f, Ast_Node *node, Function *passed_func)
 			else
 			{
 				Ast_Node *apoc_arg = node->function.arguments[arg_index - (is_apoc || send_ptr ? 1 : 0)];
-				type = &apoc_arg->variable.type;
+				type = apoc_arg->variable.type;
 				arg_string = (u8 *)AllocateCompileMemory(arg.getName().size() + 1);
 				memcpy(arg_string, arg.getName().str().c_str(), arg.getName().size());
 
-				if((apoc_arg->variable.type.type == T_STRUCT || apoc_arg->variable.type.type == T_ARRAY) && !is_standard_size(&apoc_arg->variable.type))
+				if((apoc_arg->variable.type->type == T_STRUCT || apoc_arg->variable.type->type == T_ARRAY) && !is_standard_size(apoc_arg->variable.type))
 				{
 					//auto derefrence = backend.builder->CreateLoad(apoc_type_to_llvm(apoc_arg->variable.type, &backend), &arg);
 					//derefrence->setAlignment(Align(get_type_alignment(apoc_arg->variable.type)));
@@ -1610,15 +1652,15 @@ generate_func(File_Contents *f, Ast_Node *node, Function *passed_func)
 				}
 				else
 				{
-					variable = allocate_variable(func, arg_string, apoc_arg->variable.type, &backend);
-					llvm_store(&apoc_arg->variable.type, variable, &arg, &backend);
+					variable = allocate_variable(func, arg_string, *apoc_arg->variable.type, &backend);
+					llvm_store(apoc_arg->variable.type, variable, &arg, &backend);
 				}
 
 				if(f->build_commands.debug_info)
 				{
 						DILocalVariable *debug_var = debug.builder->createParameterVariable(subprogram, arg.getName().str(),
 							arg_index, debug_unit.file,
-							apoc_arg->variable.identifier.token->line, to_debug_type(apoc_arg->variable.type, &debug));
+							apoc_arg->variable.identifier.token->line, to_debug_type(*apoc_arg->variable.type, &debug));
 						debug.builder->insertDeclare(variable, debug_var, debug.builder->createExpression(),
 							DILocation::get(subprogram->getContext(), apoc_arg->variable.identifier.token->line, 0, subprogram),
 							backend.builder->GetInsertBlock());
@@ -1767,7 +1809,7 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 		auto enumerator = op_type->enumerator.node->enumerator;
 		auto member = enumerator.members[node->selector.selected_index];
 		llvm::Value *val = interp_val_to_llvm(member->interp_val.val, &backend, func);
-		return create_cast(enumerator.type, member->interp_val.val.type, val);
+		return create_cast(enumerator.type, *member->interp_val.val.type, val);
 	}
 	else
 		Assert(false);
@@ -1819,9 +1861,9 @@ load_got_identifier(Variable_Info *variable, Variable_Types type)
 llvm::Value *
 perform_casting_operand(File_Contents *f, llvm::Function *func, Ast_Node *node)
 {
-	Type_Info cast_type = node->cast.type;
+	Type_Info *cast_type = node->cast.type;
 	Type_Info casted = node->cast.expr_type;
-	if(node->cast.expr_type.type == T_ARRAY && node->cast.type.type == T_POINTER)
+	if(node->cast.expr_type.type == T_ARRAY && node->cast.type->type == T_POINTER)
 	{
 		auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
 		llvm::Value *idx_list[] = {
@@ -1835,7 +1877,7 @@ perform_casting_operand(File_Contents *f, llvm::Function *func, Ast_Node *node)
 	{
 		llvm::Value *cast_expr = generate_expression(f, node->cast.expression, func);
 
-		cast_expr = create_cast(cast_type, casted, cast_expr);
+		cast_expr = create_cast(*cast_type, casted, cast_expr);
 		return cast_expr;
 	}
 }
@@ -1855,15 +1897,15 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		case type_run:
 		{
 			auto constant_val = interp_val_to_llvm(node->run.ran_val, &backend, func);
-			if(!is_integer(node->run.ran_val.type) && !is_float(node->run.ran_val.type))
+			if(!is_integer(*node->run.ran_val.type) && !is_float(*node->run.ran_val.type))
 			{
-				Type_Info val_type = node->run.ran_val.type;
-				auto llvm_type = apoc_type_to_llvm(val_type, &backend);
+				Type_Info *val_type = node->run.ran_val.type;
+				auto llvm_type = apoc_type_to_llvm(*val_type, &backend);
 				auto to_global = new llvm::GlobalVariable(*backend.module, llvm_type, true,
 						GlobalValue::LinkageTypes::PrivateLinkage,
 						constant_val, "constant_array");
 
-				auto location = allocate_variable(func, (u8 *)"compile_time_array", node->run.ran_val.type, &backend);
+				auto location = allocate_variable(func, (u8 *)"compile_time_array", *node->run.ran_val.type, &backend);
 
 				auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
 				llvm::Value *idx_list[] = {
@@ -1875,7 +1917,7 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				auto first_elem = backend.builder->CreateInBoundsGEP(llvm_type, location, idx_list);
 				const DataLayout layout = backend.module->getDataLayout();
 				auto alignment = location->getAlign();//Align(get_type_alignment(val_type));
-				backend.builder->CreateMemCpy(first_elem, alignment, to_global, alignment, get_type_size(node->run.ran_val.type));
+				backend.builder->CreateMemCpy(first_elem, alignment, to_global, alignment, get_type_size(*node->run.ran_val.type));
 
 				return location;
 			}
@@ -2122,6 +2164,11 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 			case tok_bits_not:
 			{
 				result = backend.builder->CreateNot(expr);
+			} break;
+			case tok_not:
+			{
+				auto zero = ConstantInt::get(apoc_type_to_llvm(expr_type, &backend), 0);
+				result = backend.builder->CreateICmpNE(expr, zero);
 			} break;
 			case tok_plusplus:
 			{
@@ -2510,49 +2557,46 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 	if(!node->assignment.rhs)
 	{
 		Assert(node->assignment.is_declaration == true);
-		location = allocate_variable(func, node->assignment.token.identifier, node->assignment.decl_type, &backend);
-		llvm_zero_out_memory(location, get_type_size(node->assignment.decl_type), Align(get_type_alignment(node->assignment.decl_type)), backend.builder);
+		location = allocate_variable(func, node->assignment.token.identifier, *node->assignment.decl_type, &backend);
+		llvm_zero_out_memory(location, get_type_size(*node->assignment.decl_type), Align(get_type_alignment(*node->assignment.decl_type)), backend.builder);
 
 		Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
 		var_info->value = location;
-		var_info->type  = &node->assignment.decl_type;
+		var_info->type  = node->assignment.decl_type;
 
 		shput(backend.named_values, node->assignment.token.identifier, var_info);
 	}
 	else if(expression_value->getType()->isPointerTy() == NULL ||
-			node->assignment.decl_type.type == T_POINTER || node->assignment.decl_type.type == T_STRING)
+			node->assignment.decl_type->type == T_POINTER || node->assignment.decl_type->type == T_STRING)
 	{
 		// @NOTE: structs and arrays are handled in their initialization
-		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type, &identifier);
+		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, *node->assignment.decl_type, &identifier);
 		if (is_untyped(node->assignment.rhs_type))
 		{
-			Type_Info var_type = node->assignment.decl_type;
+			Type_Info var_type = *node->assignment.decl_type;
 			Type_Info cast_type = node->assignment.rhs_type;
 			Assert(var_type.type != 0);
 			expression_value = create_cast(var_type, cast_type, expression_value);
 		}
 
-		llvm_store(&node->assignment.decl_type, location, expression_value, &backend);
+		llvm_store(node->assignment.decl_type, location, expression_value, &backend);
 	}
 	else
 	{
-		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, node->assignment.decl_type, &identifier);
+		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, *node->assignment.decl_type, &identifier);
 
-		Type_Info *type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
-		memcpy(type, &node->assignment.decl_type, sizeof(Type_Info));
-		
-		if(node->assignment.decl_type.type == T_POINTER && node->assignment.decl_type.pointer.type->type == T_FUNC)
+		if(node->assignment.decl_type->type == T_POINTER && node->assignment.decl_type->pointer.type->type == T_FUNC)
 		{
 			llvm_store(location, expression_value, &backend, sizeof(size_t));
 		}
 		else
 		{
-			llvm_memcpy(location, expression_value, &node->assignment.decl_type, &backend);
+			llvm_memcpy(location, expression_value, node->assignment.decl_type, &backend);
 		}
 
 		Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
 		var_info->value = location;
-		var_info->type  = type;
+		var_info->type  = node->assignment.decl_type;
 		shput(backend.named_values, node->assignment.token.identifier, var_info);
 	}
 	// @TODO: Implement volatile variable	

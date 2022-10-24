@@ -125,7 +125,7 @@ typedef struct
 
 typedef struct _Ast_Variable
 {
-	Type_Info type;
+	Type_Info *type;
 	b32 is_const;
 	Ast_Identifier identifier;
 } Ast_Variable;
@@ -209,7 +209,7 @@ typedef struct
 	Ast_Node *rhs;
 	Token assign_type;
 	Token_Iden token;
-	Type_Info decl_type;
+	Type_Info *decl_type;
 	Type_Info rhs_type;
 } Ast_Assignment;
 
@@ -311,7 +311,7 @@ typedef struct
 typedef struct
 {
 	Token_Iden *token;
-	Type_Info type;
+	Type_Info *type;
 	Ast_Node *expression;
 	Type_Info expr_type;
 } Ast_Cast;
@@ -362,7 +362,7 @@ typedef struct
 
 typedef struct
 {
-	Type_Info type;
+	Type_Info *type;
 } Ast_Type_Only;
 
 struct _abstract_syntax_tree
@@ -462,7 +462,7 @@ delimited(File_Contents *f, char start, char stop, char seperator, Ast_Node *(*p
 
 #include <Analyzer.h>
 
-Type_Info
+Type_Info *
 parse_type(File_Contents *f);
 
 b32

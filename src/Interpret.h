@@ -6,71 +6,71 @@
 #include <Type.h>
 
 #define DO_OP(out, op, l, r) \
-	Assert(l.type.type != T_INVALID); Assert(r.type.type != T_INVALID);	\
-	if(is_float(l.type))                   \
-	{                                      \
-		out.type.type = T_UNTYPED_FLOAT;   \
+	Assert(l.type->type != T_INVALID); Assert(r.type->type != T_INVALID);	\
+	if(is_float(*l.type))                      \
+	{                                          \
+		out.type->type = T_UNTYPED_FLOAT;  \
 		out._f64 = l._f64 op r._f64;       \
-	}                                      \
-	else if(is_integer(l.type))            \
-	{                                      \
-				out.type.type = T_UNTYPED_INTEGER;    \
-				if(is_signed(l.type))                 \
-				{                                     \
-					out.type.primitive.size = byte8;  \
-					out._i64 = l._i64 op r._i64;      \
-				}                                     \
-				else                                  \
-				{                                     \
-					out.type.primitive.size = ubyte8; \
-					out._u64 = l._u64 op r._u64;      \
-				}                          \
+	}                                          \
+	else if(is_integer(*l.type))               \
+	{                                          \
+				out.type->type = T_UNTYPED_INTEGER;        \
+				if(is_signed(*l.type))                     \
+				{                                          \
+					out.type->primitive.size = byte8;  \
+					out._i64 = l._i64 op r._i64;       \
+				}                                          \
+				else                                       \
+				{                                          \
+					out.type->primitive.size = ubyte8; \
+					out._u64 = l._u64 op r._u64;       \
+				}                                          \
 	}                                      \
 	else                                   \
 		Assert(false);                     
 
 #define DO_RINT_OP(out, op, l, r) \
-	Assert(l.type.type != T_INVALID);      \
-	if(is_float(l.type))                   \
-	{                                      \
-		out.type.type = T_UNTYPED_FLOAT;   \
-		out._f64 = l._f64 op r;            \
-	}                                      \
-	else if(is_integer(l.type))            \
-	{                                      \
-				out.type.type = T_UNTYPED_INTEGER;    \
-				if(is_signed(l.type))                 \
-				{                                     \
-					out.type.primitive.size = byte8;  \
-					out._i64 = l._i64 op r;           \
+	Assert(l.type->type != T_INVALID);      \
+	if(is_float(*l.type))                   \
+	{                                       \
+		out.type->type = T_UNTYPED_FLOAT;   \
+		out._f64 = l._f64 op r;             \
+	}                                       \
+	else if(is_integer(*l.type))            \
+	{                                       \
+				out.type->type = T_UNTYPED_INTEGER;    \
+				if(is_signed(*l.type))                 \
+				{                                      \
+					out.type->primitive.size = byte8;  \
+					out._i64 = l._i64 op r;            \
 				}                                     \
 				else                                  \
 				{                                     \
-					out.type.primitive.size = ubyte8; \
-					out._u64 = l._u64 op r;           \
+					out.type->primitive.size = ubyte8; \
+					out._u64 = l._u64 op r;            \
 				}                          \
 	}                                      \
 	else                                   \
 		Assert(false);                     
 
 #define DO_U_OP(out, op, l) \
-	Assert(l.type.type != T_INVALID)       \
-	if(is_float(l.type))                   \
-	{                                      \
-		out.type.type = T_UNTYPED_FLOAT;   \
-		out._f64 = op l._f64;              \
-	}                                      \
-	else if(is_integer(l.type))            \
-	{                                      \
-				out.type.type = T_UNTYPED_INTEGER;    \
-				if(is_signed(l.type))                 \
+	Assert(l.type->type != T_INVALID)       \
+	if(is_float(*l.type))                   \
+	{                                       \
+		out.type->type = T_UNTYPED_FLOAT;   \
+		out._f64 = op l._f64;               \
+	}                                       \
+	else if(is_integer(*l.type))            \
+	{                                       \
+				out.type->type = T_UNTYPED_INTEGER;    \
+				if(is_signed(*l.type))                 \
 				{                                     \
-					out.type.primitive.size = byte8;  \
+					out.type->primitive.size = byte8;  \
 					out._i64 = op l._i64;             \
 				}                                     \
 				else                                  \
 				{                                     \
-					out.type.primitive.size = ubyte8; \
+					out.type->primitive.size = ubyte8; \
 					out._u64 = op l._u64;             \
 				}                          \
 	}                                      \
@@ -83,7 +83,7 @@ typedef struct _Symbol Symbol;
 // @NOTE: pointer.type is not used, instead it's just the type of pointed here
 typedef struct
 {
-	Type_Info type;
+	Type_Info *type;
 	void *location;
 	union
 	{
@@ -108,6 +108,9 @@ typedef struct
 } Interp_Table;
 
 typedef struct _Ast_Call Ast_Call;
+
+inline Interp_Val
+create_interp_val();
 
 void
 destroy_scope();

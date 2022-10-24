@@ -112,6 +112,15 @@ typedef struct _Type_Info
 	b32 is_const;
 } Type_Info;
 
+void
+init_type_system();
+
+void
+add_fixable_type(struct _File_Contents *f, Type_Info *type);
+
+void
+fix_all_types();
+
 i32
 struct_get_offset_to_element_in_bytes(Type_Info *type, i32 index);
 

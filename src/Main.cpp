@@ -182,7 +182,22 @@ File_Contents *lex_and_parse_file(Build_Commands build_command, char *file_path,
 
 int main(int argc, char *argv[])
 {
-
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
+	// @TODO: handle empty files
 	Timers timers = {};
 	timers.total_clock = std::chrono::high_resolution_clock::now();
 
@@ -191,6 +206,7 @@ int main(int argc, char *argv[])
 	platform_initialize();
 	initialize_interpreter();
 	initialize_thread_pool();
+	init_type_system();
 
 	if(argc < 2)
 	{
@@ -243,6 +259,7 @@ int main(int argc, char *argv[])
 		TIME_FUNC(timers, file_functions[file_idx] = analyze(f, f->ast_root), analysis_clock, analysis);
 	}
 	
+	fix_all_types();
 	LOOP_FILES
 	{
 		File_Contents *f = files[file_idx];

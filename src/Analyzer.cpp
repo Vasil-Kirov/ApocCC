@@ -122,7 +122,7 @@ add_type(File_Contents *f, Ast_Node *structure)
 	for(size_t i = 0; i < structure->structure.member_count; ++i)
 	{
 		type_info.structure.member_names[i] = structure->structure.members[i].identifier.name;
-		type_info.structure.member_types[i] = structure->structure.members[i].type;
+		type_info.structure.member_types[i] = *structure->structure.members[i].type;
 	}
 	type_info.identifier = structure->structure.struct_id.name;
 	type_info.token = structure->structure.struct_id.token;
@@ -392,17 +392,17 @@ overload_fix_types(File_Contents *f, Ast_Node *overload)
 	for(size_t i = 0; i < arg_count; ++i)
 	{
 		Ast_Variable *arg = &func->function.arguments[i]->variable;
-		if(arg->type.type == T_DETECT)
+		if(arg->type->type == T_DETECT)
 		{
-			SDPush(func_param_types, arg->type);
+			SDPush(func_param_types, *arg->type);
 		}
 		else
 		{
-			auto fixed_type = fix_type(f, &arg->type);
-			arg->type = *fixed_type;
-			SDPush(func_param_types, arg->type);
+			arg->type = fix_type(f, arg->type);
+			SDPush(func_param_types, *arg->type);
 		}
 	}
+	func->function.type->func.param_types = func_param_types;
 	func->function.type->identifier = var_type_to_name(func->function.type, false);
 }
 
@@ -421,10 +421,10 @@ verify_overload(File_Contents *f, Ast_Node *overload)
 		arg_symbol.token = func->function.identifier.token;
 		arg_symbol.node = func->function.arguments[i];
 
-		Assert(arg->type.type != T_DETECT);
+		Assert(arg->type->type != T_DETECT);
 		arg_symbol.identifier = arg->identifier.name;
-		arg_symbol.type = fix_type(f, &arg->type);
-		arg_symbol.node->variable.type = *arg_symbol.type;
+		arg_symbol.type = fix_type(f, arg->type);
+		arg_symbol.node->variable.type = arg_symbol.type;
 		SDPush(f->to_add_next_scope, arg_symbol);
 	}
 	// @NOTE: don't, we keep em like that
@@ -434,13 +434,13 @@ verify_overload(File_Contents *f, Ast_Node *overload)
 		if(arg_count != 2)
 			raise_semantic_error(f, "Index overload needs exactly 2 arguemnts", *overload->overload.token);
 		auto left_arg = &func->function.arguments[0]->variable;
-		if(left_arg->type.type == T_ARRAY || left_arg->type.type == T_POINTER)
+		if(left_arg->type->type == T_ARRAY || left_arg->type->type == T_POINTER)
 			raise_semantic_error(f, "Cannot overload the index of an array or pointer type", *overload->overload.token);
 	}
 	else
 	{
 		auto left_arg = &func->function.arguments[0]->variable;
-		if(is_type_primitive(&left_arg->type))
+		if(is_type_primitive(left_arg->type))
 			raise_semantic_error(f, "Cannot overload primitive type", *overload->overload.token);
 	}
 	check_func_type_doesnt_have_anonymous_structs(f, func->function.type, func->function.identifier.name);
@@ -478,6 +478,7 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 		}
 		else if(functions[i]->type == type_assignment)
 		{
+			functions[i]->assignment.decl_type = fix_type(f, functions[i]->assignment.decl_type);
 			// @NOTE: we use the token as the variable name here which might not always be true
 			if(functions[i]->assignment.rhs)
 			{
@@ -662,13 +663,13 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		}
 	}
 
-	Interp_Val d = {};
-	d.type.type = T_INTEGER;
-	d.type.primitive.size = byte8;
+	Interp_Val d = create_interp_val();
+	d.type->type = T_INTEGER;
+	d.type->primitive.size = byte8;
 	d._i64 = 1;
-	Interp_Val first_val = {};
-	first_val.type.type = T_INTEGER;
-	first_val.type.primitive.size = byte8;
+	Interp_Val first_val = create_interp_val();
+	first_val.type->type = T_INTEGER;
+	first_val.type->primitive.size = byte8;
 	first_val._i64 = 0;
 
 	if(first_rhs && first_rhs != last_rhs)
@@ -684,32 +685,32 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		if(failed)
 			raise_semantic_error(f, "Non constant expression used for enum member value",
 					*enumerator->token);
-		if((!is_integer(first.type) && !is_float(first.type)) ||
-				(!is_integer(last.type) && !is_float(last.type)))
+		if((!is_integer(*first.type) && !is_float(*first.type)) ||
+				(!is_integer(*last.type) && !is_float(*last.type)))
 			raise_semantic_error(f, "Enum contains a non primitive value",
 					*enumerator->token);
 		
-		Interp_Val top = {};
-		Interp_Val bot = {};
+		Interp_Val top = create_interp_val();
+		Interp_Val bot = create_interp_val();
 		DO_U_OP(top, -, first);
 		DO_OP(top, +, top, last);
-		if(is_float(top.type))
+		if(is_float(*top.type))
 		{
-			bot.type.type = T_FLOAT;
-			bot.type.primitive.size = real64;
+			bot.type->type = T_FLOAT;
+			bot.type->primitive.size = real64;
 			bot._f64 = n - 1;
 		}
-		else if(is_integer(top.type))
+		else if(is_integer(*top.type))
 		{
-			bot.type.type = T_INTEGER;
-			if(is_signed(top.type))
+			bot.type->type = T_INTEGER;
+			if(is_signed(*top.type))
 			{
-				bot.type.primitive.size = byte8;
+				bot.type->primitive.size = byte8;
 				bot._i64 = n - 1;
 			}
 			else
 			{
-				bot.type.primitive.size = ubyte8;
+				bot.type->primitive.size = ubyte8;
 				bot._u64 = n - 1;
 			}
 		}
@@ -738,8 +739,9 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		enumerator->members[i]->interp_val.id = member.lhs->identifier;
 		if(!member.rhs)
 		{
-			Interp_Val val = {};
+			Interp_Val val = create_interp_val();
 			DO_RINT_OP(val, *, d, i);
+			enumerator->members[i]->interp_val.val.type = val.type;
 			DO_OP(enumerator->members[i]->interp_val.val, +, first_val, val);
 		}
 		else
@@ -844,14 +846,14 @@ func_fix_types(File_Contents *f, Ast_Node *node)
 	for(size_t i = 0; i < arg_count; ++i)
 	{
 		Ast_Variable *arg = &node->function.arguments[i]->variable;
-		if(arg->type.type == T_DETECT)
+		if(arg->type->type == T_DETECT)
 		{
-			SDPush(func_param_types, arg->type);
+			SDPush(func_param_types, *arg->type);
 		}
 		else
 		{
-			auto fixed_type = fix_type(f, &arg->type);
-			auto fixed_value_type = *fixed_type;
+			arg->type = fix_type(f, arg->type);
+			auto fixed_value_type = *arg->type;
 			SDPush(func_param_types, fixed_value_type);
 		}
 	}
@@ -908,7 +910,7 @@ verify_func(File_Contents *f, Ast_Node *node)
 			arg_symbol.token = node->function.identifier.token;
 			arg_symbol.node = node->function.arguments[i];
 		
-			if(arg->type.type == T_DETECT)
+			if(arg->type->type == T_DETECT)
 			{
 				node->function.flags |= FF_HAS_VAR_ARGS;
 				arg_symbol.identifier = (u8 *)"...";
@@ -916,17 +918,17 @@ verify_func(File_Contents *f, Ast_Node *node)
 			else
 			{
 				arg_symbol.identifier = arg->identifier.name;
-				arg_symbol.type = fix_type(f, &arg->type);
-				arg_symbol.node->variable.type = *arg_symbol.type;
+				arg_symbol.type = fix_type(f, arg->type);
+				arg_symbol.node->variable.type = arg_symbol.type;
 				if(has_body)
 					SDPush(f->to_add_next_scope, arg_symbol);
 			}
 		}
-		else if(arg->type.type != T_DETECT)
+		else if(arg->type->type != T_DETECT)
 		{
-			node->function.arguments[i]->variable.type = *fix_type(f, &arg->type);
+			node->function.arguments[i]->variable.type = fix_type(f, arg->type);
 		}
-		if(arg->type.type == T_DETECT &&
+		if(arg->type->type == T_DETECT &&
 		   i != arg_count - 1)
 		{
 			raise_semantic_error(f,"Variable length declarator must " 
@@ -1011,7 +1013,7 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 			Ast_Variable *var = &node->variable;
 			Symbol var_sym = {};
 			var_sym.identifier = var->identifier.name;
-			var_sym.type = &var->type;
+			var_sym.type = var->type;
 			var_sym.node = node;
 			var_sym.token = var->identifier.token;
 			var_sym.tag = S_VARIABLE;
@@ -1225,7 +1227,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 
 	Expression_Context *expr_info = (Expression_Context *)AllocateCompileMemory(sizeof(Expression_Context));
 	expr_info->kind = node->assignment.is_declaration ? EXPRT_DECL : EXPRT_EVAL;
-	expr_info->opt_info = &node->assignment.decl_type;
+	expr_info->opt_info = node->assignment.decl_type;
 	expr_info->flags = node->assignment.is_declaration ? CAN_INIT_STRUCT | CAN_INIT_ARRAY : 0;
 
 	if(node->type != type_assignment)
@@ -1234,12 +1236,12 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 				 __FILE__, __LINE__, type_to_str(node->type), node->type);
 	}
 
-	if(node->assignment.is_declaration && node->assignment.decl_type.type != T_DETECT)
+	if(node->assignment.is_declaration && node->assignment.decl_type->type != T_DETECT)
 	{
-		node->assignment.decl_type = *fix_type(f, &node->assignment.decl_type);
-		if(type_is_invalid(&node->assignment.decl_type))
+		node->assignment.decl_type = fix_type(f, node->assignment.decl_type);
+		if(type_is_invalid(node->assignment.decl_type))
 			raise_formated_semantic_error(f, node->assignment.token, 
-					"Type %s, used in declaration, is undefined", var_type_to_name(&node->assignment.decl_type));
+					"Type %s, used in declaration, is undefined", var_type_to_name(node->assignment.decl_type));
 	}
 
 	if(node->assignment.assign_type != '=')
@@ -1281,8 +1283,8 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 	}
 	if(node->assignment.is_declaration && node->assignment.rhs == NULL)
 	{
-		node->assignment.decl_type = *fix_type(f, &node->assignment.decl_type);
-		if(node->assignment.decl_type.type == T_DETECT)
+		node->assignment.decl_type = fix_type(f, node->assignment.decl_type);
+		if(node->assignment.decl_type->type == T_DETECT)
 		{
 			raise_semantic_error(f, "cannot automatically assign type without an expression", node->assignment.token);
 		}
@@ -1293,8 +1295,10 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 		if(!node->assignment.is_declaration)
 		{
 			// node->assignment.decl_type = get_symbol_spot(f, node->assignment.token)->type;
-			node->assignment.decl_type = get_expression_type(f, node->assignment.lhs, &node->assignment.token, node, expr_info);
-			node->assignment.is_const = node->assignment.decl_type.is_const;
+			Type_Info decl_type = get_expression_type(f, node->assignment.lhs, &node->assignment.token, node, expr_info);
+			node->assignment.decl_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+			memcpy(node->assignment.decl_type, &decl_type, sizeof(Type_Info));
+			node->assignment.is_const = node->assignment.decl_type->is_const;
 		}
 		if(type_is_invalid(&expression_type))
 		{
@@ -1302,11 +1306,12 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 		}
 
 
-		if(node->assignment.decl_type.type == T_DETECT)
+		if(node->assignment.decl_type->type == T_DETECT)
 		{
 			if(is_untyped(expression_type))
 			{
-				node->assignment.decl_type = untyped_to_type(expression_type);
+				Type_Info decl_type = untyped_to_type(expression_type);
+				memcpy(node->assignment.decl_type, &decl_type, sizeof(Type_Info));
 			}
 			else if(expression_type.type == T_ARRAY)
 			{
@@ -1315,24 +1320,24 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 					Type_Info elem_type = untyped_to_type(*expression_type.array.type);
 					memcpy(expression_type.array.type, &elem_type, sizeof(Type_Info));
 				}
-				node->assignment.decl_type = expression_type;
+				memcpy(node->assignment.decl_type, &expression_type, sizeof(Type_Info));
 			}
 			else if(expression_type.type == T_FUNC)
 			{
 				Type_Info *func = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 				memcpy(func, &expression_type, sizeof(Type_Info));
-				node->assignment.decl_type.type = T_POINTER;
-				node->assignment.decl_type.pointer.type = func;
+				node->assignment.decl_type->type = T_POINTER;
+				node->assignment.decl_type->pointer.type = func;
 			}
 			else
-				node->assignment.decl_type = expression_type;
+				memcpy(node->assignment.decl_type, &expression_type, sizeof(Type_Info));
 		}
-		else if(!check_type_compatibility(node->assignment.decl_type, expression_type))
+		else if(!check_type_compatibility(*node->assignment.decl_type, expression_type))
 		{
 			char *error = (char *)AllocateCompileMemory(2048);
 			vstd_sprintf(error, "Tried to assign %s to variable of type %s",
 						var_type_to_name(&expression_type),
-						var_type_to_name(&node->assignment.decl_type));
+						var_type_to_name(node->assignment.decl_type));
 			raise_semantic_error(f, error, node->assignment.token);
 		}
 		node->assignment.rhs_type = expression_type;
@@ -1349,7 +1354,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 		Token_Iden *sym_tok = (Token_Iden *)AllocateCompileMemory(sizeof(Token_Iden));
 		memcpy(sym_tok, &node->assignment.token, sizeof(Token_Iden));
 		Type_Info *sym_type = (Type_Info *) AllocateCompileMemory(sizeof(Type_Info) );
-		memcpy(sym_type, &node->assignment.decl_type, sizeof(Type_Info));
+		memcpy(sym_type, node->assignment.decl_type, sizeof(Type_Info));
 		Symbol this_sym = {};
 		this_sym.token = sym_tok;
 		this_sym.node = node;
@@ -1364,11 +1369,11 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 	
 
 
-		if(node->assignment.decl_type.type == T_ARRAY)
+		if(node->assignment.decl_type->type == T_ARRAY)
 		{
-			auto count_expr = node->assignment.decl_type.array.optional_expression;
-			auto elem_count = node->assignment.decl_type.array.elem_count;
-			auto type_token = node->assignment.decl_type.token;
+			auto count_expr = node->assignment.decl_type->array.optional_expression;
+			auto elem_count = node->assignment.decl_type->array.elem_count;
+			auto type_token = node->assignment.decl_type->token;
 			if(count_expr)
 			{
 				Type_Info array_size_type = get_expression_type(f, count_expr, type_token, NULL, NULL);
@@ -1379,29 +1384,29 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 			}
 			b32 failed = false;
 			
-			Interp_Val count_val = {};
+			Interp_Val count_val = create_interp_val();
 			if(count_expr)
 				count_val = interpret_expression(count_expr, &failed);
 			else
 			{
-				count_val.type.type = T_UNTYPED_INTEGER;
+				count_val.type->type = T_UNTYPED_INTEGER;
 				count_val._u64 = elem_count;
 			}
-			Assert(is_integer(count_val.type));
+			Assert(is_integer(*count_val.type));
 			if(failed)
 			{
 				raise_semantic_error(f, "Expected a constant expression", *type_token);
 			}
-			if(is_signed(count_val.type))
+			if(is_signed(*count_val.type))
 			{
 				if(count_val._i64 < 0)
 					raise_semantic_error(f, "Expression must evaluate to a value higher than 0",
 							*type_token);
-				node->assignment.decl_type.array.elem_count = count_val._i64;
+				node->assignment.decl_type->array.elem_count = count_val._i64;
 			}
 			else
 			{
-				node->assignment.decl_type.array.elem_count = count_val._u64;
+				node->assignment.decl_type->array.elem_count = count_val._u64;
 			}
 
 			// @TODO: this is a hack
@@ -1409,7 +1414,7 @@ verify_assignment(File_Contents *f, Ast_Node *node, b32 is_global)
 			while(arr_expr)
 			{
 				if(arr_expr->type == type_array_list)
-					arr_expr->array_list.type = node->assignment.decl_type;
+					arr_expr->array_list.type = *node->assignment.decl_type;
 				arr_expr = arr_expr->right;
 			}
 		}
@@ -1462,14 +1467,14 @@ get_binary_expr_type(File_Contents *f, Ast_Node *expr, Type_Info *left, Type_Inf
 	}
 	switch(expr->binary_expr.op)
 	{
-		case tok_logical_or:	 // ||
-		case tok_logical_is:	 // ==
-		case tok_logical_isnot: // !=
-		case tok_logical_and:	 // &&
-		case tok_logical_lequal:
-		case tok_logical_gequal:
-		case tok_logical_greater:
-		case tok_logical_lesser:
+		case tok_logical_or:	  // ||
+		case tok_logical_is:	  // ==
+		case tok_logical_isnot:   // !=
+		case tok_logical_and:	  // &&
+		case tok_logical_lequal:  // <=
+		case tok_logical_gequal:  // >=
+		case tok_logical_greater: // >
+		case tok_logical_lesser:  // <
 		{
 			Type_Info *boolean_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 			boolean_type->type = T_BOOLEAN;
@@ -1496,7 +1501,7 @@ b32
 is_bits_op(Token op)
 {
 	return op == tok_bits_lshift || op == tok_bits_rshift ||
-		op == tok_bits_or ||
+		op == tok_bits_or  ||
 		op == tok_bits_xor ||
 		op == tok_bits_not ||
 		op == tok_bits_and;
@@ -1656,6 +1661,25 @@ check_if_can_use_initializer_list(File_Contents *f, Ast_Node *node, Expression_C
 }
 
 Type_Info
+verify_cast(File_Contents *f, Ast_Node *expression, Expression_Context *info)
+{
+	Type_Info cast_type = *fix_type(f, expression->cast.type);
+	if (type_is_invalid(&cast_type))
+	{
+		raise_formated_semantic_error(f, *expression->cast.token,
+			"Cast type %s is undefined", var_type_to_name(&cast_type));
+	}
+	Type_Info casted = get_expression_type(f, expression->cast.expression, expression->cast.token, NULL, info);
+	expression->cast.expr_type = casted;
+	if (!is_castable(casted, cast_type))
+	{
+		raise_formated_semantic_error(f, *expression->cast.token, "Cannot cast type %s to %s",
+			var_type_to_name(&casted), var_type_to_name(&cast_type));
+	}
+	return cast_type;
+}
+
+Type_Info
 get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previous, Expression_Context *info)
 {
 	switch ((int)expression->type)
@@ -1684,6 +1708,10 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 						*expression->run.token);
 			}
 			return result;
+		} break;
+		case type_cast:
+		{
+			return verify_cast(f, expression, info);
 		} break;
 		case type_struct_init:
 		{
@@ -1920,7 +1948,21 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *prev
 			auto got = get_type(f, expression->size.operand->identifier.name);
 			if(got)
 			{
-				op_type = *got;
+				op_type = *fix_type(f, got);
+			}
+		}
+		else if(expression->size.operand->type == type_selector)
+		{
+			Import_Module *maybe_module = get_module(f, expression->size.operand->selector.operand->identifier.name);
+			if(maybe_module)
+			{
+				// It might be asking for the size of a global of that module so we don't
+				// error out if we don't find the type
+				auto got = get_type(maybe_module->f, expression->size.operand->selector.identifier->identifier.name);
+				if(got)
+				{
+					op_type = *fix_type(maybe_module->f, got);
+				}
 			}
 		}
 		if(type_is_invalid(&op_type))
@@ -1933,24 +1975,12 @@ get_unary_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *prev
 	}
 	else if(expression->type == type_cast)
 	{
-		Type_Info cast_type = *fix_type(f, &expression->cast.type);
-		if(type_is_invalid(&cast_type))
-		{
-			raise_formated_semantic_error(f, *expression->cast.token,
-					"Cast type %s is undefined", var_type_to_name(&cast_type));
-		}
-		Type_Info casted = get_expression_type(f, expression->cast.expression, expression->cast.token, NULL, info);
-		expression->cast.expr_type = casted;
-		if(!is_castable(casted, cast_type))
-		{
-			raise_formated_semantic_error(f, *expression->cast.token, "Cannot cast type %s to %s",
-					var_type_to_name(&casted), var_type_to_name(&cast_type));
-		}
-		return cast_type;
+		return verify_cast(f, expression, info);
 	}
 	else
 		return get_atom_expression_type(f, expression, previous, info);
 }
+
 
 void
 check_types_error(File_Contents *f, Token_Iden token, Type_Info a, Type_Info b)
@@ -2074,7 +2104,7 @@ overload_overwrite(Token_Iden *token, Ast_Node *expression, Ast_Node *left_expr,
 		SDPush(expression->func_call.arguments, right_expr);
 	SDPush(expression->func_call.arg_types, *left);
 	if(right)
-	SDPush(expression->func_call.arg_types, overload->overload.function->function.arguments[1]->variable.type);
+	SDPush(expression->func_call.arg_types, *overload->overload.function->function.arguments[1]->variable.type);
 	SDPush(expression->func_call.expr_types, *left);
 	if(right)
 	SDPush(expression->func_call.expr_types, *right);
@@ -2153,10 +2183,10 @@ does_overload_call_match(Ast_Node *call, Ast_Node *overload)
 		return false;
 	
 	for (int i = 0; i < arg_count; ++i) {
-		if (args[i]->variable.type.type == T_DETECT) {
+		if (args[i]->variable.type->type == T_DETECT) {
 			return true;
 		}
-		if (!check_type_compatibility(args[i]->variable.type, expr_types[i]))
+		if (!check_type_compatibility(*args[i]->variable.type, expr_types[i]))
 			return false;
 	}
 	return true;
@@ -2220,13 +2250,11 @@ verify_func_call(File_Contents *f, Ast_Node *func_call, Token_Iden *expr_token, 
 		SDPush(func_call->func_call.expr_types, expr_type);
 	}
 
-	u8 *module_name = NULL;
 	File_Contents *saved_f = NULL;
 	auto operand = func_call->func_call.operand;
 	if(operand->type == type_selector && operand->selector.flags & SEL_MODULE)
 	{
 		f = operand->selector.operand_type->f_nullable;
-		module_name = operand->selector.operand_type->mod.selector_id->identifier.name;
 		saved_f = f;
 		operand = operand->selector.identifier;
 	}
@@ -2581,8 +2609,6 @@ check_type_compatibility(Type_Info a, Type_Info b)
 
 	if(a.type == T_UNTYPED_INTEGER && b.type == T_POINTER)
 		return true;
-	if(a.type == T_POINTER && b.type == T_UNTYPED_INTEGER)
-		return true;
 	if(a.type == T_UNTYPED_INTEGER || a.type == T_UNTYPED_FLOAT)
 	{
 		if(a.type == T_UNTYPED_FLOAT && b.type == T_INTEGER)
@@ -2621,7 +2647,7 @@ check_type_compatibility(Type_Info a, Type_Info b)
 			if(a.pointer.type->type == T_VOID || b.pointer.type->type == T_VOID)
 				return true;
 		}
-		else if(b.type == T_UNTYPED_INTEGER)
+		else if(b.type == T_UNTYPED_INTEGER || b.type == T_INTEGER)
 			return true;
 		else if(b.type == T_FUNC)
 		{
@@ -2657,16 +2683,16 @@ verify_struct(File_Contents *f, Ast_Node *struct_node)
 	Type_Info *struct_type = get_type(f, struct_node->structure.struct_id.name);
 	for(size_t i = 0; i < member_count; ++i)
 	{
-		members[i].type = *fix_type(f, &members[i].type);
-		struct_type->structure.member_types[i] = members[i].type;
-		if(struct_type->type == T_STRUCT && members[i].type.type == T_STRUCT && 
-		   vstd_strcmp((char *)members[i].type.identifier, (char *)struct_type->identifier))
+		members[i].type = fix_type(f, members[i].type);
+		struct_type->structure.member_types[i] = *members[i].type;
+		if(struct_type->type == T_STRUCT && members[i].type->type == T_STRUCT && 
+		   vstd_strcmp((char *)members[i].type->identifier, (char *)struct_type->identifier))
 		{
 			raise_semantic_error(f, "You can't put a struct as it's own member variable, use a pointer",
 								 *members[i].identifier.token);
 		}
-		else if(type_is_invalid(&members[i].type))
-			raise_formated_semantic_error(f, *members[i].type.token, 
+		else if(type_is_invalid(members[i].type))
+			raise_formated_semantic_error(f, *members[i].type->token, 
 					"Type of member %s in struct %s is not declared",
 					members[i].identifier.name, struct_node->structure.struct_id.name);
 	}

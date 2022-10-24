@@ -3,6 +3,39 @@
 #include <Analyzer.h>
 #include <Parser.h>
 
+struct Fixing_Type {
+	Type_Info *type;
+	File_Contents *f;
+};
+
+static Fixing_Type *to_fix_types;
+
+void
+init_type_system()
+{
+	to_fix_types = SDCreate(Fixing_Type);
+}
+
+void
+add_fixable_type(File_Contents *f, Type_Info *type)
+{
+	Fixing_Type to_fix;
+	to_fix.f = f;
+	to_fix.type = type;
+	SDPush(to_fix_types, to_fix);
+}
+
+void
+fix_all_types()
+{
+	auto fix_count = SDCount(to_fix_types);
+	for (int i = 0; i < fix_count; ++i) {
+		auto to_fix = to_fix_types[i];
+		auto fixed = fix_type(to_fix.f, to_fix.type);
+		*to_fix.type = *fixed;
+	}
+}
+
 int
 primitive_size_to_alignment(i64 size)
 {
@@ -266,11 +299,21 @@ fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 	{
 		case T_POINTER:
 		{
+			// @TODO: remove useless allocations
+			// @TODO: remove useless allocations
+			// @TODO: remove useless allocations
+			// @TODO: remove useless allocations
+			// @TODO: remove useless allocations
+			// @TODO: remove useless allocations
+			// @TODO: remove useless allocations
+			// @TODO: remove useless allocations
 			result = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 			memcpy(result, type, sizeof(Type_Info));
 			auto pointed = fix_type(f, type->pointer.type, is_fixing_struct);
 			result->pointer.type = pointed;
 			result->f_nullable = f;
+			result->identifier = NULL;
+			result->identifier = var_type_to_name(result, false);
 			return result;
 		} break;
 		case T_STRUCT:
@@ -300,7 +343,7 @@ fix_type(File_Contents *f, Type_Info *type, b32 is_fixing_struct)
 				raise_formated_semantic_error(f, *type->mod.selected_id->identifier.token, "Couldn't find type %s, imported from module %s", type->mod.selected_id->identifier.name, type->mod.selector_id->identifier.name);
 
 			u8 *type_name = var_type_to_name(result, false);
-			result->identifier = (u8 *)AllocateCompileMemory(vstd_strlen((char *)type_name) + vstd_strlen((char *)type->mod.selector_id->identifier.name) + 10);
+			result->identifier = (u8 *)AllocateCompileMemory(vstd_strlen((char *)type_name) + 1);
 			//vstd_strcat((char *)result->identifier, (char *)type->mod.selector_id->identifier.name);
 			//vstd_strcat((char *)result->identifier, "!");
 			vstd_strcat((char *)result->identifier, (char *)type_name);
