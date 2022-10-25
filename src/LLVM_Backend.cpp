@@ -196,7 +196,7 @@ emit_assignment(File_Contents *f, Ast_Node *node, llvm::Value *location, u8 *ide
 		auto desc  = shget(debug.file_map, node->assignment.token.file);
 		DILocalVariable *debug_var = debug.builder->createAutoVariable(scope, StringRef((char *)identifier),
 			desc.file, node->assignment.token.line, to_debug_type(*node->assignment.decl_type, &debug),
-			false, DINode::FlagZero, get_type_alignment(*node->assignment.decl_type) * 8);
+			false, DINode::FlagZero);
 
 		debug.builder->insertDeclare(location, debug_var, debug.builder->createExpression(), 
 			DILocation::get(*backend.context, node->assignment.token.line, node->assignment.token.column, scope),
@@ -2114,6 +2114,10 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 				for(i64 i = expr_count - 1; i >= 0; --i)
 				{
 					llvm::Value *expr_val = generate_expression(f, expressions[i], func);
+					if(node->struct_init.expr_types[i].type == T_STRUCT)
+					{
+						expr_val = llvm_load(&node->struct_init.expr_types[i], expr_val, "listed_struct", &backend);
+					}
 					expr_val = create_cast(members[i], node->struct_init.expr_types[i], expr_val);
 				
 					llvm::Value *member_loc = backend.builder->CreateStructGEP(type, struct_loc, i);
@@ -2567,6 +2571,7 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 		var_info->value = location;
 		var_info->type  = node->assignment.decl_type;
 
+		Assert(node->assignment.is_declaration);
 		shput(backend.named_values, node->assignment.token.identifier, var_info);
 	}
 	else if(expression_value->getType()->isPointerTy() == NULL ||
@@ -2597,13 +2602,16 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 			llvm_memcpy(location, expression_value, node->assignment.decl_type, &backend);
 		}
 
-		Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
-		var_info->value = location;
-		var_info->type  = node->assignment.decl_type;
-		shput(backend.named_values, node->assignment.token.identifier, var_info);
+		if(node->assignment.is_declaration)
+		{
+			Variable_Info *var_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
+			var_info->value = location;
+			var_info->type  = node->assignment.decl_type;
+			shput(backend.named_values, node->assignment.token.identifier, var_info);
+		}
 	}
 	// @TODO: Implement volatile variable	
 	if(node->assignment.is_declaration)
-		emit_assignment(f, node, location, identifier);
+		emit_assignment(f, node, location, node->assignment.token.identifier);
 }
 

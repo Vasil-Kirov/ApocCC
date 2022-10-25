@@ -3,9 +3,7 @@ $import "Basic.apoc";
 
 
 fn main() -> i32 {
-	m_t := true;
-	m_f := false;
-	-> ((!m_t == false) && (!m_f == true)) as i32;
+	-> ((!true == false) && (!false == true)) as i32;
 }
 
 

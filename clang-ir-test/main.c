@@ -1,67 +1,11 @@
-#if 0
 
-typedef struct
-{
-	void *return_val;
-} __Internal_Context;
+struct my_struct {
+	int x;
+int y;
+};
 
-typedef struct
-{
-	char data[1024];
-	int len;
-} Big_Struct;
-
-void init_builder(__Internal_Context *context, char *text)
-{
-	__Internal_Context result = *context;
-
-	Big_Struct result_struct = {};
-	result_struct.len = 10;
-	result_struct.data[0] = text[0];
-
-	*(Big_Struct *)result.return_val = result_struct;
+int main() {
+	struct my_struct s = {};
+    int arr[1024];
+	return arr[4];
 }
-
-void change_struct(Big_Struct the_struct)
-{
-	the_struct.data[0] = 10;
-}
-
-int main()
-{
-	Big_Struct out_struct;
-	__Internal_Context context;
-//__Internal_Context *context = (__Internal_Context *)_alloca(sizeof(__Internal_Context));
-	context.return_val = &out_struct;
-	init_builder(&context, (char *)"my text");
-	change_struct(out_struct);
-	return out_struct.len;
-}
-
-#else
-
-typedef struct
-{
-	struct {
-		short a;
-		short b;
-	} bar;
-	int c;
-} Foo;
-
-Foo get_type() 
-{
-	Foo x = {};
-	x.bar.a = 0xC;
-	x.bar.a *= 12323;
-	return x;
-}
-
-int main()
-{
-	Foo (*fn_ptr)() = get_type;
-	return 0;
-}
-
-#endif
-

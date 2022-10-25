@@ -1,0 +1,23 @@
+// 6
+
+
+fn main() -> i32 {
+	arr: [4]SS;
+	x  := S { 1, 2 };
+	xx := SS { x, 1, 2 };
+	arr[3] = xx;
+	xx = arr[3];
+	-> xx.s.x + xx.s.y + xx.x + xx.y;
+}
+
+struct S {
+	x: i32;
+	y: i32;
+}
+
+struct SS {
+	s: S;
+	x: i32;
+	y: i32;
+}
+

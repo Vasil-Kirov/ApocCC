@@ -349,13 +349,13 @@ interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 }
 
 Metadata *
-create_struct_field(Debug_Info *debug, u8 *identifier,
+create_struct_field(Debug_Info *debug, DICompositeType *parent, u8 *identifier,
 		Type_Info type, u64 offset_in_bits)
 {
 	auto desc = shget(debug->file_map, type.token->file);
 	auto name_ref = StringRef((char *)identifier, vstd_strlen((char *)identifier));
 
-	return debug->builder->createMemberType(desc.file, name_ref, desc.file, type.token->line,
+	return debug->builder->createMemberType(parent, name_ref, desc.file, type.token->line,
 			get_type_size(type) * 8, get_type_alignment(type) * 8, offset_in_bits,
 			DINode::FlagZero, to_debug_type(type, debug));
 }
@@ -364,8 +364,14 @@ DICompositeType *
 create_struct_type(Type_Info type, Debug_Info *debug)
 {
 	auto desc = shget(debug->file_map, type.token->file);
+
 	if(type.structure.is_union)
 	{		
+		auto union_type = debug->builder->createUnionType(nullptr, (char *)type.identifier,
+			desc.file,
+			type.token->line, get_type_size(type) * 8,
+			get_struct_alignment(type) * 8,
+			DINode::FlagZero, 0, 0, "");
 		//Type_Info biggest_type = union_get_biggest_type(type.structure);
 		auto members = type.structure.member_types;
 		auto names = type.structure.member_names;
@@ -379,13 +385,13 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 				to_fix[i] = true;
 				Type_Info opaque_pointer = members[i];
 				opaque_pointer.pointer.type = NULL;
-				member_data[i] = create_struct_field(debug, names[i], opaque_pointer, 0);
+				member_data[i] = create_struct_field(debug, union_type, names[i], opaque_pointer, 0);
 			}
 			else
 			{
 				to_fix[i] = false;
 
-				member_data[i] = create_struct_field(debug, names[i],
+				member_data[i] = create_struct_field(debug, union_type, names[i],
 					members[i], 0);
 			}
 		}
@@ -393,29 +399,38 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 				makeArrayRef((Metadata **)member_data, member_count)
 				);
 
+		union_type->replaceElements(member_array);
+#if 0
 		auto created =  debug->builder->createStructType(desc.file, (char *)type.identifier,
 				desc.file,
 				type.token->line, get_type_size(type) * 8, 
 				get_struct_alignment(type) * 8,
 				DINode::FlagZero, nullptr,
 				member_array);
+#endif
 
-		shput(debug->struct_map, type.identifier, created);
+		shput(debug->struct_map, type.identifier, union_type);
 		for(size_t i = 0; i < member_count; ++i)
 		{
 			if(to_fix[i])
 			{
-				auto new_metadata = create_struct_field(debug, names[i], members[i], 0);
+				auto new_metadata = create_struct_field(debug, union_type, names[i], members[i], 0);
 				member_array->replaceOperandWith(i, new_metadata);
 			}
 		}
 
 		// @TODO: check if needed
-		created->replaceElements(member_array);
-		return created;
+		union_type->replaceElements(member_array);
+		return union_type;
 	}
 	else
 	{
+		auto struct_type = debug->builder->createStructType(nullptr, (char *)type.identifier,
+				desc.file,
+				type.token->line, get_type_size(type) * 8,
+				get_struct_alignment(type) * 8,
+				DINode::FlagZero, nullptr,
+				nullptr);
 		auto members = type.structure.member_types;
 		size_t memory_address = 0;
 		size_t member_count = type.structure.member_count;
@@ -451,13 +466,13 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 				to_fix[i] = true;
 				Type_Info opaque_pointer = members[i];
 				opaque_pointer.pointer.type = NULL;
-				member_data[i] = create_struct_field(debug, type.structure.member_names[i], opaque_pointer, 
+				member_data[i] = create_struct_field(debug, struct_type, type.structure.member_names[i], opaque_pointer, 
 						offset_in_bits);
 			}
 			else
 			{
 				to_fix[i] = false;
-				member_data[i] = create_struct_field(debug, type.structure.member_names[i],
+				member_data[i] = create_struct_field(debug, struct_type, type.structure.member_names[i],
 						members[i], offset_in_bits);
 			}
 
@@ -466,26 +481,20 @@ create_struct_type(Type_Info type, Debug_Info *debug)
 		auto member_array = debug->builder->getOrCreateArray(
 				makeArrayRef((Metadata **)member_data, member_count)
 				);
-		
-		auto created =  debug->builder->createStructType(desc.file, (char *)type.identifier,
-				desc.file,
-				type.token->line, get_type_size(type) * 8, 
-				get_struct_alignment(type) * 8,
-				DINode::FlagZero, nullptr,
-				member_array);
+		struct_type->replaceElements(member_array);
 
-		shput(debug->struct_map, type.identifier, created);
+		shput(debug->struct_map, type.identifier, struct_type);
 		for(size_t i = 0; i < member_count; ++i)
 		{
 			if(to_fix[i])
 			{
-				auto new_metadata = create_struct_field(debug, type.structure.member_names[i], members[i], member_locations[i]);
+				auto new_metadata = create_struct_field(debug, struct_type, type.structure.member_names[i], members[i], member_locations[i]);
 				member_array->replaceOperandWith(i, new_metadata);
 			}
 		}
 
-		created->replaceElements(member_array);
-		return created;
+		struct_type->replaceElements(member_array);
+		return struct_type;
 	}
 }
 
