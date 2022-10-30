@@ -10,6 +10,9 @@ set_genned();
 LoadInst *
 llvm_load(Type_Info *type, llvm::Value *ptr, const char *name, Backend_State *backend);
 
+AllocaInst *
+allocate_size(Function *func, u8 *var_name, int size, Backend_State *backend);
+
 void
 llvm_store(Type_Info *type, llvm::Value *ptr, llvm::Value *value, Backend_State *backend);
 

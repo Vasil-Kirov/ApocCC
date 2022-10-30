@@ -1,0 +1,24 @@
+// 96
+
+
+fn main() -> i32 {
+	array: [16]S;
+	s := S { 10, 20 };
+	d := S { 1, 2 };
+	array[0] = s;
+	array[1] = d;
+	array[2] = s;
+	array[3] = d;
+	array[4] = s;
+	x: i32= 0;
+	for item in array {
+		x += item.x + item.y;
+	}
+	-> x;
+}
+
+struct S {
+	x: i32;
+	y: i32;
+}
+

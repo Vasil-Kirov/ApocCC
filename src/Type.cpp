@@ -36,6 +36,20 @@ fix_all_types()
 	}
 }
 
+static u64 register_bit_size = 64;
+
+void
+set_register_bit_size(u64 bit_size)
+{
+	register_bit_size = bit_size;
+}
+
+u64
+get_register_bit_size()
+{
+	return register_bit_size;
+}
+
 int
 primitive_size_to_alignment(i64 size)
 {
@@ -93,7 +107,7 @@ get_type_alignment(Type_Info type)
 		case T_STRING:
 		case T_FUNC:
 		case T_POINTER:
-		return sizeof(size_t);
+		return get_register_bit_size() / 8;
 		case T_STRUCT:
 		return get_struct_alignment(type);
 		case T_ARRAY:
@@ -141,7 +155,7 @@ get_type_size(Type_Info type)
 		return primitive_size_to_alignment(type.primitive.size);
 	}
 	else if(type.type == T_POINTER || type.type == T_FUNC)
-		return sizeof(size_t);
+		return get_register_bit_size() / 8;
 	else if(type.type == T_ARRAY)
 	{
 		return type.array.elem_count * get_type_size(*type.array.type);

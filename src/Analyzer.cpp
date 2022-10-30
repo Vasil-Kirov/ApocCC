@@ -975,6 +975,48 @@ verify_func_level_statement(File_Contents *f, Ast_Node *node, Ast_Node *func_nod
 		{
 			node->identifier.symbol_spot = get_symbol_spot(f, *node->identifier.token, true);
 		} break;
+		case type_for_in:
+		{
+			Assert(node->for_in.array && node->for_in.item);
+			Token_Iden *scope_tok = node->for_in.token;
+			Scope_Info new_scope = {};
+			new_scope.file = scope_tok->file;
+			new_scope.start_line = scope_tok->line;
+			push_scope(f, new_scope);
+			if(node->for_in.i_nullalbe)
+			{
+				Symbol i_sym = {};
+				i_sym.tag = S_VARIABLE;
+				i_sym.identifier = node->for_in.i_nullalbe->identifier.name;
+				i_sym.node = node->for_in.i_nullalbe;
+				i_sym.token = node->for_in.i_nullalbe->identifier.token;
+				i_sym.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+				i_sym.type->type = T_INTEGER;
+				i_sym.type->primitive.size = byte8;
+				add_symbol(f, i_sym);
+			}
+			auto array_sym = get_symbol_spot(f, *node->for_in.array->identifier.token);
+			array_sym->type = fix_type(f, array_sym->type);
+			node->for_in.array->identifier.symbol_spot = array_sym;
+			if(array_sym->tag != S_VARIABLE && array_sym->tag != S_GLOBAL_VAR)
+			{
+				raise_formated_semantic_error(f, *node->for_in.array->identifier.token,
+						"%s, used as an array in for in loop, is not a variable", node->for_in.array->identifier.name);
+			}
+			if(array_sym->type->type != T_ARRAY)
+			{
+				raise_formated_semantic_error(f, *node->for_in.array->identifier.token, 
+						"Cannot iterate over %s as it is not array. %s is of type %s",
+						node->for_in.array->identifier.name, node->for_in.array->identifier.name, var_type_to_name(array_sym->type));
+			}
+			Symbol item_sym = {};
+			item_sym.tag = S_VARIABLE;
+			item_sym.identifier = node->for_in.item->identifier.name;
+			item_sym.node = node->for_in.item;
+			item_sym.token = node->for_in.item->identifier.token;
+			item_sym.type = array_sym->type->array.type;
+			add_symbol(f, item_sym);
+		} break;
 		case type_for:
 		{
 			Token_Iden *scope_tok = node->for_loop.token;
@@ -1694,6 +1736,16 @@ get_atom_expression_type(File_Contents *f, Ast_Node *expression, Ast_Node *previ
 						expression->identifier.name);
 			}
 			return *expression->identifier.symbol_spot->type;
+		} break;
+		case type_overload:
+		{
+			/***********************************************
+			 *
+			 * No need to verify since overload can only be
+			 * written dirrectly by the compiler
+			 *
+			 * ********************************************/
+			return *expression->overload.function->function.type;
 		} break;
 		case type_run:
 		{

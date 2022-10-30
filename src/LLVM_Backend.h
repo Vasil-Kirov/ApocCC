@@ -140,6 +140,9 @@ get_identifier(File_Contents *f, u8 *name, Variable_Types *returned_type, b32 is
 void
 generate_overloads(File_Contents *f);
 
+llvm::Value *
+generate_index(File_Contents *f, Ast_Node *node, Function *func, llvm::Value *rhs, b32 is_decl, Type_Info decl_type);
+
 llvm::StructType *
 get_context_type();
 

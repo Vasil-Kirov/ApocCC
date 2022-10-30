@@ -113,6 +113,12 @@ typedef struct _Type_Info
 } Type_Info;
 
 void
+set_register_bit_size(u64 bit_size);
+
+u64
+get_register_bit_size();
+
+void
 init_type_system();
 
 void

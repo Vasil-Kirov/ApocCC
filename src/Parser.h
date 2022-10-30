@@ -21,6 +21,7 @@ typedef enum _Ast_Type
 {
 	type_root         = -100,
 		
+	type_for_in       = -71,
 	type_continue     = -70,
 	type_dunn         = -69,
 	type_defer        = -68,
@@ -310,6 +311,14 @@ typedef struct
 
 typedef struct
 {
+	Ast_Node *item;
+	Ast_Node *i_nullalbe;
+	Ast_Node *array;
+	Token_Iden *token;
+} Ast_For_In;
+
+typedef struct
+{
 	Token_Iden *token;
 	Type_Info *type;
 	Ast_Node *expression;
@@ -381,6 +390,7 @@ struct _abstract_syntax_tree
 		Ast_Array_List array_list;
 		Ast_Cast cast;
 		Ast_For for_loop;
+		Ast_For_In for_in;
 		Ast_Selector selector;
 		Ast_Func function;
 		Ast_Condition condition;

@@ -59,6 +59,7 @@ initialize_compiler(File_Contents *f)
 		//shput(keyword_table, "cast",       tok_cast);
 		shput(keyword_table, "if",         tok_if);
 		shput(keyword_table, "for",        tok_for);
+		shput(keyword_table, "in",         tok_in);
 		shput(keyword_table, "switch",     tok_switch);
 		shput(keyword_table, "case",       tok_case);
 		shput(keyword_table, "as",         tok_as);

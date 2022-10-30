@@ -941,6 +941,153 @@ generate_boolean_expression(File_Contents *f, Ast_Node *expression, Function *fu
 	return evaluation;
 }
 
+llvm::Value *
+generate_for_in_condition(llvm::Value *array, llvm::Value *i, llvm::Value *elem_count)
+{
+	auto i_val = backend.builder->CreateLoad(backend.builder->getIntNTy(get_register_bit_size()), i);
+	return backend.builder->CreateICmpSLT(i_val, elem_count, "for_in_compare");
+}
+
+void
+increment_val(llvm::Value *i)
+{
+	auto one = backend.builder->getIntN(get_register_bit_size(), 1);
+	auto i_val = backend.builder->CreateLoad(backend.builder->getIntNTy(get_register_bit_size()), i);
+	llvm_store(i, backend.builder->CreateAdd(i_val, one), &backend, get_register_bit_size() / 8);
+}
+
+llvm::Value *
+generate_item_for_in(llvm::Value *i, Variable_Info *array, llvm::Function *func)
+{
+	i = backend.builder->CreateLoad(backend.builder->getIntNTy(get_register_bit_size()), i);
+	auto zero = ConstantInt::get(*backend.context, llvm::APInt(get_register_bit_size(), 0, true));
+	llvm::Value *idx_list[] = {
+		zero,
+		i
+	};
+	auto array_type = apoc_type_to_llvm(*array->type, &backend);
+	auto item = backend.builder->CreateGEP(array_type, array->value, idx_list, "item_ptr");
+	if(array->type->type != T_STRUCT && array->type->type != T_ARRAY)
+		item = llvm_load(array->type->array.type, item, "item", &backend);
+	else
+	{
+		auto allocated = allocate_variable(func, (u8 *)"item", *array->type->array.type, &backend);
+		llvm_memcpy(allocated, item, array->type->array.type, &backend);
+		item = allocated;
+	}
+
+	Variable_Info *i_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
+	i_info->value = i;
+	i_info->type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	i_info->type->type = T_UNTYPED_INTEGER;
+
+	Variable_Info *it_info = (Variable_Info *)AllocateCompileMemory(sizeof(Variable_Info));
+	it_info->value = item;
+	it_info->type = array->type->array.type;
+
+	shput(backend.named_values, "idx", i_info);
+	shput(backend.named_values, "item", it_info);
+	return item;
+}
+
+void
+generate_for_in_loop(File_Contents *f, Ast_Node *node, Function *func,
+		BasicBlock *block, BasicBlock *to_go, Ast_Node *statements, u64 *idx)
+{
+	Symbol *array_sym = node->for_in.array->identifier.symbol_spot;
+	Variable_Types ret_info;
+	auto array = get_identifier(f, array_sym->identifier, &ret_info);
+	Assert(array->type->type == T_ARRAY);
+
+	BasicBlock *cond = BasicBlock::Create(*backend.context, "for.cond", func);
+	BasicBlock *body = BasicBlock::Create(*backend.context, "for.body", func);
+	BasicBlock *incr = BasicBlock::Create(*backend.context, "for.incr", func);
+	BasicBlock *aftr = BasicBlock::Create(*backend.context, "for.aftr", func);
+
+	llvm::Type  *i_type = backend.builder->getIntNTy(get_register_bit_size());
+	llvm::Value *i = allocate_with_llvm(func, (u8 *)"idx", i_type, get_register_bit_size() / 8);
+	llvm_store(i, backend.builder->getIntN(get_register_bit_size(), 0), &backend, get_register_bit_size() / 8);
+	llvm::Value *elem_count = backend.builder->getIntN(get_register_bit_size(), array->type->array.elem_count);
+
+	/*******************************************************
+	 *
+	 * Branch from the current block to the loop condition
+	 *
+	 ******************************************************/
+	create_branch(block, cond, &backend);
+
+	/*******************************************************
+	 *
+	 * Save the current break and conitnue block incase of nesting
+	 *
+	 ******************************************************/
+	auto break_block = f->break_block;
+	auto continue_block = f->continue_block;
+	f->break_block = aftr;
+	f->continue_block = incr;
+
+	/*******************************************************
+	 *
+	 * Generate the condition block
+	 *
+	 ******************************************************/
+	backend.builder->SetInsertPoint(cond);
+	DEBUG_INFO (
+		emit_location(f, *node->for_loop.token);
+			)
+	auto eval = generate_for_in_condition(array->value, i, elem_count);
+	backend.builder->CreateCondBr(eval, body, aftr);
+
+	/*******************************************************
+	 *
+	 * Generate the loop body
+	 *
+	 ******************************************************/
+	auto list = statements->statements.list;
+	*idx += 1;
+	Assert(list[*idx]->type == type_scope_start);
+
+	backend.builder->SetInsertPoint(body);
+	generate_item_for_in(i, array, func);
+	generate_blocks_from_list(f, list[*idx]->scope_desc.body, func, body, "for.body",
+			incr);
+
+	/*******************************************************
+	 *
+	 * Now that the body is finished generating
+	 * we can reset the break and continue blocks
+	 *
+	 ******************************************************/
+	f->break_block = break_block;
+	f->continue_block = continue_block;
+
+	*idx += 1;
+	create_branch(body, incr, &backend);
+
+	/*******************************************************
+	 *
+	 * Create the increment block
+	 *
+	 ******************************************************/
+	backend.builder->SetInsertPoint(incr);
+	increment_val(i);
+	backend.builder->CreateBr(cond);
+
+
+	/*******************************************************
+	 *
+	 * Generate everything after the loop
+	 *
+	 ******************************************************/
+	{
+		backend.builder->SetInsertPoint(aftr);
+		size_t count = SDCount(list);
+		for(; *idx < count; *idx += 1)
+			generate_block(f, list[*idx], func, aftr, "for.aftr", to_go, statements, idx);
+		create_branch(aftr, to_go, &backend);
+	}
+}
+
 void
 generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 		BasicBlock *block, BasicBlock *to_go, Ast_Node *statements, u64 *idx)
@@ -952,8 +1099,17 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	BasicBlock *body = BasicBlock::Create(*backend.context, "for.body", func);
 	BasicBlock *incr = NULL;
 	BasicBlock *aftr = BasicBlock::Create(*backend.context, "for.aftr", func);
+
+	/*******************************************************
+	 *
+	 * Branch to the loop condition and generate it
+	 *
+	 ******************************************************/
 	backend.builder->CreateBr(cond);
 
+	DEBUG_INFO (
+			emit_location(f, *node->for_loop.token);
+			)
 	backend.builder->SetInsertPoint(cond);
 	auto eval = generate_boolean_expression(f, node->for_loop.expr2, func);
 	backend.builder->CreateCondBr(eval, body, aftr);
@@ -964,6 +1120,12 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	if(node->for_loop.expr3)
 		incr = BasicBlock::Create(*backend.context, "for.incr", func);
 
+
+	/*******************************************************
+	 *
+	 * Save the current break and conitnue block incase of nesting
+	 *
+	 ******************************************************/
 	auto after_body = node->for_loop.expr3 ? incr : cond;
 
 	auto break_block = f->break_block;
@@ -974,16 +1136,37 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	backend.builder->SetInsertPoint(body);
 	Assert(list[*idx]->type == type_scope_start);
 
+
+	/*******************************************************
+	 *
+	 * Generate the loop body
+	 *
+	 ******************************************************/
 	generate_blocks_from_list(f, list[*idx]->scope_desc.body, func, body, "for.body",
 			after_body);
 
+	/*******************************************************
+	 *
+	 * Now that the body is finished generating
+	 * we can reset the break and continue blocks
+	 *
+	 ******************************************************/
 	f->break_block = break_block;
 	f->continue_block = continue_block;
 
+	/*******************************************************
+	 *
+	 * Branch the body to either increment or condition block
+	 *
+	 ******************************************************/
 	*idx += 1;
-	if(body->getTerminator() == NULL)
-		backend.builder->CreateBr(after_body);
+	create_branch(body, after_body, &backend);
 
+	/*******************************************************
+	 *
+	 * Generate the increment block if it exists
+	 *
+	 ******************************************************/
 	if(node->for_loop.expr3)
 	{
 		backend.builder->SetInsertPoint(incr);
@@ -992,6 +1175,11 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 	}
 
 
+	/*******************************************************
+	 *
+	 * Generate everything after the loop
+	 *
+	 ******************************************************/
 	{
 		backend.builder->SetInsertPoint(aftr);
 		size_t count = SDCount(list);
@@ -1000,10 +1188,6 @@ generate_for_loop(File_Contents *f, Ast_Node *node, Function *func,
 		create_branch(aftr, to_go, &backend);
 	}
 
-
-	DEBUG_INFO(
-			emit_location(f, *node->for_loop.token);
-			)
 }
 
 llvm::Value *
@@ -1401,10 +1585,17 @@ generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *pas
 		} break;
 		case type_for:
 		{
-			DEBUG_INFO(
-			emit_location(f, *node->for_loop.token);
+			DEBUG_INFO (
+				emit_location(f, *node->for_loop.token);
 			)
-			generate_for_loop(f, node, func, passed_block, to_go, list,idx);
+			generate_for_loop(f, node, func, passed_block, to_go, list, idx);
+		} break;
+		case type_for_in:
+		{
+			DEBUG_INFO (
+				emit_location(f, *node->for_in.token);
+			)
+			generate_for_in_loop(f, node, func, passed_block, to_go, list, idx);
 		} break;
 		case type_if:
 		{
@@ -1513,7 +1704,7 @@ generate_blocks_from_list(File_Contents *f, Ast_Node *list_node, Function *func,
 llvm::Value *
 generate_index(File_Contents *f, Ast_Node *node, Function *func, llvm::Value *rhs, b32 is_decl, Type_Info decl_type)
 {
-	auto zero = ConstantInt::get(*backend.context, llvm::APInt(64, 0, true));
+	auto zero = ConstantInt::get(*backend.context, llvm::APInt(get_register_bit_size(), 0, true));
 	llvm::Value *idx = generate_expression(f, node->index.expression, func);
 	llvm::Value *array = NULL;
 	auto array_type = apoc_type_to_llvm(node->index.operand_type, &backend);

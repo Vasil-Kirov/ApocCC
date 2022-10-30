@@ -102,6 +102,7 @@ typedef enum : signed short
 	tok_type      = -59,
 	tok_wasm_import = -60,
 	tok_wasm_export = -61,
+	tok_in          = -62,
 } Token;
 
 typedef struct _str_hash_table

@@ -1,0 +1,30 @@
+// 11
+
+
+fn main() -> i32 {
+	x1 := S {1, 2};
+	x2 := Y {2, 3};
+	x1 += x1 * x2;
+	-> x1.x + x1.y;
+}
+
+overload+(a: S, b: S) -> S {
+	result := S { a.x + b.x, a.y + b.y };
+	-> result;
+}
+
+overload*(a: S, b: Y) -> S {
+	result := S { a.x * b.x, a.y * b.y };
+	-> result;
+}
+
+struct S {
+	x: i32;
+	y: i32;
+}
+
+struct Y {
+	x: i32;
+	y: i32;
+}
+

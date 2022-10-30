@@ -633,7 +633,8 @@ parse_identifier_statement(File_Contents *f, Token ends_with)
 						"The syntax for a declaration in this language is: [ name: Type; ]", f);
 				}
 			}
-			parser_eat(f, ends_with);
+			if(ends_with != NO_EXPECT)
+				parser_eat(f, ends_with);
 			return lhs;
 		} break;
 	}
@@ -649,16 +650,56 @@ parse_for_statement(File_Contents *f)
 	Ast_Node *result = alloc_node();
 	result->type = type_for;
 	if(f->curr_token->type != ';')
-		result->for_loop.expr1 = parse_identifier_statement(f, (Token)';');
+	{
+		Ast_Node *first_expr = parse_identifier_statement(f, NO_EXPECT);
+		f->expression_level = -1;
+		if(f->curr_token->type == (Token)',')
+		{
+			advance_token(f);
+			Ast_Node *index_expr = parse_expression(f, NO_EXPECT, false);
+			if(index_expr->type != type_identifier)
+			{
+				raise_parsing_unexpected_token("identifier for index in iterator loop after [ , ].\n\tSyntax: for item, index in array { do_stuff }", f);
+			}
+			result->type = type_for_in;
+			result->for_in.i_nullalbe = index_expr;
+		}
+		if(f->curr_token->type == tok_in)
+		{
+			result->type = type_for_in;
+			if(first_expr->type != type_identifier)
+			{
+				raise_parsing_unexpected_token("identifier before [ in ] keyword.\n\tSyntax: for item in array { do_stuff(item) }", f);
+			}
+			result->for_in.token = advance_token(f);
+			result->for_in.item = first_expr;
+			result->for_in.array = parse_expression(f, NO_EXPECT, false);
+			if(result->for_in.array->type != type_identifier)
+			{
+				raise_parsing_unexpected_token("identifier for array after [ in ] keyword.\n\tSyntax: for item in array { do_stuff(item) }", f);
+			}
+			f->expression_level = 0;
+			return result;
+		}
+		else
+		{
+			f->expression_level = 0;
+			if(result->type == type_for_in)
+				raise_parsing_unexpected_token("[ in ] after ',' in for statement\n\tSyntax: for item, index in array { do_stuff }", f);
+			result->for_loop.expr1 = first_expr;
+			parser_eat(f, (Token)';');
+		}
+	}
 	else
 		advance_token(f);
+
 	
 	// @TODO: Make optional
 	result->for_loop.expr2 = parse_expression(f, (Token)';', false);
 
 	f->expression_level = -1;
 	if(f->curr_token->type != '{')
-		result->for_loop.expr3 = parse_expression(f, (Token)NO_EXPECT, false);
+		result->for_loop.expr3 = parse_expression(f, NO_EXPECT, false);
 	f->expression_level = 0;
 
 	result->for_loop.token = token;
