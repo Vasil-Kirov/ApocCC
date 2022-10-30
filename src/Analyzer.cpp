@@ -468,14 +468,6 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 			func_fix_types(f, functions[i]);
 		else if(functions[i]->type == type_overload)
 			overload_fix_types(f, functions[i]);
-		else if(functions[i]->type == type_run)
-		{
-			get_expression_type(f, node->run.to_run, node->run.token, node, NULL);
-			b32 failed = false;
-			node->run.ran_val = interpret_expression(node->run.to_run, &failed);
-			if(failed)
-				raise_semantic_error(f, "Expression couldn't be run at compile time", *node->run.token);
-		}
 		else if(functions[i]->type == type_assignment)
 		{
 			functions[i]->assignment.decl_type = fix_type(f, functions[i]->assignment.decl_type);
@@ -492,10 +484,10 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 			else
 				interp_add_symbol(functions[i]->assignment.token.identifier, {});
 		}
+		else if(functions[i]->type == type_run) {}
 		else
 			Assert(false);
 	}
-
 	return functions;
 }
 
@@ -508,6 +500,14 @@ analyze_functions_and_overloads(File_Contents *f, Ast_Node **functions)
 	{
 		if(functions[i]->type == type_func)
 			verify_func(f, functions[i]);
+		else if(functions[i]->type == type_run)
+		{
+			get_expression_type(f, functions[i]->run.to_run, functions[i]->run.token, functions[i], NULL);
+			b32 failed = false;
+			functions[i]->run.ran_val = interpret_expression(functions[i]->run.to_run, &failed);
+			if(failed)
+				raise_semantic_error(f, "Expression couldn't be run at compile time", *functions[i]->run.token);
+		}
 	}
 	for(size_t i = 0; i < func_count; ++i)
 	{

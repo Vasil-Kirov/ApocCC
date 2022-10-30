@@ -4,6 +4,10 @@
 #include <Basic.h>
 #include <Stack.h>
 
+#ifndef NO_VM
+#include <LLVM_Helpers.h>
+#endif
+
 static Stack symbol_scope;
 
 Interp_Table *
@@ -13,6 +17,14 @@ create_scope()
 	sh_new_arena(new_table);
 	return new_table;
 }
+
+void
+interp_push_scope()
+{
+	auto scope = create_scope();
+	stack_push(symbol_scope, scope);
+}
+
 
 void
 destroy_scope()
@@ -148,13 +160,6 @@ create_interp_val()
 }
 
 void
-interp_push_scope()
-{
-	auto scope = create_scope();
-	stack_push(symbol_scope, scope);
-}
-
-void
 interp_add_symbol(u8 *identifier, Interp_Val value)
 {
 	auto scope = stack_pop(symbol_scope, Interp_Table *);
@@ -189,6 +194,27 @@ interp_look_up_symbol(u8 *identifier)
 	return got;
 }
 
+Platform_Dynamic_Lib *dynamic_libs;
+
+void
+set_dll_array(Platform_Dynamic_Lib *libs)
+{
+	dynamic_libs = libs;
+}
+
+void *
+find_function(u8 *name)
+{
+	auto lib_count = SDCount(dynamic_libs);
+	for(size_t i = 0; i < lib_count; ++i)
+	{
+		auto fn = platform_find_fn(dynamic_libs[i], (char *)name);
+		if(fn)
+			return fn;
+	}
+	return NULL;
+}
+
 void
 initialize_interpreter()
 {
@@ -197,13 +223,138 @@ initialize_interpreter()
 	stack_push(symbol_scope, file_scope);
 }
 
+typedef void *(*Extern_Call_Intermidiate_Fn)();
+
+Interp_Val
+jit_foreign_function_call(Ast_Node *func, Ast_Node *call, b32 *failed)
+{
+#if defined(NO_VM)
+	Assert(false);
+#else
+	auto fn = find_function(func->function.identifier.name);
+	if(!fn)
+	{
+		char error[1024] = {};
+		vstd_sprintf(error, "Could not find function %s.\n\t"
+				"Functions called in the interpreter need to be linked with a dll/shared object.\n\t"
+				"You can pass that dll to the compiler using --dll or --shared", func->function.identifier.name);
+		raise_interpret_error(error, *call->func_call.token);
+		*failed = true;
+		return {};
+	}
+	llvm::LLVMContext context;
+	Backend_State backend = {};
+	backend.context = &context;
+	std::unique_ptr<Module> module = std::make_unique<Module>("jit_call", context);
+	backend.module = module.get();
+	backend.builder = new IRBuilder<>(*backend.context);
+
+	Type_Info *entry_fn_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	entry_fn_type->type = T_FUNC;
+	entry_fn_type->func.calling_convention = CALL_C_DECL;
+	entry_fn_type->func.return_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	entry_fn_type->func.return_type->type = T_POINTER;
+	entry_fn_type->func.return_type->pointer.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	entry_fn_type->func.return_type->pointer.type->type = T_VOID;
+	entry_fn_type->func.param_types = SDCreate(Type_Info);
+
+
+	auto entry_fn = Function::Create(type_to_func_type(*entry_fn_type, &backend), Function::LinkageTypes::ExternalLinkage, "entry_fn", backend.module);
+	auto entry = BasicBlock::Create(*backend.context, "entry", entry_fn);
+	backend.builder->SetInsertPoint(entry);
+
+	int arg_count = SDCount(call->func_call.arguments);
+	llvm::Value *args[arg_count];
+	memset(args, 0, sizeof(args));
+	for(int i = 0; i < arg_count; ++i)
+	{
+		auto arg = interpret_expression(call->func_call.arguments[i], failed);
+		if(*failed)
+		{
+			char error[1024] = {};
+			vstd_sprintf(error, "Failed to interpret expression #%d in function call", i + 1);
+			raise_interpret_error(error, *call->func_call.token);
+			return {};
+		}
+		args[i] = interp_val_to_llvm(arg, &backend);
+	}
+	llvm::Value * fn_val = backend.builder->getIntN(get_register_bit_size(), (u64)fn);
+	fn_val = backend.builder->CreateIntToPtr(fn_val, PointerType::get(*backend.context, 0));
+
+	/*************************************************************************
+	 *
+	 * @TODO: remove this
+	 * Automatically change functions to treat them as c calling convention
+	 *
+	 ************************************************************************/
+	auto call_convention = func->function.type->func.calling_convention;
+	func->function.type->func.calling_convention = CALL_C_DECL;
+	auto fn_type = type_to_func_type(*func->function.type, &backend);
+	func->function.type->func.calling_convention = call_convention;
+
+	auto callee = llvm::FunctionCallee(fn_type, fn_val);
+	if(func->function.type->func.return_type->type != T_VOID)
+	{
+		Type_Info *ret_type = func->function.type->func.return_type;
+		llvm::Value *result = backend.builder->CreateCall(callee, makeArrayRef(args, arg_count), "jitted_call");
+		Type_Info *ptr_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		ptr_type->type = T_POINTER;
+
+		b32 should_cast = false;
+		auto op = get_cast_type(*ptr_type, *ret_type, &should_cast);
+		if(should_cast)
+		{
+			result = backend.builder->CreateCast(op, result, PointerType::get(*backend.context, 0));
+		}
+		backend.builder->CreateRet(backend.builder->CreateBitCast(result, PointerType::get(*backend.context, 0)));
+	}
+	else
+	{
+		backend.builder->CreateCall(callee, makeArrayRef(args, arg_count));
+		backend.builder->CreateRet(Constant::getNullValue(PointerType::get(*backend.context, 0)));
+	}
+
+	std::string error;
+	ExecutionEngine *ee = llvm::EngineBuilder(std::move(module))
+		.setEngineKind(EngineKind::JIT)
+		.setErrorStr(&error)
+		.create();
+	
+	if(!ee)
+	{
+		LG_FATAL("Couldn't create execution engine %s", error.c_str());
+	}
+
+#if DEBUG
+	ee->setVerifyModules(true);
+#endif
+	ee->finalizeObject();
+
+	void *fn_ptr = (void *)ee->getFunctionAddress(std::string("entry_fn"));
+	void *fn_result = ((Extern_Call_Intermidiate_Fn)fn_ptr)();
+	Interp_Val out = create_interp_val();
+	out.type = func->function.type->func.return_type;
+	out._u64 = (u64)fn_result;
+
+	entry_fn->eraseFromParent();
+	delete backend.builder;
+	delete ee;
+	return out;
+#endif
+}
+
 Interp_Val
 interpret_func_call(Ast_Node *node, b32 *failed)
 {
+	Interp_Val result;
 	Interp_Val operand = interpret_expression(node->func_call.operand, failed);
-	Interp_Val result = interpret_function(operand, node->func_call, failed);
+	if(((Ast_Node *)operand.pointed)->function.body == NULL)
+		result = jit_foreign_function_call((Ast_Node *)operand.pointed, node, failed);
+	else
+		result = interpret_function(operand, node->func_call, failed);
+
 	if(*failed)
-		LG_ERROR("Cannot interpret function call at (%d:%d), it might be an external function",
+		LG_ERROR("Cannot interpret function call at (%d:%d)",
 				node->func_call.token->line, node->func_call.token->column);
 	return result;
 }
@@ -548,6 +699,8 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 		{
 			*returned = true;
 			*token = node->ret.token;
+			if(!node->ret.expression)
+				return result;
 			result = interpret_expression(node->ret.expression, failed);
 			Interp_Val casted = create_interp_val();
 			casted._u64 = result._u64;
@@ -813,6 +966,11 @@ interpret_operand(Ast_Node *node, b32 *failed)
 					member_ptr->type = &result.type->structure.member_types[i];
 				}
 			}
+		} break;
+		case type_const_str:
+		{
+			result.type->type = T_STRING;
+			result.pointed = node->atom.identifier.name;
 		} break;
 		default:
 		{

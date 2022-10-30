@@ -295,9 +295,8 @@ write_type_info_to_llvm(File_Contents *f, Type_Info to_write, llvm::Value *ptr, 
 	}
 }
 
-// @TODO: remove Function * argument
 llvm::Constant *
-interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
+interp_val_to_llvm(Interp_Val val, Backend_State *backend, ExecutionEngine *ee)
 {
 	llvm::Constant *result = NULL;
 	switch((int)val.type->type)
@@ -325,7 +324,7 @@ interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 			for(size_t i = 0 ; i < elem_count; ++i)
 			{
 				Interp_Val *elem = (Interp_Val *)val.pointed + i;
-				array[i] = interp_val_to_llvm(*elem, backend, func);
+				array[i] = interp_val_to_llvm(*elem, backend);
 			}
 			result = ConstantArray::get((ArrayType *)array_type, makeArrayRef((Constant **)array, elem_count));
 		} break;
@@ -341,6 +340,12 @@ interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func)
 			int_type.primitive.size = ubyte8;
 			result = (Constant *)create_cast(*val.type, int_type, result);
 			//result = ConstantExpr::getIntToPtr(result, PointerType::get(*backend->context, 0));
+		} break;
+		case T_STRING:
+		{
+			u8 *str = (u8 *)val.pointed;
+			auto len = vstd_strlen((char *)str) + 1;
+			return backend->builder->CreateGlobalString(toStringRef(makeArrayRef(str, len)), "", 0, backend->module);
 		} break;
 		default:
 			Assert(false);

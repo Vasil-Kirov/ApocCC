@@ -4,6 +4,7 @@
 #include <Basic.h>
 #include <Lexer.h>
 #include <Parser.h>
+#include <platform/platform.h>
 #include <string>
 
 #if !defined(NOVM)
@@ -89,6 +90,7 @@ typedef struct
 	u8 *linker_command;
 	Define_Table *defines;
 	u8  **included_dirs;
+	Platform_Dynamic_Lib  *dynamic_libs;
 	b32 debug_info;
 	b32 call_linker;
 	b32 dump_symbols;

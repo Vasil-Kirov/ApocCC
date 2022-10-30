@@ -15,6 +15,7 @@ typedef struct _platform_config
 	const char *Name;
 } Platform_Config;
 
+typedef void *Platform_Dynamic_Lib;
 typedef void *Platform_Thread;
 typedef void *Platform_State;
 typedef void *Platform_Object;
@@ -49,6 +50,12 @@ platform_create_thread(void *Func, void *Args);
 
 b32
 platform_iterate_files_in_directory(u8 *directory, Iterate_Func fn, void *pass_data);
+
+Platform_Dynamic_Lib
+platform_load_dynamic_lib(const char *name_no_extension);
+
+void *
+platform_find_fn(Platform_Dynamic_Lib lib, char *name);
 
 void
 platform_join_threads(u32 count, Platform_Thread *threads);

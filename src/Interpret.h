@@ -4,6 +4,7 @@
 #include <Basic.h>
 #include <Lexer.h>
 #include <Type.h>
+#include <platform/platform.h>
 
 #define DO_OP(out, op, l, r) \
 	Assert(l.type->type != T_INVALID); Assert(r.type->type != T_INVALID);	\
@@ -117,6 +118,9 @@ destroy_scope();
 
 void
 interp_push_scope();
+
+void
+set_dll_array(Platform_Dynamic_Lib *libs);
 
 void
 interp_add_symbol(u8 *identifier, Interp_Val value);

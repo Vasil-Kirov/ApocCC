@@ -44,6 +44,8 @@ llvm_backend_generate(File_Contents **files);
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Pass.h>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/Interpreter.h>
 #include <map>
 
 #define DEBUG_INFO(x) if(f->build_commands.debug_info) { x }
@@ -149,12 +151,11 @@ get_context_type();
 llvm::Value *
 generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, b32 is_decl, Type_Info decl_type, u8 **out_identifier = NULL);
 
-// @TODO: remove
-llvm::Constant *
-interp_val_to_llvm(Interp_Val val, Backend_State backend, Function *func);
-
 void
 generate_struct_type(File_Contents *f, Type_Info type, llvm::StructType *opaque_struct);
+
+void
+llvm_initialize_targets();
 
 void
 generate_signatures(File_Contents **files);

@@ -31,6 +31,8 @@ args:
         llvm
 	custom
     --include [path]
+    --dll [file]
+    --shared [file]
 )del";
 
 void
@@ -55,6 +57,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	build_commands.linker_command = NULL;
 	build_commands.output_file = NULL;
 	build_commands.included_dirs = SDCreate(u8 *);
+	build_commands.dynamic_libs = SDCreate(Platform_Dynamic_Lib);
 #if !defined(NOVM)
 	build_commands.backend = LLVM_Backend;
 #else
@@ -83,8 +86,23 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 
 #if defined(_WIN32)
 	shput(build_commands.defines, "Windows", true);
+	auto kernel32 = platform_load_dynamic_lib("kernel32");
+	auto user32   = platform_load_dynamic_lib("user32");
+	auto ntdll    = platform_load_dynamic_lib("ntdll");
+	auto msvcrt   = platform_load_dynamic_lib("msvcrt");
+	if(kernel32)
+		SDPush(build_commands.dynamic_libs, kernel32);
+	if(user32)
+		SDPush(build_commands.dynamic_libs, user32);
+	if(ntdll)
+		SDPush(build_commands.dynamic_libs, ntdll);
+	if(msvcrt)
+		SDPush(build_commands.dynamic_libs, msvcrt);
 #elif defined(CM_LINUX)
 	shput(build_commands.defines, "Linux", true);
+
+	// @NOTE: put default linux libs here
+	Assert(false);
 #endif
 	
 	FOR_EACH(args)
@@ -183,6 +201,19 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 					linker_append += args[i];
 				}
 			}
+			else if(arg == "--dll" || arg == "--shared")
+			{
+				auto lib = args[++i];
+				auto c_str = lib.c_str();
+				auto len = vstd_strlen((char *)c_str);
+				auto copied = AllocateCompileMemory(len + 1);
+				memcpy(copied, c_str, len);
+				auto no_ext = change_file_extension((char *)copied, (char *)"");
+				auto got = platform_load_dynamic_lib(no_ext);
+				if(!got)
+					raise_build_error("Couldn't find dynamic library %s", c_str);
+				SDPush(build_commands.dynamic_libs, got);
+			}
 			else if (arg == "--dump-symbols")
 			{
 				build_commands.dump_symbols = true;
@@ -244,6 +275,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 	strcpy((char *)std_dir, (char *)module_path);
 	SDPush(build_commands.included_dirs, std_dir);
 	vstd_strcat((char *)module_path, "/Basic.apoc");
+	files->push_back(std::string((char *)module_path));
 	// @CleanUp
 
 	if(build_commands.linker == LINK_EXE)

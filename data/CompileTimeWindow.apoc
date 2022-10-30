@@ -1,0 +1,11 @@
+$import "Basic.apoc";
+$import "C_Standard.apoc";
+
+
+fn main()
+{
+	printf("Hello World!\n");
+}
+
+$run main();
+

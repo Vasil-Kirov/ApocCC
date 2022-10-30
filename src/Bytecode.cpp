@@ -149,7 +149,7 @@ ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func)
 				auto last_segment = ir->allocated[segment_size - 1];
 				global_var.position = last_segment.position + last_segment.size;
 			}
-			auto size = get_type_size(value.type);
+			auto size = get_type_size(*value.type);
 			global_var.init_val = (u64)value.pointed;
 			global_var.size = size;
 			SDPush(ir->allocated, global_var);

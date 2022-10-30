@@ -1,0 +1,12 @@
+// s "Called printf with 10 as an argument"
+fn printf(str: *u8, ...);
+
+fn interp() -> i64 {
+	my_var := 10;
+	printf("Called printf with %d as an argument\n", my_var);
+	-> 0;
+}
+
+fn main() -> i32 {
+	-> #i32 $run interp();
+}

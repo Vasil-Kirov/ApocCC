@@ -40,6 +40,25 @@ platform_call_and_wait(const char *command)
 	WaitForSingleObject(pc.hProcess, INFINITE);
 }
 
+Platform_Dynamic_Lib
+platform_load_dynamic_lib(const char *name_no_extension)
+{
+	/*
+	auto name_len = vstd_strlen(name_no_extension);
+	char *name = (char *)AllocatePermanentMemory(name_len + 5);
+	vstd_strcat(name, name_no_extension);
+	vstd_strcat(name, ".dll");
+	*/
+
+	return (Platform_Dynamic_Lib)LoadLibraryA(name_no_extension);
+}
+
+void *
+platform_find_fn(Platform_Dynamic_Lib lib, char *name)
+{
+	return (void *)GetProcAddress((HMODULE)lib, name);
+}
+
 void
 platform_get_absolute_path(char *Out)
 {

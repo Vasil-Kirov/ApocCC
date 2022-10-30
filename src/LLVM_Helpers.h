@@ -60,6 +60,6 @@ DIType *
 to_debug_type(Type_Info type, Debug_Info *debug);
 
 llvm::Constant *
-interp_val_to_llvm(Interp_Val val, Backend_State *backend, Function *func);
+interp_val_to_llvm(Interp_Val val, Backend_State *backend, ExecutionEngine *ee = NULL);
 
 #endif // _LLVM_HELPERS_H

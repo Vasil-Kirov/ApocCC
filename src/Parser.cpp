@@ -389,7 +389,9 @@ parse_file_level_statement(File_Contents *f)
 		} break;
 		case tok_run:
 		{
-			result = ast_run(advance_token(f), parse_expression(f, NO_EXPECT, false));
+			auto run_tok = advance_token(f);
+			result = ast_run(run_tok, parse_expression(f, NO_EXPECT, false));
+			parser_eat(f, (Token)';');
 		} break;
 		case tok_import:
 		{

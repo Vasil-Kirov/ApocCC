@@ -207,6 +207,9 @@ int main(int argc, char *argv[])
 	initialize_interpreter();
 	initialize_thread_pool();
 	init_type_system();
+#if !NO_VM
+	llvm_initialize_targets();
+#endif
 
 	if(argc < 2)
 	{
@@ -215,6 +218,9 @@ int main(int argc, char *argv[])
 
 	std::vector<std::string> file_names;
 	Build_Commands build_command = parse_command_line(argc, argv, &file_names);
+
+	set_dll_array(build_command.dynamic_libs);
+
 	if(file_names.size() == 0)
 		LG_FATAL("No source files specified");
 	File_Contents **files = SDCreate(File_Contents *);

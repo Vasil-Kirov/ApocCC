@@ -237,16 +237,22 @@ emit_file(TargetMachine* target_machine, CodeGenFileType file_type, char *file_n
 }
 
 void
+llvm_initialize_targets()
+{
+	llvm::InitializeNativeTarget();
+	LLVMLinkInMCJIT();
+	INITIALIZE_TARGET(AArch64);
+	INITIALIZE_TARGET(X86);
+	INITIALIZE_TARGET(WebAssembly);
+}
+
+void
 generate_obj(File_Contents* f)
 {
 
 	if (f->build_commands.optimization != OPT_NONE)
 		do_passes(f);
 	llvm::Target a_target = {};
-
-	INITIALIZE_TARGET(AArch64);
-	INITIALIZE_TARGET(X86);
-	INITIALIZE_TARGET(WebAssembly);
 
 	auto target_triple = sys::getDefaultTargetTriple();
 
@@ -674,7 +680,7 @@ generate_if_global_var(File_Contents *f, Ast_Node *node)
 						node->assignment.token);
 				LG_FATAL(".");
 			}
-			const_val = interp_val_to_llvm(interp_val, &backend, NULL);
+			const_val = interp_val_to_llvm(interp_val, &backend);
 		}
 		if(!const_val)
 		{
@@ -738,6 +744,7 @@ generate_statement(File_Contents *f, Ast_Node *node)
 		case type_struct: break;
 		case type_scope_start: break;
 		case type_overload: break;
+		case type_run: break;
 		default:
 		{
 			LG_ERROR("Statement of type %s not handled in code generation", type_to_str(node->type));
@@ -2000,7 +2007,7 @@ generate_selector(File_Contents *f, Ast_Node *node, Function *func)
 	{
 		auto enumerator = op_type->enumerator.node->enumerator;
 		auto member = enumerator.members[node->selector.selected_index];
-		llvm::Value *val = interp_val_to_llvm(member->interp_val.val, &backend, func);
+		llvm::Value *val = interp_val_to_llvm(member->interp_val.val, &backend);
 		return create_cast(enumerator.type, *member->interp_val.val.type, val);
 	}
 	else
@@ -2088,7 +2095,7 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		} break;
 		case type_run:
 		{
-			auto constant_val = interp_val_to_llvm(node->run.ran_val, &backend, func);
+			auto constant_val = interp_val_to_llvm(node->run.ran_val, &backend);
 			if(!is_integer(*node->run.ran_val.type) && !is_float(*node->run.ran_val.type))
 			{
 				Type_Info *val_type = node->run.ran_val.type;
