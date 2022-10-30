@@ -260,7 +260,7 @@ interpret_lhs(Ast_Node *lhs)
 }
 
 Interp_Val
-copy_struct(Interp_Val *_struct)
+copy_struct(Interp_Val *_struct, Type_Info *dst_type)
 {
 	Assert(_struct->type->type == T_STRUCT);
 	int struct_size = _struct->type->structure.member_count * sizeof(Interp_Val);
@@ -283,19 +283,49 @@ copy_array(Interp_Val *_array)
 	return result;
 }
 
+Interp_Val
+generate_empty(Type_Info *type)
+{
+	Interp_Val result = {};
+	result.type = type;
+	if(type->type == T_STRUCT)
+	{
+		result.pointed = AllocateCompileMemory(type->structure.member_count * sizeof(Interp_Val));
+		for(int i = 0; i < type->structure.member_count; ++i)
+			((Interp_Val *)result.pointed)[i] = generate_empty(&type->structure.member_types[i]);
+	}
+	else if(type->type == T_ARRAY)
+	{
+		result.pointed = AllocateCompileMemory(type->array.elem_count * sizeof(Interp_Val));
+		for(int i = 0; i < type->array.elem_count; ++i)
+			((Interp_Val *)result.pointed)[i] = generate_empty(type->array.type);
+	}
+	return result;
+}
+
 void
 interpret_assignment(Ast_Node *node, b32 *failed)
 {
-	Interp_Val result = interpret_expression(node->assignment.rhs, failed);
+	Interp_Val result;
+	if(node->assignment.rhs)
+		result = interpret_expression(node->assignment.rhs, failed);
+	else
+	{
+		result = generate_empty(node->assignment.decl_type);
+	}
 
 	// Make a copy so when we do 
 	// _my_struct = _my_other_struct
 	// we don't make them point to the same piece
 	// of memory
 	if(node->assignment.decl_type->type == T_STRUCT)
-		result = copy_struct(&result);
-	if(node->assignment.decl_type->type == T_ARRAY)
+	{
+		result = copy_struct(&result, node->assignment.decl_type);
+	}
+	else if(node->assignment.decl_type->type == T_ARRAY)
+	{
 		result = copy_array(&result);
+	}
 
 	if(node->assignment.is_declaration)
 	{
@@ -389,7 +419,20 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 			*token = *node->for_loop.token;
 			if(node->for_loop.expr1)
 				interpret_assignment(node->for_loop.expr1, failed);
+
+			if(*failed)
+			{
+				raise_interpret_error("expression 1 in for loop failed", *token);
+				return result;
+			}
+
 			Interp_Val expr2 = interpret_expression(node->for_loop.expr2, failed);
+
+			if(*failed)
+			{
+				raise_interpret_error("expression 2 in for loop failed", *token);
+				return result;
+			}
 			b32 is_true = val_to_bool(expr2);
 
 			
@@ -401,21 +444,103 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 				interp_push_scope();
 				if(next_node->type == type_scope_start)
 				{
+					/********************************************************
+					 * 
+					 * This automatically destroys scope when it reaches }
+					 *
+					 * *****************************************************/
 					result = interpret_statement_list(next_node->scope_desc.body, failed, 
 							token, scope_count, returned);
+					if(*failed)
+					{
+						raise_interpret_error("loop body couldn't be interpreted", *token);
+						return result;
+					}
 				}
 				else
 				{
 					result = interpret_statement(next_node, failed, token,
 							scope_count, returned, node_list, idx);
 					destroy_scope();
+					if(*failed)
+					{
+						raise_interpret_error("loop body couldn't be interpreted", *token);
+						return result;
+					}
 				}
 				if(*returned)
+				{
+					destroy_scope();
 					return result;
+				}
 				
 				interpret_expression(node->for_loop.expr3, failed);
 				Interp_Val expr2 = interpret_expression(node->for_loop.expr2, failed);
 				is_true = val_to_bool(expr2);
+			}
+			destroy_scope();
+		} break;
+		case type_for_in:
+		{
+			interp_push_scope();
+			*token = *node->for_in.token;
+			Interp_Val array = interpret_expression(node->for_in.array, failed);
+			if(*failed)
+			{
+				raise_interpret_error("array in for in expression couldn't be interpreted", *token);
+				return result;
+			}
+			Interp_Val i = create_interp_val();
+			Interp_Val elem_count = create_interp_val();
+			elem_count._i64 = array.type->array.elem_count;
+
+			
+			*idx += 1;
+			Ast_Node *next_node = node_list->statements.list[*idx];
+			while(i._i64 < elem_count._i64)
+			{
+				interp_push_scope();
+				if(node->for_in.i_nullalbe)
+					interp_add_symbol(node->for_in.i_nullalbe->identifier.name,  i);
+
+				auto array_loc = (Interp_Val *)array.pointed;
+				result = array_loc[i._i64];
+
+				interp_add_symbol(node->for_in.item->identifier.name, result);
+
+				if(next_node->type == type_scope_start)
+				{
+					/********************************************************
+					 * 
+					 * This automatically destroys scope when it reaches }
+					 *
+					 * *****************************************************/
+					result = interpret_statement_list(next_node->scope_desc.body, failed, 
+							token, scope_count, returned);
+					if(*failed)
+					{
+						raise_interpret_error("loop body couldn't be interpreted", *token);
+						return result;
+					}
+				}
+				else
+				{
+					result = interpret_statement(next_node, failed, token,
+							scope_count, returned, node_list, idx);
+					destroy_scope();
+					if(*failed)
+					{
+						raise_interpret_error("loop body couldn't be interpreted", *token);
+						return result;
+					}
+				}
+				if(*returned)
+				{
+					destroy_scope();
+					return result;
+				}
+				
+				i._i64 += 1;
 			}
 			destroy_scope();
 		} break;
@@ -424,7 +549,10 @@ interpret_statement(Ast_Node *node, b32 *failed, Token_Iden *token, i32 scope_co
 			*returned = true;
 			*token = node->ret.token;
 			result = interpret_expression(node->ret.expression, failed);
-			return result;
+			Interp_Val casted = create_interp_val();
+			casted._u64 = result._u64;
+			*casted.type = node->ret.func_type;
+			return casted;
 		} break;
 		default:
 		{
@@ -630,9 +758,14 @@ interpret_operand(Ast_Node *node, b32 *failed)
 
 			for(size_t i = 0; i < list_count; ++i)
 			{
-				auto elem_ptr = array_loc + i;
-				*elem_ptr = perform_cast(*elem_ptr, *node->array_list.type.array.type);
+				array_loc[i] = perform_cast(array_loc[i], *node->array_list.type.array.type);
 			}
+
+			for(size_t i = list_count; i < node->array_list.type.array.elem_count; ++i)
+			{
+				array_loc[i] = generate_empty(node->array_list.type.array.type);
+			}
+
 			result.type = &node->array_list.type;
 			result.pointed = array_loc;
 		} break;
@@ -645,15 +778,19 @@ interpret_operand(Ast_Node *node, b32 *failed)
 			
 			result.type = &node->struct_init.type;
 			result.pointed = struct_loc;
-			for(int i = 0; i < member_count; ++i) {
-				struct_loc[i].type = &node->struct_init.type.structure.member_types[i];
+
+			if(node->struct_init.is_empty_init || SDCount(node->struct_init.expressions) < result.type->structure.member_count)
+			{
+				for(int i = 0; i < member_count; ++i)
+				{
+					struct_loc[i] = generate_empty(&result.type->structure.member_types[i]);
+				}
 			}
 
 			// @NOTE: fast path
 			if(node->struct_init.is_empty_init)
 			{
-				// @NOTE: Memory is already cleared to zero on allocation so we don't
-				// need to do anything
+				// nothing to do here
 			}
 			else
 			{
@@ -673,6 +810,7 @@ interpret_operand(Ast_Node *node, b32 *failed)
 					Interp_Val *member_ptr = struct_loc + i;
 					// Just copy the value, doesn't matter what it actually is
 					member_ptr->_u64 = expr_val._u64;
+					member_ptr->type = &result.type->structure.member_types[i];
 				}
 			}
 		} break;

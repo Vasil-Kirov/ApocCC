@@ -957,7 +957,7 @@ increment_val(llvm::Value *i)
 }
 
 llvm::Value *
-generate_item_for_in(llvm::Value *i, Variable_Info *array, llvm::Function *func)
+generate_item_for_in(llvm::Value *i, Variable_Info *array, llvm::Function *func, Ast_Node *node)
 {
 	i = backend.builder->CreateLoad(backend.builder->getIntNTy(get_register_bit_size()), i);
 	auto zero = ConstantInt::get(*backend.context, llvm::APInt(get_register_bit_size(), 0, true));
@@ -985,8 +985,9 @@ generate_item_for_in(llvm::Value *i, Variable_Info *array, llvm::Function *func)
 	it_info->value = item;
 	it_info->type = array->type->array.type;
 
-	shput(backend.named_values, "idx", i_info);
-	shput(backend.named_values, "item", it_info);
+	if(node->for_in.i_nullalbe)
+		shput(backend.named_values, node->for_in.i_nullalbe->identifier.name, i_info);
+	shput(backend.named_values, node->for_in.item->identifier.name, it_info);
 	return item;
 }
 
@@ -1048,7 +1049,7 @@ generate_for_in_loop(File_Contents *f, Ast_Node *node, Function *func,
 	Assert(list[*idx]->type == type_scope_start);
 
 	backend.builder->SetInsertPoint(body);
-	generate_item_for_in(i, array, func);
+	generate_item_for_in(i, array, func, node);
 	generate_blocks_from_list(f, list[*idx]->scope_desc.body, func, body, "for.body",
 			incr);
 

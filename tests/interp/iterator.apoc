@@ -1,7 +1,6 @@
 // 96
 
-
-fn main() -> i32 {
+fn interp() -> i32 {
 	array: [16]S;
 	s := S { 10, 20 };
 	d := S { 1, 2 };
@@ -15,6 +14,10 @@ fn main() -> i32 {
 		x += it.x + it.y;
 	}
 	-> x;
+}
+
+fn main() -> i32 {
+	-> $run interp();
 }
 
 struct S {
