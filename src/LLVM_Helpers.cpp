@@ -671,6 +671,7 @@ llvm_store(Type_Info *type, llvm::Value *ptr, llvm::Value *value, Backend_State 
 {
 	if(type->type == T_ARRAY)
 	{
+#if 0
 		auto llvm_type = apoc_type_to_llvm(*type, backend);
 		auto zero = ConstantInt::get(*backend->context, APInt::getZero(64));
 		llvm::Value *zero_index[] = { zero, zero };
@@ -682,6 +683,8 @@ llvm_store(Type_Info *type, llvm::Value *ptr, llvm::Value *value, Backend_State 
 
 		Align alignment = llvm::Align(get_type_alignment(*type));
 		backend->builder->CreateMemCpy(ptr, alignment, zero_ptr, alignment, size);
+#endif
+		llvm_memcpy(ptr, value, type, backend);
 	}
 	else
 	{

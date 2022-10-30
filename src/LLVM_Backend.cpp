@@ -2034,7 +2034,7 @@ load_got_identifier(Variable_Info *variable, Variable_Types type)
 		} break;
 		case ID_LOCAL:
 		{
-			if(variable->type->type == T_FUNC || variable->type->type == T_STRUCT)
+			if(variable->type->type == T_FUNC || variable->type->type == T_STRUCT || variable->type->type == T_ARRAY)
 				return variable->value;
 			return backend.builder->CreateLoad(
 					apoc_type_to_llvm(*variable->type, &backend), variable->value);
