@@ -478,11 +478,14 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 				auto val = interpret_expression(functions[i]->assignment.rhs, &failed);
 				if(failed)
 					raise_semantic_error(f, "Global expression couldn't be interpreted at compile time", functions[i]->assignment.token);
-				val.type = functions[i]->assignment.decl_type;
-				interp_add_symbol(functions[i]->assignment.token.identifier, val);
+				interp_fix_and_add_val(functions[i]->assignment.token.identifier, &val, val.type);
 			}
 			else
-				interp_add_symbol(functions[i]->assignment.token.identifier, {});
+			{
+				auto val = create_interp_val();
+				val.type = node->assignment.decl_type;
+				interp_fix_and_add_val(functions[i]->assignment.token.identifier, &val, val.type);
+			}
 		}
 		else if(functions[i]->type == type_run) {}
 		else
@@ -500,19 +503,28 @@ analyze_functions_and_overloads(File_Contents *f, Ast_Node **functions)
 	{
 		if(functions[i]->type == type_func)
 			verify_func(f, functions[i]);
-		else if(functions[i]->type == type_run)
-		{
-			get_expression_type(f, functions[i]->run.to_run, functions[i]->run.token, functions[i], NULL);
-			b32 failed = false;
-			functions[i]->run.ran_val = interpret_expression(functions[i]->run.to_run, &failed);
-			if(failed)
-				raise_semantic_error(f, "Expression couldn't be run at compile time", *functions[i]->run.token);
-		}
 	}
 	for(size_t i = 0; i < func_count; ++i)
 	{
 		if(functions[i]->type == type_overload)
 			verify_overload(f, functions[i]);
+	}
+}
+
+void
+run_global_runs(File_Contents *f, Ast_Node **top_level)
+{
+	size_t top_level_count = SDCount(top_level);
+	for(size_t i = 0; i < top_level_count; ++i)
+	{
+		if(top_level[i]->type == type_run)
+		{
+			get_expression_type(f, top_level[i]->run.to_run, top_level[i]->run.token, top_level[i], NULL);
+			b32 failed = false;
+			top_level[i]->run.ran_val = interpret_expression(top_level[i]->run.to_run, &failed);
+			if(failed)
+				raise_semantic_error(f, "Expression couldn't be run at compile time", *top_level[i]->run.token);
+		}
 	}
 }
 
@@ -555,10 +567,15 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 				if(failed)
 					raise_semantic_error(f, "Expression for global declaration is not constant",
 							node->assignment.token);
-				interp_add_symbol(node->assignment.lhs->identifier.name, expr);
+
+				interp_fix_and_add_val(node->assignment.lhs->identifier.name, &expr, node->assignment.decl_type);
 			}
 			else
-				interp_add_symbol(node->assignment.lhs->identifier.name, {});
+			{
+				auto val = create_interp_val();
+				val.type = node->assignment.decl_type;
+				interp_fix_and_add_val(node->assignment.lhs->identifier.name, &val, node->assignment.decl_type);
+			}
 
 			return node;
 		} break;
@@ -639,7 +656,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 			auto mem_val = interpret_expression(member->rhs, &failed);
 			if(failed)
 				raise_semantic_error(f, "Expression in enum is not constant", member->token);
-			interp_add_symbol(member->lhs->identifier.name, mem_val);
+			interp_fix_and_add_val(member->lhs->identifier.name, &mem_val, mem_val.type);
 
 			Type_Info *symbol_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
 			memcpy(symbol_type, &enumerator->type, sizeof(Type_Info));
@@ -664,10 +681,12 @@ verify_enum(File_Contents *f, Ast_Node *node)
 	}
 
 	Interp_Val d = create_interp_val();
+	d.type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 	d.type->type = T_INTEGER;
 	d.type->primitive.size = byte8;
 	d._i64 = 1;
 	Interp_Val first_val = create_interp_val();
+	first_val.type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 	first_val.type->type = T_INTEGER;
 	first_val.type->primitive.size = byte8;
 	first_val._i64 = 0;
@@ -692,6 +711,7 @@ verify_enum(File_Contents *f, Ast_Node *node)
 		
 		Interp_Val top = create_interp_val();
 		Interp_Val bot = create_interp_val();
+		bot.type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 		DO_U_OP(top, -, first);
 		DO_OP(top, +, top, last);
 		if(is_float(*top.type))
@@ -2706,7 +2726,9 @@ check_type_compatibility(Type_Info a, Type_Info b)
 		else if(b.type == T_FUNC)
 		{
 			if(a.pointer.type->type == T_FUNC)
-				return true;
+			{
+				return vstd_strcmp((char *)a.identifier, (char *)b.identifier);
+			}
 		}
 	}
 	if(a.type == T_BOOLEAN && b.type == T_BOOLEAN)

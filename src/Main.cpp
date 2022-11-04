@@ -264,6 +264,11 @@ int main(int argc, char *argv[])
 		File_Contents *f = files[file_idx];
 		TIME_FUNC(timers, file_functions[file_idx] = analyze(f, f->ast_root), analysis_clock, analysis);
 	}
+
+#if !NOVM
+	llvm_initialize(files);
+	generate_structs_for_all_files(files);
+#endif
 	
 	fix_all_types();
 	LOOP_FILES
@@ -271,6 +276,12 @@ int main(int argc, char *argv[])
 		File_Contents *f = files[file_idx];
 		TIME_FUNC(timers, analyze_functions_and_overloads(f, file_functions[file_idx]), analysis_clock, analysis);
 		pop_scope(f, f->prev_token);
+	}
+
+	LOOP_FILES
+	{
+		File_Contents *f = files[file_idx];
+		TIME_FUNC(timers, run_global_runs(f, file_functions[file_idx]), analysis_clock, analysis);
 	}
 
 

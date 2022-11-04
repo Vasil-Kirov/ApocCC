@@ -176,6 +176,9 @@ struct Expression_Context
 void
 import_non_imported(File_Contents **files);
 
+void
+run_global_runs(File_Contents *f, Ast_Node **top_level);
+
 Type_Info
 number_to_untyped_type(u8 *number);
 

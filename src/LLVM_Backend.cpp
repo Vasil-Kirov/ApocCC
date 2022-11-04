@@ -96,7 +96,6 @@ do_passes(File_Contents *f)
 Backend_State
 llvm_initialize(File_Contents **files)
 {
-	Backend_State backend = {};
 	backend.context = new LLVMContext();
 	backend.module = new Module(platform_path_to_file_name((char *)files[0]->path), *backend.context);
 	backend.builder = new IRBuilder<>(*backend.context);
@@ -309,8 +308,6 @@ generate_obj(File_Contents* f)
 void
 llvm_backend_generate(File_Contents **files)
 {
-	backend = llvm_initialize(files);
-
 	if(sizeof(size_t) == 8)
 		backend.module->setDataLayout(StringRef("i64:64:64"));
 
@@ -363,8 +360,10 @@ llvm_backend_generate(File_Contents **files)
 }
 
 void
-generate_struct_type(File_Contents *f, Type_Info type, llvm::StructType *opaque_struct)
+generate_struct_type(File_Contents *f, Type_Info type, llvm::StructType *opaque_struct, Backend_State *opt_backend)
 {
+	if(!opt_backend)
+		opt_backend = &backend;
 	auto members = type.structure.member_types;
 	auto member_count = type.structure.member_count;
 
@@ -377,7 +376,7 @@ generate_struct_type(File_Contents *f, Type_Info type, llvm::StructType *opaque_
 				debug_types[i] = to_debug_type(members[i], &debug);
 		}
 
-		mem_types[i] = apoc_type_to_llvm(members[i], &backend);
+		mem_types[i] = apoc_type_to_llvm(members[i], opt_backend);
 	}
 	auto array_ref = makeArrayRef(mem_types, member_count);
 
@@ -403,7 +402,7 @@ generate_union_type(File_Contents *f, Type_Info passed_type, llvm::StructType *o
 	}
 	else
 	{
-		generate_struct_type(f, type, opaque_struct);
+		generate_struct_type(f, type, opaque_struct, NULL);
 	}
 }
 
@@ -584,7 +583,7 @@ generate_structs(File_Contents *f)
 }
 
 void
-generate_signatures(File_Contents **files)
+generate_structs_for_all_files(File_Contents **files)
 {
 	// @NOTE: generate opaque structs and then fill them out
 	// so that structs that contain pointers or hold other structs
@@ -609,6 +608,12 @@ generate_signatures(File_Contents **files)
 		File_Contents *f = files[file_idx];
 		generate_structs(f);
 	}
+}
+
+void
+generate_signatures(File_Contents **files)
+{
+	size_t file_count = SDCount(files);
 
 	LOOP_FILES {
 		File_Contents *f = files[file_idx];
@@ -802,19 +807,22 @@ generate_statement_list(File_Contents *f, Ast_Node *list, i32 *out_func_count)
 }
 
 llvm::Value *
-create_cast(Type_Info to, Type_Info from, llvm::Value *castee)
+create_cast(Type_Info to, Type_Info from, llvm::Value *castee, Backend_State *opt_backend)
 {
+	if(!opt_backend)
+		opt_backend = &backend;
+
 	if(to.type == T_BOOLEAN && from.type != T_BOOLEAN)
 	{
 		auto zero = ConstantInt::get(apoc_type_to_llvm(from, &backend), 0);
-		return backend.builder->CreateICmpNE(castee, zero);
+		return opt_backend->builder->CreateICmpNE(castee, zero);
 	}
 	b32 should_cast = true;
 	auto to_cast = get_cast_type(to, from, &should_cast);
 
 	if (should_cast)
 	{
-		castee = backend.builder->CreateCast(to_cast, castee, apoc_type_to_llvm(to, &backend), "cast");
+		castee = opt_backend->builder->CreateCast(to_cast, castee, apoc_type_to_llvm(to, opt_backend), "cast");
 	}
 	return castee;
 }

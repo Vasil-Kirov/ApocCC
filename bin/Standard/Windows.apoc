@@ -2,6 +2,21 @@ $if Windows
 $import "OS.apoc";
 $import "Basic.apoc";
 
+$type ATOM u16
+
+CS_VREDRAW :u32: 0x0001;
+CS_HREDRAW :u32: 0x0002;
+
+WS_OVERLAPPED       :u32: 0x00000000;
+WS_CAPTION          :u32: 0x00C00000;
+WS_SYSMENU          :u32: 0x00080000;
+WS_THICKFRAME       :u32: 0x00040000;
+WS_MINIMIZEBOX      :u32: 0x00020000;
+WS_MAXIMIZEBOX      :u32: 0x00010000;
+WS_OVERLAPPEDWINDOW :u32: WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+WS_VISIBLE          :u32: 0x10000000;
+CW_USEDEFAULT       :i32: 0x80000000;
+
 fn $call c_decl GetLastError() -> u32;
 
 fn $call c_decl CreateFileA(
@@ -13,6 +28,45 @@ fn $call c_decl CreateFileA(
   dwFlagsAndAttributes: File_Attribute,
   hTemplateFile: *void
 ) ->* void;
+
+fn $call c_decl RegisterClassA(
+	lpWndClass: *WNDCLASSA
+) -> ATOM;
+
+fn $call c_decl GetModuleHandleA(
+	name: *u8
+) -> *void;
+
+fn $call c_decl CreateWindowA(
+	class_name: *u8,
+	window_name: *u8,
+	style: u32,
+	x: i32,
+	y: i32,
+	w: i32,
+	h: i32,
+	parent: *void,
+	menu: *void,
+	instance: *void,
+	lparam: *void
+) -> *void {
+	-> CreateWindowExA(0, class_name, window_name, style, x, y, w, h, parent, menu, instance, lparam);
+}
+
+fn $call c_decl CreateWindowExA(
+	ext_styles: u32,
+	class_name: *u8,
+	window_name: *u8,
+	style: u32,
+	x: i32,
+	y: i32,
+	w: i32,
+	h: i32,
+	parent: *void,
+	menu: *void,
+	instance: *void,
+	lparam: *void
+) -> *void;
 
 fn $call c_decl WriteFile(
 	hFile: *void,
@@ -47,6 +101,19 @@ fn write_file(file: *void, data: *void, size: u32) -> bool
 fn get_stdout() -> *void
 {
 	-> GetStdHandle(STD_Handle.OUTPUT);
+}
+
+struct WNDCLASSA {
+	style: u32;
+	wnd_proc: fn(*void, u32, u64, u64) -> u64;
+	cb_cls_extra: i32;
+	cb_wnd_extra: i32;
+	instance: *void;
+	icon: *void;
+	cursor: *void;
+	background: *void;
+	menu_name: *u8;
+	class_name: *u8;
 }
 
 struct SECURITY_ATTRIBUTES {

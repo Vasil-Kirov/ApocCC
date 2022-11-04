@@ -338,7 +338,7 @@ interp_val_to_llvm(Interp_Val val, Backend_State *backend, ExecutionEngine *ee)
 			Type_Info int_type = {};
 			int_type.type = T_INTEGER;
 			int_type.primitive.size = ubyte8;
-			result = (Constant *)create_cast(*val.type, int_type, result);
+			result = (Constant *)create_cast(*val.type, int_type, result, backend);
 			//result = ConstantExpr::getIntToPtr(result, PointerType::get(*backend->context, 0));
 		} break;
 		case T_STRING:
@@ -631,7 +631,7 @@ apoc_type_to_llvm(Type_Info type, Backend_State *backend)
 		if(!struct_type)
 		{
 			struct_type = StructType::get(*backend->context, type.structure.is_packed);
-			generate_struct_type(NULL, type, struct_type);
+			generate_struct_type(NULL, type, struct_type, backend);
 		}
 		return struct_type;
 	}

@@ -25,11 +25,36 @@ interp_push_scope()
 	stack_push(symbol_scope, scope);
 }
 
+void
+free_interp_val(Interp_Val *val)
+{
+	if(val->type->type == T_STRUCT)
+	{
+		for(int i = 0; i < val->type->structure.member_count; ++i)
+		{
+			free_interp_val(((Interp_Val *)val->pointed) + i);
+		}
+	}
+	else if(val->type->type == T_ARRAY)
+	{
+		for(int i = 0; i < val->type->array.elem_count; ++i)
+		{
+			free_interp_val(((Interp_Val *)val->pointed) + i);
+		}
+	}
+	//FreeInterpMiscMemory(val->type);
+	FreeInterpMemory(val->location);
+}
 
 void
 destroy_scope()
 {
 	Interp_Table *old_table = stack_pop(symbol_scope, Interp_Table *);
+	auto len = shlen(old_table);
+	for(size_t i = 0; i < len; ++i)
+	{
+		Assert(old_table[i].value.type);
+	}
 	shfree(old_table);
 }
 
@@ -44,6 +69,9 @@ perform_cast(Interp_Val operand, Type_Info cast)
 {
 	if(is_untyped(*operand.type))
 	{
+		Type_Info *typed = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
+		memcpy(typed, operand.type, sizeof(Type_Info));
+		operand.type = typed;
 		if(is_integer(*operand.type))
 		{
 			operand.type->primitive.size = byte8;
@@ -155,7 +183,7 @@ inline Interp_Val
 create_interp_val()
 {
 	Interp_Val result = {};
-	result.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	//result.type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 	return result;
 }
 
@@ -165,6 +193,18 @@ interp_add_symbol(u8 *identifier, Interp_Val value)
 	auto scope = stack_pop(symbol_scope, Interp_Table *);
 	shput(scope, identifier, value);
 	stack_push(symbol_scope, scope);
+}
+
+void
+interp_fix_and_add_val(u8 *identifier, Interp_Val *value, Type_Info *type)
+{
+	auto size = get_type_size(*type);
+	auto dst = AllocateInterpMemory(size);
+	copy_interp_val_to_memory(dst, value, type);
+	auto val = create_interp_val();
+	val.type = type;
+	val.location = dst;
+	interp_add_symbol(identifier, val);
 }
 
 Interp_Val *
@@ -242,19 +282,18 @@ jit_foreign_function_call(Ast_Node *func, Ast_Node *call, b32 *failed)
 		*failed = true;
 		return {};
 	}
-	llvm::LLVMContext context;
 	Backend_State backend = {};
-	backend.context = &context;
-	std::unique_ptr<Module> module = std::make_unique<Module>("jit_call", context);
+	backend.context = new LLVMContext();
+	std::unique_ptr<Module> module = std::make_unique<Module>("jit_call", *backend.context);
 	backend.module = module.get();
 	backend.builder = new IRBuilder<>(*backend.context);
 
-	Type_Info *entry_fn_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	Type_Info *entry_fn_type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 	entry_fn_type->type = T_FUNC;
 	entry_fn_type->func.calling_convention = CALL_C_DECL;
-	entry_fn_type->func.return_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	entry_fn_type->func.return_type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 	entry_fn_type->func.return_type->type = T_POINTER;
-	entry_fn_type->func.return_type->pointer.type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+	entry_fn_type->func.return_type->pointer.type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 	entry_fn_type->func.return_type->pointer.type->type = T_VOID;
 	entry_fn_type->func.param_types = SDCreate(Type_Info);
 
@@ -266,9 +305,12 @@ jit_foreign_function_call(Ast_Node *func, Ast_Node *call, b32 *failed)
 	int arg_count = SDCount(call->func_call.arguments);
 	llvm::Value *args[arg_count];
 	memset(args, 0, sizeof(args));
+	b32 found_var_args = false;
 	for(int i = 0; i < arg_count; ++i)
 	{
 		auto arg = interpret_expression(call->func_call.arguments[i], failed);
+		if(!found_var_args && call->func_call.arg_types[i].type == T_DETECT)
+			found_var_args = true;
 		if(*failed)
 		{
 			char error[1024] = {};
@@ -277,6 +319,8 @@ jit_foreign_function_call(Ast_Node *func, Ast_Node *call, b32 *failed)
 			return {};
 		}
 		args[i] = interp_val_to_llvm(arg, &backend);
+		if(!found_var_args)
+				args[i] = create_cast(call->func_call.arg_types[i], call->func_call.expr_types[i], args[i], &backend);
 	}
 	llvm::Value * fn_val = backend.builder->getIntN(get_register_bit_size(), (u64)fn);
 	fn_val = backend.builder->CreateIntToPtr(fn_val, PointerType::get(*backend.context, 0));
@@ -297,8 +341,10 @@ jit_foreign_function_call(Ast_Node *func, Ast_Node *call, b32 *failed)
 	{
 		Type_Info *ret_type = func->function.type->func.return_type;
 		llvm::Value *result = backend.builder->CreateCall(callee, makeArrayRef(args, arg_count), "jitted_call");
-		Type_Info *ptr_type = (Type_Info *)AllocateCompileMemory(sizeof(Type_Info));
+		Type_Info *ptr_type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 		ptr_type->type = T_POINTER;
+		ptr_type->pointer.type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
+		ptr_type->pointer.type->type = T_VOID;
 
 		b32 should_cast = false;
 		auto op = get_cast_type(*ptr_type, *ret_type, &should_cast);
@@ -307,6 +353,9 @@ jit_foreign_function_call(Ast_Node *func, Ast_Node *call, b32 *failed)
 			result = backend.builder->CreateCast(op, result, PointerType::get(*backend.context, 0));
 		}
 		backend.builder->CreateRet(backend.builder->CreateBitCast(result, PointerType::get(*backend.context, 0)));
+
+		FreeInterpMiscMemory(ptr_type);
+		FreeInterpMiscMemory(ptr_type->pointer.type);
 	}
 	else
 	{
@@ -337,6 +386,11 @@ jit_foreign_function_call(Ast_Node *func, Ast_Node *call, b32 *failed)
 	out._u64 = (u64)fn_result;
 
 	entry_fn->eraseFromParent();
+
+	FreeInterpMiscMemory(entry_fn_type);
+	FreeInterpMiscMemory(entry_fn_type->func.return_type);
+	FreeInterpMiscMemory(entry_fn_type->func.return_type->pointer.type);
+
 	delete backend.builder;
 	delete ee;
 	return out;
@@ -369,11 +423,16 @@ interpret_lhs(Ast_Node *lhs)
 			Assert(lhs->unary_expr.op->type == tok_star);
 			Assert(lhs->unary_expr.expr_type.type == T_POINTER);
 			Interp_Val *id = interpret_lhs(lhs->unary_expr.expression);
-			return (Interp_Val *)id->pointed;	
+			WORK HERE
 		} break;
 		case type_identifier:
 		{
 			return interp_look_up_symbol(lhs->identifier.name);
+		} break;
+		case type_selector:
+		{
+			Interp_Val *operand = interpret_lhs(lhs->selector.operand);
+			return operand + lhs->selector.selected_index;
 		} break;
 		case type_index:
 		{
@@ -410,28 +469,101 @@ interpret_lhs(Ast_Node *lhs)
 	return NULL;
 }
 
-Interp_Val
-copy_struct(Interp_Val *_struct, Type_Info *dst_type)
+void
+copy_struct(Interp_Val *_struct, Type_Info *dst_type, void *dst);
+
+void
+copy_array(Interp_Val *_array, void *dst);
+
+// @NOTE: this frees the memory of the copied value
+void
+copy_interp_val_to_memory(void *dst, Interp_Val *val, Type_Info *dst_type)
 {
-	Assert(_struct->type->type == T_STRUCT);
-	int struct_size = _struct->type->structure.member_count * sizeof(Interp_Val);
-	Interp_Val result = create_interp_val();
-	result.type = _struct->type;
-	result.pointed = AllocateInterpMemory(struct_size);
-	memcpy(result.pointed, _struct->pointed, struct_size);
-	return result;
+	switch(dst_type->type)
+	{
+		case T_STRUCT:
+		{
+			copy_struct(val, dst_type, dst);
+			FreeInterpMiscMemory(val->pointed);
+		} break;
+		case T_ARRAY:
+		{
+			copy_array(val, dst);
+			FreeInterpMiscMemory(val->pointed);
+		} break;
+		case T_POINTER:
+		{
+			*(void **)dst = val->pointed;
+		} break;
+		default:
+		{
+			if(is_untyped(*dst_type))
+			{
+				*dst_type = untyped_to_type(*dst_type);
+			}
+			switch(dst_type->primitive.size)
+			{
+				case logical_bit:
+				case ubyte1:
+				case byte1:
+					{
+						*(u8 *)dst = val->_u8;
+					} break;
+				case ubyte2:
+				case byte2:
+					{
+						*(u16 *)dst = val->_u16;
+					} break;
+				case real32:
+				case ubyte4:
+				case byte4:
+					{
+						*(u32 *)dst = val->_u32;
+					} break;
+				case real64:
+				case ubyte8:
+				case byte8:
+					{
+						*(u64 *)dst = val->_u64;
+					} break;
+				default: 
+					{
+						// @TODO: SIMD support
+						// @TODO: SIMD support
+						// @TODO: SIMD support
+						Assert(false);
+					} break;
+			}
+		} break;
+	}
 }
 
-Interp_Val
-copy_array(Interp_Val *_array)
+void
+copy_struct(Interp_Val *_struct, Type_Info *dst_type, void *dst)
+{
+	Assert(_struct->type->type == T_STRUCT);
+
+	u8 *it = (u8 *)dst;
+	for(int i = 0; i < dst_type->structure.member_count; ++i)
+	{
+		copy_interp_val_to_memory(it, (Interp_Val *)_struct->pointed + i, &dst_type->structure.member_types[i]);
+		auto elem_size = get_type_size(_struct->type->structure.member_types[i]);
+		it += elem_size;
+	}
+}
+
+void
+copy_array(Interp_Val *_array, void *dst)
 {
 	Assert(_array->type->type == T_ARRAY);
-	int struct_size = _array->type->array.elem_count * sizeof(Interp_Val);
-	Interp_Val result = create_interp_val();
-	result.type = _array->type;
-	result.pointed = AllocateInterpMemory(struct_size);
-	memcpy(result.pointed, _array->pointed, struct_size);
-	return result;
+
+	u8 *it = (u8 *)dst;
+	auto elem_size = get_type_size(*_array->type->array.type);
+	for(int i = 0; i < _array->type->array.elem_count; ++i)
+	{
+		copy_interp_val_to_memory(it, (Interp_Val *)_array->pointed + i, _array->type->array.type);
+		it += elem_size;
+	}
 }
 
 Interp_Val
@@ -441,13 +573,13 @@ generate_empty(Type_Info *type)
 	result.type = type;
 	if(type->type == T_STRUCT)
 	{
-		result.pointed = AllocateCompileMemory(type->structure.member_count * sizeof(Interp_Val));
+		result.pointed = AllocateInterpMemory(type->structure.member_count * sizeof(Interp_Val));
 		for(int i = 0; i < type->structure.member_count; ++i)
 			((Interp_Val *)result.pointed)[i] = generate_empty(&type->structure.member_types[i]);
 	}
 	else if(type->type == T_ARRAY)
 	{
-		result.pointed = AllocateCompileMemory(type->array.elem_count * sizeof(Interp_Val));
+		result.pointed = AllocateInterpMemory(type->array.elem_count * sizeof(Interp_Val));
 		for(int i = 0; i < type->array.elem_count; ++i)
 			((Interp_Val *)result.pointed)[i] = generate_empty(type->array.type);
 	}
@@ -465,18 +597,9 @@ interpret_assignment(Ast_Node *node, b32 *failed)
 		result = generate_empty(node->assignment.decl_type);
 	}
 
-	// Make a copy so when we do 
-	// _my_struct = _my_other_struct
-	// we don't make them point to the same piece
-	// of memory
-	if(node->assignment.decl_type->type == T_STRUCT)
-	{
-		result = copy_struct(&result, node->assignment.decl_type);
-	}
-	else if(node->assignment.decl_type->type == T_ARRAY)
-	{
-		result = copy_array(&result);
-	}
+	void *dst = AllocateInterpMemory(get_type_size(*node->assignment.decl_type));
+	copy_interp_val_to_memory(dst, &result, node->assignment.decl_type);
+	result.location = dst;
 
 	if(node->assignment.is_declaration)
 	{
@@ -749,19 +872,22 @@ interpret_function(Interp_Val func, Ast_Call call, b32 *failed)
 
 	auto args = f_node->function.arguments;
 	size_t arg_count = SDCount(args);
+	Interp_Val arg_results[arg_count];
 	for (size_t i = 0; i < arg_count; ++i)
 	{
+		arg_results[i] = interpret_expression(call.arguments[i], failed);
+	}
+	for(size_t i = 0; i < arg_count; ++i)
+	{
 		Ast_Variable arg = args[i]->variable;
-		// @TODO: Do a heap allocator
-		void *location = AllocateInterpMemory((get_type_size(*arg.type) + 1)
-				* sizeof(Interp_Val));
-		Interp_Val *the_arg = (Interp_Val *)location;
-		the_arg->type = arg.type;
-		the_arg->location = location;
-		if(the_arg->type->type == T_ARRAY)
-			the_arg->pointed = (Interp_Val *)location + 1;
 
-		interp_add_symbol(arg.identifier.name, *the_arg);
+		void *location = AllocateInterpMemory(get_type_size(*arg.type));
+		copy_interp_val_to_memory(location, &arg_results[i], arg.type);
+		Interp_Val the_arg = create_interp_val();
+		the_arg.type = arg.type;
+		the_arg.location = location;
+
+		interp_add_symbol(arg.identifier.name, the_arg);
 	}
 	
 	Token_Iden token = {};
@@ -780,6 +906,54 @@ Interp_Val
 str_to_interp_val(u8 *str)
 {
 	Interp_Val result = create_interp_val();
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	// @TODO: MEMORY LEAK
+	result.type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 	size_t str_len = vstd_strlen((char *)str);
 	for(size_t i = 0; i < str_len; ++i)
 	{
@@ -809,6 +983,7 @@ interpret_add_function(Symbol func_sym)
 {
 	Interp_Table *top = stack_pop(symbol_scope, Interp_Table *);
 	Interp_Val func = create_interp_val();
+	func.type = (Type_Info *)AllocateInterpMiscMemory(sizeof(Type_Info));
 	func.type->type = T_FUNC;
 	func.pointed = func_sym.node;
 	shput(top, func_sym.identifier, func);
@@ -836,8 +1011,16 @@ interpret_operand(Ast_Node *node, b32 *failed)
 				*failed = true;
 				return result;
 			}
-			result = *location;
-			result.location = location;
+			auto size = get_type_size(*location->type);
+			if(location->type->type == T_FUNC)
+			{
+				result.pointed = location->pointed;
+			}
+			else
+			{
+				memcpy(&result._u64, location->location, size);
+			}
+			result.type = location->type;
 		} break;
 		case type_literal:
 		{
@@ -898,7 +1081,7 @@ interpret_operand(Ast_Node *node, b32 *failed)
 		case type_array_list:
 		{
 			int type_size = node->array_list.type.array.elem_count * sizeof(Interp_Val);
-			Interp_Val *array_loc = (Interp_Val *)AllocateInterpMemory(type_size);
+			Interp_Val *array_loc = (Interp_Val *)AllocateInterpMiscMemory(type_size);
 
 			auto list = node->array_list.list;
 			size_t list_count = SDCount(list);
@@ -927,7 +1110,7 @@ interpret_operand(Ast_Node *node, b32 *failed)
 			Assert(node->struct_init.type.type == T_STRUCT);
 			auto member_count = node->struct_init.type.structure.member_count;
 			auto type_size = member_count * sizeof(Interp_Val);//get_type_size(node->struct_init.type);
-			Interp_Val *struct_loc = (Interp_Val *)AllocateInterpMemory(type_size);
+			Interp_Val *struct_loc = (Interp_Val *)AllocateInterpMiscMemory(type_size);
 			
 			result.type = &node->struct_init.type;
 			result.pointed = struct_loc;
@@ -969,6 +1152,25 @@ interpret_operand(Ast_Node *node, b32 *failed)
 		} break;
 		case type_const_str:
 		{
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			// @TODO: LEAK
+			result.type = (Type_Info *)AllocateInterpMemory(sizeof(Type_Info));
 			result.type->type = T_STRING;
 			result.pointed = node->atom.identifier.name;
 		} break;
@@ -983,14 +1185,18 @@ interpret_operand(Ast_Node *node, b32 *failed)
 Interp_Val
 interpret_unary(Ast_Node *node, b32 *failed)
 {
-	Interp_Val result = create_interp_val();
+	Interp_Val result;
 	if(*failed)
-		return result;
+		return {};
 	switch(node->type)
 	{
 		case type_unary_expr:
 		{
-			Interp_Val operand = interpret_expression(node->unary_expr.expression, failed);
+			result = create_interp_val();
+
+			Interp_Val operand;
+			if(node->unary_expr.op->type != '@')
+				operand = interpret_expression(node->unary_expr.expression, failed);
 			switch((int)node->unary_expr.op->type)
 			{
 				case tok_plusplus:
@@ -1015,9 +1221,11 @@ interpret_unary(Ast_Node *node, b32 *failed)
 				} break;
 				case '@':
 				{
-					Assert(operand.location);
+					auto operand = interpret_lhs(node->unary_expr.expression);
+					Assert(operand->location);
 					result.type->type = T_POINTER;
-					result.pointed = operand.location;
+					result.type->pointer.type = operand->type;
+					result.pointed = operand->location;
 				} break;
 				case '*':
 				{
@@ -1053,6 +1261,7 @@ interpret_binary(Ast_Node *node, b32 *failed)
 		// auto right_type = node->binary_expr.right;
 
 		Interp_Val result = create_interp_val();
+		result.type = left.type;
 		if(*failed)
 			return result;
 
@@ -1060,11 +1269,43 @@ interpret_binary(Ast_Node *node, b32 *failed)
 		{
 			case '+':
 			{
-				DO_OP(result, +, left, right);
+				if(left.type->type == T_POINTER)
+				{
+					Assert(is_integer(*right.type));
+					result.type = left.type;
+					if(is_signed(*right.type))
+					{
+						result._u64 = left._u64 + right._i64;
+					}
+					else
+					{
+						result._u64 = left._u64 + right._u64;
+					}
+				}
+				else
+				{
+					DO_OP(result, +, left, right);
+				}
 			} break;
 			case '-':
 			{
-				DO_OP(result, -, left, right);
+				if(left.type->type == T_POINTER)
+				{
+					Assert(is_integer(*right.type));
+					result.type = left.type;
+					if(is_signed(*right.type))
+					{
+						result._u64 = left._u64 - right._i64;
+					}
+					else
+					{
+						result._u64 = left._u64 - right._u64;
+					}
+				}
+				else
+				{
+					DO_OP(result, -, left, right);
+				}
 			} break;
 			case '*':
 			{
@@ -1107,7 +1348,6 @@ interpret_binary(Ast_Node *node, b32 *failed)
 			} break;
 			case tok_bits_rshift:
 			{
-				result.type->type = T_UNTYPED_INTEGER;
 				if(is_signed(*left.type))
 				{
 					result.type->primitive.size = byte8;
@@ -1121,7 +1361,6 @@ interpret_binary(Ast_Node *node, b32 *failed)
 			} break;
 			case tok_bits_lshift:
 			{
-				result.type->type = T_UNTYPED_INTEGER;
 				if(is_signed(*left.type))
 				{
 					result.type->primitive.size = byte8;
@@ -1151,7 +1390,6 @@ interpret_binary(Ast_Node *node, b32 *failed)
 			} break;
 			case tok_bits_and:
 			{
-				result.type->type = T_UNTYPED_INTEGER;
 				if(is_signed(*left.type))
 				{
 					result.type->primitive.size = byte8;
@@ -1165,7 +1403,6 @@ interpret_binary(Ast_Node *node, b32 *failed)
 			} break;
 			case tok_bits_xor:
 			{
-				result.type->type = T_UNTYPED_INTEGER;
 				if(is_signed(*left.type))
 				{
 					result.type->primitive.size = byte8;
@@ -1179,7 +1416,6 @@ interpret_binary(Ast_Node *node, b32 *failed)
 			} break;
 			case tok_bits_or:
 			{
-				result.type->type = T_UNTYPED_INTEGER;
 				if(is_signed(*left.type))
 				{
 					result.type->primitive.size = byte8;

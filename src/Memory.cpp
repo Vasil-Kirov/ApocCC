@@ -12,20 +12,17 @@ typedef struct _ap_memory
 	u64 MaxSize;
 } ap_memory;
 
-
-
-
-static ap_memory MemoryAllocators[3];
-
+static ap_memory MemoryAllocators[4];
 
 #define INTERP_SIZE GB(4)
+#define INTERP_MISC_SIZE GB(1)
 #define PERM_SIZE GB(16)
 #define COMP_SIZE GB(256)
 
 #define INTERP_CHUNK MB(128)
+#define INTERP_MISC_CHUNK MB(32)
 #define COMP_CHUNK MB(512)
 #define PERM_CHUNK MB(256)
-
 
 void
 InitAPMem(ap_memory *Memory, u64 Size, u64 ChunkSize)
@@ -47,6 +44,7 @@ initialize_memory()
 	InitAPMem(&MemoryAllocators[PERM_INDEX], PERM_SIZE, PERM_CHUNK);
 	InitAPMem(&MemoryAllocators[COMP_INDEX], COMP_SIZE, COMP_CHUNK);
 	InitAPMem(&MemoryAllocators[INTERP_INDEX], INTERP_SIZE, INTERP_CHUNK);
+	InitAPMem(&MemoryAllocators[INTERP_MISC_INDEX], INTERP_MISC_SIZE, INTERP_MISC_CHUNK);
 }
 
 void *
@@ -71,6 +69,57 @@ AllocateMemory(u64 Size, i8 Index)
 	unlock_mutex();
 	memset(Result, 0, Size);
 	return Result;
+}
+
+struct free_list
+{
+	struct free_list *Next;
+	u8 *Ptr;
+};
+
+free_list *FreeList[2];
+
+void *
+_AllocateInterpMemory(u64 Size, i8 Index)
+{
+	free_list *FreeListPtr = FreeList[Index - INTERP_INDEX];
+	free_list *Prev = FreeListPtr;
+	free_list *Current = FreeListPtr;
+	while(Current)
+	{
+		if(*(u64 *)(Current->Ptr - sizeof(u64)) == Size)
+		{
+			u8 *Ptr = Current->Ptr;
+			if(Prev == FreeListPtr)
+			{
+				FreeList[Index - INTERP_INDEX] = Current->Next;
+			}
+			else
+			{
+				Prev->Next = Current->Next;
+			}
+			*(u64 *)(Ptr - sizeof(u64)) = Size;
+			memset(Ptr, 0, Size);
+			return Ptr;
+		}
+		Prev = Current;
+		Current = Current->Next;
+	}
+
+	u8 *Ptr = (u8 *)AllocateMemory(Size + sizeof(Size), Index);
+	*(u64 *)Ptr = Size;
+	return Ptr + sizeof(u64);
+}
+
+void
+_FreeInterpMemory(void *Ptr, i8 Index)
+{
+	if(Ptr == NULL)
+		return;
+	free_list *Node = (free_list *)AllocatePermanentMemory(sizeof(free_list));
+	Node->Ptr = (u8 *)Ptr;
+	Node->Next = FreeList[Index - INTERP_INDEX];
+	FreeList[Index - INTERP_INDEX] = Node;
 }
 
 void

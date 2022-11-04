@@ -152,7 +152,10 @@ llvm::Value *
 generate_lhs(File_Contents *f, Function *func, Ast_Node *lhs, llvm::Value *rhs, b32 is_decl, Type_Info decl_type, u8 **out_identifier = NULL);
 
 void
-generate_struct_type(File_Contents *f, Type_Info type, llvm::StructType *opaque_struct);
+generate_struct_type(File_Contents *f, Type_Info type, llvm::StructType *opaque_struct, Backend_State *opt_backend = NULL);
+
+void
+generate_structs_for_all_files(File_Contents **files);
 
 void
 llvm_initialize_targets();
@@ -185,7 +188,7 @@ void
 generate_assignment(File_Contents *f, Function *func, Ast_Node *node);
 
 llvm::Value *
-create_cast(Type_Info to, Type_Info from, llvm::Value *castee);
+create_cast(Type_Info to, Type_Info from, llvm::Value *castee, Backend_State *opt_backend = NULL);
 
 BasicBlock *
 generate_block(File_Contents *f, Ast_Node *node, Function *func, BasicBlock *passed_block,
