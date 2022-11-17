@@ -86,6 +86,7 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 
 #if defined(_WIN32)
 	shput(build_commands.defines, "Windows", true);
+
 	auto kernel32 = platform_load_dynamic_lib("kernel32");
 	auto user32   = platform_load_dynamic_lib("user32");
 	auto ntdll    = platform_load_dynamic_lib("ntdll");
@@ -101,8 +102,9 @@ parse_command_line(int c_argc, char *c_argv[], std::vector<std::string> *files)
 #elif defined(CM_LINUX)
 	shput(build_commands.defines, "Linux", true);
 
-	// @NOTE: put default linux libs here
-	Assert(false);
+	auto libc = platform_load_dynamic_lib("libc.so.6");
+	if(libc)
+		SDPush(build_commands.dynamic_libs, libc);
 #endif
 	
 	FOR_EACH(args)

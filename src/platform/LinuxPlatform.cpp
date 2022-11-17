@@ -9,6 +9,9 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <dlfcn.h>
+#include <dirent.h>
+#include <semaphore.h>
 
 #include <pthread.h>
 #include <errno.h>
@@ -23,6 +26,7 @@ platform_get_absolute_path(char *Out)
 		// This can't be an error since it will result in an infinite loop
 		// as errors and fatal errors call this function
 		LG_WARN("Failed to get directory location, file path might be too long");
+		return;
 	}
 
 	size_t Size = vstd_strlen(Out);
@@ -61,8 +65,84 @@ delete_file(const char *file)
 	return (unlink(file));
 }
 
+char *
+platform_relative_to_absolute_path(char *path)
+{
+	char *full_path = (char *)AllocatePermanentMemory(PATH_MAX);
+	return realpath(path, full_path);
+}
+
+Platform_Object
+platform_create_semaphore(int initial_count, int)
+{
+	sem_t *semaphore = (sem_t *)AllocatePermanentMemory(sizeof(sem_t));
+	if(sem_init(semaphore, 0, initial_count) != 0)
+		return NULL;
+	return semaphore;
+}
+
+void
+platform_call_and_wait(const char *command)
+{
+	execve((char const *)"", (char * const *)command, (char * const *)"");
+}
+
+void
+platform_alert_semaphore(Platform_Object semaphore)
+{
+	sem_post((sem_t *)semaphore);
+}
+
+void
+platform_wait_for_object(Platform_Object obj)
+{
+	sem_wait((sem_t *)obj);
+}
+
 b32
-platform_write_file(void *data, i32 bytes_to_write, const char *path, b32 overwrite)
+platform_iterate_files_in_directory(u8 *directory, Iterate_Func fn, void *user_data)
+{
+	struct dirent *dir_info;
+	DIR *dir = opendir((const char *)directory);
+	if (dir)
+	{
+		b32 result = false;
+		while((dir_info = readdir(dir)) != NULL)
+		{
+			LG_INFO("%s", dir_info->d_name);
+			Assert(false);
+		}
+		closedir(dir);
+		return result;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+Platform_Object
+platform_create_mutex()
+{
+	pthread_mutex_t *mutex = (pthread_mutex_t *)AllocatePermanentMemory(sizeof(pthread_mutex_t));
+	pthread_mutex_init(mutex, NULL);
+	return mutex;
+}
+
+void
+platform_lock_mutex(Platform_Object mutex)
+{
+	pthread_mutex_lock((pthread_mutex_t *)mutex);
+}
+
+void
+platform_unlock_mutex(Platform_Object mutex)
+{
+	pthread_mutex_unlock((pthread_mutex_t *)mutex);
+}
+
+b32
+platform_write_file(void *data, u32 bytes_to_write, const char *path, b32 overwrite)
 {
 	b32 is_std = false;
 	int file;
@@ -101,14 +181,37 @@ platform_write_file(void *data, i32 bytes_to_write, const char *path, b32 overwr
 	return true;
 }
 
+typedef void *(*pthread_fn)(void *);
+
 Platform_Thread
 platform_create_thread(void *func, void *args)
 {
 	pthread_t thread_id; 
-	pthread_create(&thread_id, NULL, func, args);
+	pthread_create(&thread_id, NULL, (pthread_fn)func, args);
 	Platform_Thread result = AllocatePermanentMemory(sizeof(pthread_t));
 	*(pthread_t *)result = thread_id;
 	return result;
+}
+
+Platform_Dynamic_Lib
+platform_load_dynamic_lib(const char *name_no_extension)
+{
+	Platform_Dynamic_Lib result = dlopen(name_no_extension, RTLD_NOW);
+	if(result == NULL)
+	{
+		auto name_len = vstd_strlen((char *)name_no_extension);
+		char *name = (char *)AllocatePermanentMemory(name_len + 5);
+		vstd_strcat(name, name_no_extension);
+		vstd_strcat(name, ".so");
+		result = dlopen(name, RTLD_NOW);
+	}
+	return result;
+}
+
+void *
+platform_find_fn(Platform_Dynamic_Lib lib, char *name)
+{
+	return dlsym(lib, name);
 }
 
 void

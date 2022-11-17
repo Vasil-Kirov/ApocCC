@@ -134,7 +134,7 @@ Token_Iden *advance_token(File_Contents *f);
 Token_Iden *get_next_expecting(File_Contents *f, Token type, const char *error_msg);
 
 u8 *token_to_str(Token token);
-enum _Ast_Type;
-u8 *type_to_str(enum _Ast_Type type);
+#include <Parser.h>
+u8 *type_to_str(Ast_Type type);
 
 #endif //_LEXER_H

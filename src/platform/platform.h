@@ -41,7 +41,9 @@ typedef struct _Quad
 #define platform_interlocked_decrement(num) _InterlockedDecrement(num)
 #define platform_write_barrirer _WriteBarrier(); _mm_sfence()
 #else
-#error DEFINE INTERLOCKED INCREMENT
+#define platform_interlocked_increment(num) __sync_fetch_and_add(num, 1)
+#define platform_interlocked_decrement(num) __sync_fetch_and_sub(num, 1)
+#define platform_write_barrirer __asm__ __volatile__("":::"memory"); _mm_sfence()
 #endif
 
 // Function should take 1 argument of type void pointer
@@ -102,9 +104,6 @@ platform_exit(i32 ExitCode);
 char *
 platform_relative_to_absolute_path(char *path);
 
-char *
-platform_path_to_file_name(char *path);
-
 wchar_t *
 platform_relative_to_absolute_pathw(wchar_t *path);
 
@@ -146,5 +145,18 @@ platform_read_entire_file(void *Data, u64 *Size, char *Path);
 
 void
 platform_call_and_wait(const char *command);
+
+inline char *
+platform_path_to_file_name(char *path)
+{
+	char *file_name = (char *)AllocatePermanentMemory(260);
+	size_t path_len = vstd_strlen(path);
+	char *scanner = path + path_len;
+	char *end = scanner;
+	while(*scanner != '\\' && *scanner != '/')
+		scanner--;
+	memcpy(file_name, scanner + 1, end - scanner);
+	return file_name;
+}
 
 #endif //PLATFORM_H

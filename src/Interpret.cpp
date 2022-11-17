@@ -423,7 +423,13 @@ interpret_lhs(Ast_Node *lhs)
 			Assert(lhs->unary_expr.op->type == tok_star);
 			Assert(lhs->unary_expr.expr_type.type == T_POINTER);
 			Interp_Val *id = interpret_lhs(lhs->unary_expr.expression);
-			WORK HERE
+			Assert(false);
+			Assert(false);
+			Assert(false);
+			Assert(false);
+			Assert(false);
+			Assert(false);
+			Assert(false);
 		} break;
 		case type_identifier:
 		{

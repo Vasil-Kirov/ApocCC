@@ -1,5 +1,5 @@
 #include <Threading.h>
-#include <intrin.h>
+#include <immintrin.h>
 #include <x64_Gen.h>
 
 #define THREAD_COUNT 8

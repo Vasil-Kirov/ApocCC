@@ -203,13 +203,6 @@ emit_assignment(File_Contents *f, Ast_Node *node, llvm::Value *location, u8 *ide
 	}
 }
 
-void set_asm_syntax_to_intel()
-{
-    char const *args[] = { "some-exe-name", "--x86-asm-syntax=intel" };
-    auto const res = llvm::cl::ParseCommandLineOptions(std::size(args), args);
-    Assert(res);
-}
-
 bool
 emit_file(TargetMachine* target_machine, CodeGenFileType file_type, char *file_name)
 {
@@ -2781,7 +2774,7 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 		Assert(node->assignment.is_declaration);
 		shput(backend.named_values, node->assignment.token.identifier, var_info);
 	}
-	else if(expression_value->getType()->isPointerTy() == NULL ||
+	else if(expression_value->getType()->isPointerTy() ||
 			node->assignment.decl_type->type == T_POINTER || node->assignment.decl_type->type == T_STRING)
 	{
 		// @NOTE: structs and arrays are handled in their initialization
