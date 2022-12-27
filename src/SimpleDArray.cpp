@@ -91,7 +91,7 @@ _ISimpleDArraySkip(void **Array, int Amount)
 	   SDHeader(ArrayPtr)->CurrentlyAllocated)
 	{
 		u64 NewSize = (u64)(SDHeader(ArrayPtr)->CurrentlyAllocated * 1.5);
-		void *NewPtr = platform_allocate_chunk(NewSize);
+		void *NewPtr = platform_allocate_chunk(NewSize + sizeof(DArray_Header));
 		if(NewPtr == 0) LG_FATAL("Failed to allocate needed memory");
 		
 		SDHeader(ArrayPtr)->CurrentlyAllocated = NewSize;
