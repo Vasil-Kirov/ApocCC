@@ -42,6 +42,9 @@ Log(log_level Level, const char *Format, ...)
 	
 	if(Level == LOG_FATAL)
 	{
+#if DEBUG
+		__debugbreak();
+#endif
 //		platform_message_box("Error", ToPrint);
 		platform_exit(1);
 	}

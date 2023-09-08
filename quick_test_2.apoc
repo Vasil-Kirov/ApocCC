@@ -1,5 +1,5 @@
 
 fn $call c_decl the_num() -> i32 {
         result :i32 = 1023;
-	-> result + 1;
+		-> result + 1;
 }

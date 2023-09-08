@@ -1349,6 +1349,13 @@ get_callee_maybe_overloaded(File_Contents *f, llvm::Value *operand, Ast_Node *ca
 }
 
 llvm::Value *
+gep(llvm::Value *ptr, Type_Info *type, ArrayRef<Value *>idx_list, Backend_State *in_backend = &backend, const Twine &name = "")
+{
+	llvm::Type *llvm_type = apoc_type_to_llvm(*type, in_backend);
+	return in_backend->builder->CreateGEP(llvm_type, ptr, idx_list, name);
+}
+
+llvm::Value *
 copy_argument_to_ptr(llvm::Value *arg, Function *func, Type_Info type)
 {
 	auto result = allocate_variable(func, (u8 *)"arg_copy", type, &backend);
@@ -2156,7 +2163,9 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			one_type.type = T_INTEGER;
 			one_type.primitive.size = byte8;
 			Type_Info *type = node->postfix.postfix_type;
-			one = create_cast(*type, one_type, one);
+			// pointers are handled differently here
+			if(type->type != T_POINTER)
+				one = create_cast(*type, one_type, one);
 
 			auto ptr = generate_lhs(f, func, node->postfix.operand, NULL, false, {});
 			Assert(ptr);
@@ -2166,6 +2175,14 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			{
 				if(is_float(*node->postfix.postfix_type))
 					llvm_store(ptr, backend.builder->CreateFAdd(result, one), &backend, get_type_alignment(*type));
+				else if(node->postfix.postfix_type->type == T_POINTER)
+				{
+					llvm::Value *idx_list[] = {
+						one
+					};
+					auto gep_result = gep(result, type->pointer.type, idx_list);
+					llvm_store(ptr, gep_result, &backend, get_type_alignment(*type));
+				}
 				else
 					llvm_store(ptr, backend.builder->CreateAdd(result, one), &backend, get_type_alignment(*type));
 			}
@@ -2173,6 +2190,15 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 			{
 				if(is_float(*node->postfix.postfix_type))
 					llvm_store(ptr, backend.builder->CreateFSub(result, one), &backend, get_type_alignment(*type));
+				else if(node->postfix.postfix_type->type == T_POINTER)
+				{
+					llvm::Value *minus_one = backend.builder->getInt64(-1);
+					llvm::Value *idx_list[] = {
+						minus_one
+					};
+					auto gep_result = gep(result, type->pointer.type, idx_list);
+					llvm_store(ptr, gep_result, &backend, get_type_alignment(*type));
+				}
 				else
 					llvm_store(ptr, backend.builder->CreateSub(result, one), &backend, get_type_alignment(*type));
 			}
@@ -2329,6 +2355,8 @@ generate_operand(File_Contents *f, Ast_Node *node, Function *func)
 		case type_index:
 		{
 			auto elem_ptr = generate_index(f, node, func, NULL, false, (Type_Info){});
+			if(node->index.idx_type.type == T_STRUCT)
+				return elem_ptr;
 			return llvm_load(&node->index.idx_type, elem_ptr, "indexed_val", &backend);
 		} break;
 		default:
@@ -2379,6 +2407,18 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 			} break;
 			case tok_plusplus:
 			{
+				// for pointers use GEP instead of adding 1
+				if(expr_type.type == T_POINTER)
+				{
+					llvm::Value *one = backend.builder->getInt64(1);
+					auto to_store = generate_lhs(f, func, node->unary_expr.expression, NULL, false, {});
+					llvm::Value *idx_list[] = {
+						one
+					};
+					result = gep(expr, expr_type.pointer.type, idx_list);
+					llvm_store(&expr_type, to_store, result, &backend);
+					break;
+				}
 				llvm::Value *one = backend.builder->getInt64(1);
 				Type_Info one_type = {};
 				one_type.type = T_INTEGER;
@@ -2395,6 +2435,18 @@ generate_unary(File_Contents *f, Ast_Node *node, Function *func)
 			} break;
 			case tok_minusminus:
 			{
+				// for pointers use GEP instead of subtracting 1
+				if(expr_type.type == T_POINTER)
+				{
+					llvm::Value *minus_one = backend.builder->getInt64(-1);
+					auto to_store = generate_lhs(f, func, node->unary_expr.expression, NULL, false, {});
+					llvm::Value *idx_list[] = {
+						minus_one
+					};
+					result = gep(expr, expr_type.pointer.type, idx_list);
+					llvm_store(&expr_type, to_store, result, &backend);
+					break;
+				}
 				llvm::Value *one = backend.builder->getInt64(1);
 				Type_Info one_type = {};
 				one_type.type = T_INTEGER;
@@ -2758,12 +2810,17 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 	llvm::Value *location = NULL;
 	llvm::Value *expression_value;
 	if(node->assignment.rhs)
+	{
 		expression_value = generate_expression(f, node->assignment.rhs, func);
+		if(is_untyped(node->assignment.rhs_type))
+		{
+			expression_value = create_cast(*node->assignment.decl_type, node->assignment.rhs_type, expression_value);
+		}
+	}
 
 
 	if(!node->assignment.rhs)
 	{
-		Assert(node->assignment.is_declaration == true);
 		location = allocate_variable(func, node->assignment.token.identifier, *node->assignment.decl_type, &backend);
 		llvm_zero_out_memory(location, get_type_size(*node->assignment.decl_type), Align(get_type_alignment(*node->assignment.decl_type)), backend.builder);
 
@@ -2777,7 +2834,6 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 	else if(expression_value->getType()->isPointerTy() ||
 			node->assignment.decl_type->type == T_POINTER || node->assignment.decl_type->type == T_STRING)
 	{
-		// @NOTE: structs and arrays are handled in their initialization
 		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, *node->assignment.decl_type, &identifier);
 		if (is_untyped(node->assignment.rhs_type))
 		{
@@ -2787,15 +2843,23 @@ generate_assignment(File_Contents *f, Function *func, Ast_Node *node)
 			expression_value = create_cast(var_type, cast_type, expression_value);
 		}
 
-		llvm_store(node->assignment.decl_type, location, expression_value, &backend);
+		if(is_user_defined(node->assignment.decl_type) || node->assignment.decl_type->type == T_ARRAY)
+		{
+			llvm_memcpy(location, expression_value, node->assignment.decl_type, &backend);
+		}
+		else
+		{
+			llvm_store(node->assignment.decl_type, location, expression_value, &backend);
+		}
 	}
 	else
 	{
 		location = generate_lhs(f, func, node->assignment.lhs, expression_value, node->assignment.is_declaration, *node->assignment.decl_type, &identifier);
 
-		if(node->assignment.decl_type->type == T_POINTER && node->assignment.decl_type->pointer.type->type == T_FUNC)
+		if(node->assignment.decl_type->type == T_POINTER || node->assignment.decl_type->type == T_FUNC || 
+				is_integer(*node->assignment.decl_type) || is_float(*node->assignment.decl_type) || node->assignment.decl_type->type == T_BOOLEAN)
 		{
-			llvm_store(location, expression_value, &backend, sizeof(size_t));
+			llvm_store(location, expression_value, &backend, get_type_alignment(*node->assignment.decl_type));
 		}
 		else
 		{

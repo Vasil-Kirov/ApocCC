@@ -484,7 +484,11 @@ analyze_file_level_statement_list(File_Contents *f, Ast_Node *node)
 			{
 				auto val = create_interp_val();
 				val.type = node->assignment.decl_type;
-				interp_fix_and_add_val(functions[i]->assignment.token.identifier, &val, val.type);
+				
+				// @NOTE: Not sure about this, it causes a derefrence to a null pointer with structs
+				// but it was here for some reason...
+				// interp_fix_and_add_val(functions[i]->assignment.token.identifier, &val, val.type);
+				interp_add_symbol(functions[i]->assignment.token.identifier, val);
 			}
 		}
 		else if(functions[i]->type == type_run) {}
@@ -574,7 +578,10 @@ analyze_file_level_statement(File_Contents *f, Ast_Node *node)
 			{
 				auto val = create_interp_val();
 				val.type = node->assignment.decl_type;
-				interp_fix_and_add_val(node->assignment.lhs->identifier.name, &val, node->assignment.decl_type);
+				// @NOTE: Not sure about this, it causes a derefrence to a null pointer with structs
+				// but it was here for some reason...
+				//interp_fix_and_add_val(node->assignment.lhs->identifier.name, &val, node->assignment.decl_type);
+				interp_add_symbol(node->assignment.lhs->identifier.name, val);
 			}
 
 			return node;

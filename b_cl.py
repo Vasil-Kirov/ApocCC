@@ -19,7 +19,7 @@ if 'release' in sys.argv:
 	compiler_args = ' -O2 -Wall'
 else:
 	print('--- DEBUG ---')
-	compiler_args = ' -Zi -Od -Wall -DDEBUG'
+	compiler_args = ' -Z7 -Od -Wall -DDEBUG'
 
 if 'bounds' in sys.argv:
 	print('--- BOUNDS ---')
@@ -34,7 +34,8 @@ if 'novm' in sys.argv:
     compiler_args += ' -DNOVM'
 
 if 'ir' in sys.argv:
-	compiler_args += ' -DONLY_IR'
+    print('--- IR ---')
+    compiler_args += ' -DONLY_IR'
 
 linker_args = ""
 if sys.platform == "win32":
@@ -55,10 +56,10 @@ os.chdir('bin')
 if include_llvm:
     compiler_args += ' ' + os.popen('llvm-config.exe --cppflags --cxxflags').read()
     linker_args   += ' ' + os.popen('llvm-config.exe --libs all').read()
+    linker_args = linker_args.replace('\n', '')
 
 if 'bounds' in sys.argv:
-    linker_args = linker_args.replace('E:\\GitClone\\llvm-project\\llvm\\build\\Release\\lib\\LLVMDemangle.lib', '');
-    print(linker_args.split(' '))
+    linker_args = linker_args.replace('E:\\GitClone\\llvm-project\\llvm\\build\\Release\\lib\\LLVMDemangle.lib', '')
 
 compiler_args += ' -c'
 
@@ -68,10 +69,11 @@ c_command += compiler_args.split(' ')
 
 linker_command = []
 if use_msvc_link:
-	linker_command += ['link.exe']
+    print("Using MSVC Linker")
+    linker_command += ['link.exe']
 else:
 	linker_command += ['lld-link.exe']
-linker_command += ['/out:apoc.exe', '/DEBUG']
+linker_command += ['/out:apoc.exe', '/DEBUG:FULL']
 linker_command += linker_args.split(' ')
 linker_command += ['apoc.o']
 

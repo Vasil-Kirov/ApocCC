@@ -23,7 +23,7 @@ else:
 	compiler_args = '-g -O0 -Wall -DDEBUG'
 
 if 'ir' in sys.argv:
-	print('--- ONLY IR ---')
+	print('--- IR ---')
 	compiler_args += ' -DONLY_IR'
 
 llvm_flags = r"-fno-exceptions -std=c++14 -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DUNICODE -D_UNICODE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"

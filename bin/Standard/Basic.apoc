@@ -25,11 +25,6 @@ struct String_Builder
 	next:* String_Builder;
 }
 
-
-fn return_true() -> bool {
-	-> false;
-}
-
 enum Call_Conv: i32
 {
 	CALL_APOC   = 1;

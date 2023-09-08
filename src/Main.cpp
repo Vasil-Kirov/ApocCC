@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
 
 	vstd_strcat((char *)final_linker_command, (char *)build_command.output_file);
 
-	//LG_DEBUG("Linker Command: %s", final_linker_command);
+	LG_DEBUG("Linker Command: %s", final_linker_command);
 	if(build_command.call_linker)
 	{
 		TIME_FUNC(timers, platform_call_and_wait((char *)final_linker_command),
