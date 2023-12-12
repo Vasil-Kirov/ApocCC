@@ -109,43 +109,39 @@ ast_to_bytecode(File_Contents **files)
 	ptr_type->pointer.type = type_64;
 
 	IR **result = SDCreate(IR *);
+	IR first = {};
+	first.allocated = SDCreate(Data_Segment);
+	first.reg_count = reg_invalid + 1; // starting from here so we know that
+					   // anything under is a physical register instead of a virtual one
+	first.blocks = SDCreate(IR_Block *);
+	alloc_block("global_block", &first);
+	// @NOTE: maybe not needed since we are at global scope?
+	SDPush(result, first);
+
 	LOOP_FILES {
 		File_Contents *f = files[file_idx];
 		auto ir = SDCreate(IR);
-
-		{
-			IR global_block = {};
-			global_block.allocated = SDCreate(Data_Segment);
-			global_block.reg_count = reg_invalid + 1; // starting from here so we know that
-											   // anything under is a physical register instead of a virtual one
-			global_block.blocks = SDCreate(IR_Block *);
-			alloc_block("global_block", &global_block);
-			SDPush(ir, global_block);
-		}
-
-		// @NOTE: Always return pointers of dynamic arrays in case they realocate inside the function
-		ir = ast_to_bc_file_level_list(f, f->ast_root->statements.list, ir);
+		ast_to_bc_file_level_list(f, f->ast_root->statements.list, ir);
 		SDPush(result, ir);
 	}
 	
 	return result;
 }
 
-IR *
+void
 ast_to_bc_file_level_list(File_Contents *f, Ast_Node **list, IR *ir)
 {
 	size_t count = SDCount(list);
 	for(size_t i = 0; i < count; ++i) {
-		ir = ast_to_bc_file_level(f, list[i], &ir[0], false);
+		ast_to_bc_file_level(f, list[i], &ir[0], false);
 	}
 
 	for(size_t i = 0; i < count; ++i) {
-		ir = ast_to_bc_file_level(f, list[i], ir, true);
+		ast_to_bc_file_level(f, list[i], ir, true);
 	}
-	return ir;
 }
 
-IR *
+void
 ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func)
 {
 	switch((int)node->type)
@@ -153,25 +149,25 @@ ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func)
 		case type_assignment:
 		{
 			if(gen_func)
-				return ir;
+				return;
 
 			Assert(node->assignment.is_declaration);
 			b32 failed = false;
 			auto value = interpret_expression(node->assignment.rhs, &failed);
 			Data_Segment global_var;
 			global_var.virtual_register = -1;
-			if(ir[0].allocated == NULL || SDCount(ir[0].allocated) == 0)
+			if(ir->allocated == NULL || SDCount(ir->allocated) == 0)
 				global_var.position = 0;
 			else {
-				size_t segment_size = SDCount(ir[0].allocated);
-				auto last_segment = ir[0].allocated[segment_size - 1];
+				size_t segment_size = SDCount(ir->allocated);
+				auto last_segment = ir->allocated[segment_size - 1];
 				global_var.position = last_segment.position + last_segment.size;
 			}
 			auto size = get_type_size(*value.type);
 			global_var.init_val = (u64)value.pointed;
 			global_var.size = size;
-			SDPush(ir[0].allocated, global_var);
-			shput(f->global_table, node->assignment.token.identifier, SDCount(ir[0].allocated) - 1);
+			SDPush(ir->allocated, global_var);
+			shput(f->global_table, node->assignment.token.identifier, SDCount(ir->allocated) - 1);
 		} break;
 		case type_func:
 		{
@@ -205,7 +201,6 @@ ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func)
 
 		} break;
 	}
-	return ir;
 }
 
 i32
@@ -1125,7 +1120,7 @@ allocate_stack_space(IR *ir, size_t size)
 }
 
 i32
-store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type_Info *expr_type, Type_Info *store_type, b32 should_align, b32 is_removable)
+store_expression(Ast_Node *node, IR *ir, IR_Block *block, Type_Info *expr_type, Type_Info *store_type, b32 should_align, b32 is_removable)
 {
 	if(should_align) {
 		i32 alignment = get_type_alignment(*store_type);
@@ -1144,7 +1139,7 @@ store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type
 		// on the stack, so we store -3, -2, -1, instead of -1, -2, -3
 		// so it's correctly continuous in memory
 		for(i64 i = count - 1; i >= 0; --i) {
-			store_expression(f, expressions[i], ir, block, &expr_types[i], &member_types[i], !store_type->structure.is_packed, false);
+			store_expression(expressions[i], ir, block, &expr_types[i], &member_types[i], !store_type->structure.is_packed, false);
 		}
 		return SDCount(ir->allocated) - 1;
 	}
@@ -1159,7 +1154,7 @@ store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type
 		// on the stack, so we store -3, -2, -1, instead of -1, -2, -3
 		// so it's correctly continuous in memory
 		for(i64 i = count - 1; i >= 0; --i) {
-			store_expression(f, expressions[i], ir, block, &expr_types[i], store_type->array.type, false, false);
+			store_expression(expressions[i], ir, block, &expr_types[i], store_type->array.type, false, false);
 		}
 		return SDCount(ir->allocated) - 1;
 	}
@@ -1181,19 +1176,19 @@ store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type
 }
 
 void
-assign_to_bc(File_Contents *f, Ast_Node *node, IR_Block *block, IR *ir)
+assign_to_bc(Ast_Node *node, IR_Block *block, IR *ir)
 {
 	if(node->assignment.is_declaration) {
-		i32 result = store_expression(f, node->assignment.rhs, ir, block, &node->assignment.rhs_type, node->assignment.decl_type, true, true);
+		i32 result = store_expression(node->assignment.rhs, ir, block, &node->assignment.rhs_type, &node->assignment.decl_type, true, true);
 		shput(ir->lookup, node->assignment.token.identifier, result);
 	}
 	else {
 		i32 expr_register = expression_to_bc(f, node->assignment.rhs, block, ir, false);
 		i32 dst_pointer = expression_to_bc(f, node->assignment.lhs, block, ir, true);
-		i32 casted = do_cast(expr_register, &node->assignment.rhs_type, node->assignment.decl_type, ir, block);
+		i32 casted = do_cast(expr_register, &node->assignment.rhs_type, &node->assignment.decl_type, ir, block);
 		if(casted == -1)
 			casted = expr_register;
-		instruction(dst_pointer, casted, -1, BC_STORE_REG, block, node->assignment.decl_type);
+		instruction(dst_pointer, casted, -1, BC_STORE_REG, block, &node->assignment.decl_type);
 	}
 }
 
@@ -1232,7 +1227,7 @@ ast_to_bc_func_level_list(File_Contents *f, Ast_Node **list, i32 *optional_index
 IR_Block *
 ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *optional_block, const char *id, IR *ir, IR_Block *to_go)
 {
-	return ast_to_bc_func_level_list(list, optional_index, optional_block, id, ir, to_go);
+	return ast_to_bc_func_level_list(list, optional_index, optional_block, (u8 *)id, ir, to_go);
 }
 
 void
@@ -1269,7 +1264,7 @@ get_function_arguments(Ast_Node *function, IR *ir, IR_Block *block)
 	for(size_t i = 0; i < count; ++i)
 	{
 		auto arg = &args[i]->variable;
-		auto type = arg->type;
+		auto type = &arg->type;
 		i32 result = allocate_register(ir);
 		if(type->type == T_STRUCT || type->type == T_ARRAY)
 		{
@@ -1324,7 +1319,7 @@ ast_to_bc_function(File_Contents *f, Ast_Node **list, Ast_Node *function)
 	instruction(reg_bp, -1, -1, BC_PUSH_REG, entry, type_64);
 	instruction(reg_bp, reg_sp, reg_bp, BC_MOVE_REG_TO_REG, entry, type_64);
 	get_function_arguments(function, &result, entry);
-	ast_to_bc_func_level_list(f, list, NULL, entry, (u8 *)"entry", &result, NULL);
+	ast_to_bc_func_level_list(f, list, NULL, entry, "entry", &result, NULL);
 
 	// Write function signature to file to be able to read ir
 	u8 func_signature[1024] = {};
@@ -1333,7 +1328,7 @@ ast_to_bc_function(File_Contents *f, Ast_Node **list, Ast_Node *function)
 	platform_write_file(func_signature, signature_size, "out.ir", false);
 	size_t block_count = SDCount(result.blocks);
 
-#if 1
+#if 0
 	write_blocks_to_file(&result, "out.ir");
 #endif
 
@@ -1363,7 +1358,7 @@ ast_to_bc_function(File_Contents *f, Ast_Node **list, Ast_Node *function)
 	// but it's better to profile it when there are actually programs
 	// to profile it on
 	remove_useless_stores(&result);
-#if 0
+#if 1
 	write_blocks_to_file(&result, "out.ir");
 #endif
 
@@ -1400,7 +1395,7 @@ bc_cond_branch(i32 expression_register, IR_Block *from, IR_Block *_true, IR_Bloc
 }
 
 IR_Block *
-if_to_bc(File_Contents *f, IR *ir, IR_Block *block, Ast_Node *node, i32 *idx, Ast_Node **list, IR_Block *to_go)
+if_to_bc(IR *ir, IR_Block *block, Ast_Node *node, i32 *idx, Ast_Node **list, IR_Block *to_go)
 {
 	IR_Block *block_true = alloc_block("if.true", ir);
 	IR_Block *block_aftr = alloc_block("if.aftr", ir);
@@ -1448,7 +1443,7 @@ ast_to_bc_func_level(File_Contents *f, Ast_Node *node, IR_Block *current_block, 
 		} break;
 		case type_if:
 		{
-			result = if_to_bc(f, ir, current_block, node, optional_index, list, to_go);
+			result = if_to_bc(ir, current_block, node, optional_index, list, to_go);
 		} break;
 		case type_return:
 		{

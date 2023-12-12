@@ -13,11 +13,9 @@
 #include <Interpret.h>
 #include <CommandLine.h>
 #include <DumpInfo.h>
-#if 0
 #include <Bytecode.h>
 #include <x64_Gen.h>
 #include <ObjDumper.h>
-#endif
 #include <Threading.h>
 
 #include <platform/platform.h>
@@ -34,11 +32,9 @@
 #include <Interpret.cpp>
 #include <CommandLine.cpp>
 #include <DumpInfo.cpp>
-#if 0
 #include <Bytecode.cpp>
 #include <x64_Gen.cpp>
 #include <ObjDumper.cpp>
-#endif
 #include <Threading.cpp>
 
 #if !defined(NOVM)
@@ -207,7 +203,7 @@ int main(int argc, char *argv[])
 	initialize_interpreter();
 	initialize_thread_pool();
 	init_type_system();
-#if !NO_VM
+#if !defined(NOVM)
 	llvm_initialize_targets();
 #endif
 
@@ -298,18 +294,16 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-#if 0
-	if(f->build_commands.backend == Fast_Backend)
+	if(build_command.backend == Fast_Backend)
 	{
 		Relocation *relocations = NULL;
 		u32 relocation_count = 0;
-		TIME_FUNC(timers, IR *ir = ast_to_bytecode(files), codegen_clock, codegen);
-		TIME_FUNC(timers, Code_Buffer code = x64_generate_code(f, ir, &relocations, &relocation_count), codegen_clock, codegen);
-		TIME_FUNC(timers, dump_obj(f, code, relocations, relocation_count, obj_symbols), codegen_clock, codegen);
+		TIME_FUNC(timers, IR **ir = ast_to_bytecode(files), codegen_clock, codegen);
+		TIME_FUNC(timers, Code_Buffer code = x64_generate_code(files, ir, &relocations, &relocation_count), codegen_clock, codegen);
+		TIME_FUNC(timers, dump_obj(files[0], code, relocations, relocation_count, obj_symbols), codegen_clock, codegen);
 	}
-#endif
 #if !defined(NOVM)
-	if(build_command.backend == LLVM_Backend)
+	else if(build_command.backend == LLVM_Backend)
 	{
 		TIME_FUNC(timers, llvm_backend_generate(files), codegen_clock, codegen);
 	}

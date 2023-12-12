@@ -1,0 +1,1 @@
+[DEBUG] Linker Command: LINK -nologo  Test.o /ENTRY:mainCRTStartup /defaultlib:libcmt /OUT:a.exe 

@@ -179,8 +179,11 @@ push_intrinsic_function_symbols()
 }
 
 Code_Buffer
-x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_relocation_count)
+x64_generate_code(File_Contents **files, IR **ir_array, Relocation **relocations, u32 *out_relocation_count)
 {
+	int ir_count = SDCount(ir_array);
+	int file_count = SDCount(files);
+	Assert(ir_count == file_count);
 	obj_symbols = SDCreate(Symbol_Descriptor);
 
 	// Set up some simple types to use whe needed
@@ -204,93 +207,122 @@ x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_r
 	x64_str_type->pointer.type = type_u8;
 	x64_str_type->identifier = (u8 *)"* u8";
 
-	size_t count = SDCount(ir);
-	size_t func_count = SDCount(f->functions);
-	for(size_t i = 1; i < count; ++i)
+	// Loop through functions and operator overloads and add them to the symbol table
+
+	int total_global_block_count = 0;
+	for(size_t ir_i = 0; ir_i < ir_count; ++ir_i)
 	{
-		// @NOTE: we store the index as the value and fix it later
-		// to the address
-		b32 has_body = false;
-		Symbol_Descriptor func_sym = {};
-		if(i > func_count)
-		{
-			func_sym.name = f->overloads[i - 1 - func_count]->overload.function->function.identifier.name;
-			Assert(f->overloads[i - 1 - func_count]->overload.function->function.body);
-			has_body = true;
-		}
-		else
-		{
-			func_sym.name = f->functions[i - 1]->identifier;
-			has_body = f->functions[i - 1]->node->function.body != NULL;
-		}
-		func_sym.value = i;
-		func_sym.type = OBJ_FUNCTION;
-		func_sym.position = func_sym.value;
-
-		if(has_body)
-		{
-			func_sym.section = SEC_TEXT;
-		}
-		else
-		{
-			func_sym.section = SEC_UNDEFINED;
-		}
-		push_symbol(func_sym);
-
+		total_global_block_count += SDCount(ir_array[ir_i]);
 	}
 
-	size_t globals_count = SDCount(ir[0].allocated);
-	for(size_t i = 0; i < globals_count; ++i)
+	auto relative_relocations = (Relative_Relocation_Array *)AllocateCompileMemory(total_global_block_count * sizeof(Relative_Relocation_Array));
+	auto fixables = (Fixable_Array *)AllocateCompileMemory(total_global_block_count * sizeof(Fixable_Array));
+	auto code_buffers = (Code_Buffer *)AllocateCompileMemory(total_global_block_count * sizeof(Code_Buffer));
+
+	int passed_global_blocks = 0;
+	for(size_t ir_i = 0; ir_i < ir_count; ++ir_i)
 	{
-		u64 init_val = ir[i].allocated->init_val;
-		int size = ir[i].allocated->size;
-	}
+		File_Contents *f = files[ir_i];
+		IR *ir = ir_array[ir_i];
+		size_t global_block_count = SDCount(ir);
+		size_t func_count = SDCount(f->functions);
+		for(size_t i = 1; i < global_block_count; ++i)
+		{
+			// @NOTE: we store the index as the value and fix it later
+			// to the address
+			b32 has_body = false;
+			Symbol_Descriptor func_sym = {};
+			if(i > func_count)
+			{
+				func_sym.name = f->overloads[i - 1 - func_count]->overload.function->function.identifier.name;
+				Assert(f->overloads[i - 1 - func_count]->overload.function->function.body);
+				has_body = true;
+			}
+			else
+			{
+				func_sym.name = f->functions[i - 1]->identifier;
+				has_body = f->functions[i - 1]->node->function.body != NULL;
+			}
+			func_sym.value = i + passed_global_blocks;
+			func_sym.type = OBJ_FUNCTION;
+			func_sym.position = func_sym.value;
 
-	auto relative_relocations = (Relative_Relocation_Array *)AllocateCompileMemory(count * sizeof(Relative_Relocation_Array));
-	auto fixables = (Fixable_Array *)AllocateCompileMemory(count * sizeof(Fixable_Array));
-	auto code_buffers = (Code_Buffer *)AllocateCompileMemory(count * sizeof(Code_Buffer));
-	for(size_t i = 1; i < count; ++i)
-	{
+			if(has_body)
+			{
+				func_sym.section = SEC_TEXT;
+			}
+			else
+			{
+				func_sym.section = SEC_UNDEFINED;
+			}
+			push_symbol(func_sym);
+		}
 
-		Relative_Relocation_Array reloc_array;
-		reloc_array.relocs = (Relative_Relocation *)AllocateCompileMemory(ir[i].bc_count * sizeof(Relative_Relocation));
-		reloc_array.count = 0;
-		relative_relocations[i] = reloc_array;
+		// @TODO: Crashes for some reason, ir[0].allocated gets lost on 5th loop in the bytecode generator
+		size_t globals_count = SDCount(ir[0].allocated);
+		for(size_t i = 0; i < globals_count; ++i)
+		{
+			u64 init_val = ir[0].allocated[i].init_val;
+			int size = ir[0].allocated[i].size;
+			// TODO: DO SOMETHING WITH THIS
+			// TODO: DO SOMETHING WITH THIS
+			// TODO: DO SOMETHING WITH THIS
+			// TODO: DO SOMETHING WITH THIS
+			// TODO: DO SOMETHING WITH THIS
+			// TODO: DO SOMETHING WITH THIS
+			// TODO: DO SOMETHING WITH THIS
+			// TODO: DO SOMETHING WITH THIS
+			// ALLOCATE THE GLOBAL VARIABLES (IDK HOW)
+		}
 
-		Fixable_Array fixable_arr;
-		fixable_arr.fixables = (Fixable *)AllocateCompileMemory(ir[i].bc_count * sizeof(Fixable));
-		fixable_arr.count = 0;
-		fixables[i] = fixable_arr;
+		for(size_t i = 1; i < global_block_count; ++i)
+		{
+			int i_total = i + passed_global_blocks;
 
-		Code_Buffer code_buffer;
-		code_buffer.buffer = (u8 *)AllocateCompileMemory(ir[i].bc_count * 12); // @NOTE: is this enough ? is it too much?
-		code_buffer.count = 0;
-		code_buffers[i] = code_buffer;
+			Relative_Relocation_Array reloc_array;
+			reloc_array.relocs = (Relative_Relocation *)AllocateCompileMemory(ir[i].bc_count * sizeof(Relative_Relocation));
+			reloc_array.count = 0;
 
-		Generate_Code_Args *args = (Generate_Code_Args *)AllocatePermanentMemory(sizeof(Generate_Code_Args));
-		args->ir          = &ir[i];
-		args->buffer      = &code_buffers[i];
-		args->relocs      = &relative_relocations[i];
-		args->fixable_arr = &fixables[i];
-		args->global_ds = ir[0].allocated;
-		args->buffer_index = i;
-		post_job_listing(JOB_GENERATE_CODE, (void *)x64_gen_ir, args);
+			Fixable_Array fixable_arr;
+			fixable_arr.fixables = (Fixable *)AllocateCompileMemory(ir[i].bc_count * sizeof(Fixable));
+			fixable_arr.count = 0;
+
+			Code_Buffer code_buffer;
+			code_buffer.buffer = (u8 *)AllocateCompileMemory(ir[i].bc_count * 12); // @NOTE: is this enough ? is it too much?
+			code_buffer.count = 0;
+
+
+			relative_relocations[i_total] = reloc_array;
+			fixables[i_total] = fixable_arr;
+			code_buffers[i_total] = code_buffer;
+
+
+			Generate_Code_Args *args = (Generate_Code_Args *)AllocatePermanentMemory(sizeof(Generate_Code_Args));
+			args->ir          = &ir[i];
+			args->buffer      = &code_buffers[i_total];
+			args->relocs      = &relative_relocations[i_total];
+			args->fixable_arr = &fixables[i_total];
+			args->global_ds = ir[0].allocated;
+			args->buffer_index = i_total;
+			post_job_listing(JOB_GENERATE_CODE, (void *)x64_gen_ir, args);
+		}
+		passed_global_blocks += global_block_count;
 	}
 
 	push_intrinsic_function_symbols();
 	wait_for_threads();
 
 	u32 total_code_size = 0;
-	for(int i = 0; i < count; ++i)
+	for(int i = 0; i < total_global_block_count; ++i)
 	{
 		total_code_size += code_buffers[i].count;
 	}
 
-	u32 buffer_offsets[count];
+	u32 buffer_offsets[total_global_block_count];
 	Code_Buffer program_code;
 	program_code.buffer = (u8 *)AllocateCompileMemory(total_code_size);
 	program_code.count = 0;
-	for(int i = 0; i < count; ++i)
+	for(int i = 0; i < total_global_block_count; ++i)
 	{
 		buffer_offsets[i] = program_code.count;
 		memcpy(program_code.buffer + program_code.count, code_buffers[i].buffer, code_buffers[i].count);
@@ -299,7 +331,7 @@ x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_r
 
 
 	size_t total_relocation_count = 0;
-	for(int i = 0; i < count; ++i)
+	for(int i = 0; i < total_global_block_count; ++i)
 	{
 		int relocation_count = relative_relocations[i].count;
 		auto relocations = relative_relocations[i].relocs;
@@ -312,7 +344,7 @@ x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_r
 	*out_relocation_count = total_relocation_count;
 
 	Relocation *absolute_relocations = (Relocation *)AllocateCompileMemory(total_relocation_count * sizeof(Relocation));
-	for(int i = 0; i < count; ++i)
+	for(int i = 0; i < total_global_block_count; ++i)
 	{
 		int relocation_count = relative_relocations[i].count;
 		auto relocations = relative_relocations[i].relocs;
@@ -333,7 +365,7 @@ x64_generate_code(File_Contents *f, IR *ir, Relocation **relocations, u32 *out_r
 		}
 	}
 
-	for(int i = 0; i < count; ++i)
+	for(int i = 0; i < total_global_block_count; ++i)
 	{
 		auto fix_array = fixables[i].fixables;
 		i32 fixable_count = fixables[i].count;

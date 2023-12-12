@@ -31,6 +31,7 @@ _FreeInterpMemory(void *Ptr, i8 Index);
 #define AllocateCompileMemory(SIZE)    AllocateMemory(SIZE, COMP_INDEX)
 #define AllocateInterpMemory(SIZE)     _AllocateInterpMemory(SIZE, INTERP_INDEX)
 #define AllocateInterpMiscMemory(SIZE) _AllocateInterpMemory(SIZE, INTERP_MISC_INDEX)
+#define NewType(Type) (Type *)AllocateCompileMemory(sizeof(Type))
 
 #define FreeInterpMemory(PTR)     _FreeInterpMemory(PTR, INTERP_INDEX)
 #define FreeInterpMiscMemory(PTR) _FreeInterpMemory(PTR, INTERP_MISC_INDEX)

@@ -1,0 +1,9 @@
+
+fn main -> [fn c_decl () -> i32]:
+entry:
+[i64] 	 PUSH r_bp
+[i64] r_bp:	 MOVE r_sp
+[i64] 33:	 MOVE 0xA
+[i64] 33:	 STORE [0x8] 33
+[i32] CAST TRUNC 33 TO 34
+[i32] RETURN 34

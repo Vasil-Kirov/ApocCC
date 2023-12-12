@@ -14,7 +14,6 @@ static i32 *overload_table;
 static Type_Info *ptr_type;
 static i32 CALL_MEMCPY_INTRIN;
 
-#define COPY_TYPE(DST, SRC) DST = NewType(Type_Info); memcpy(DST, SRC, sizeof(Type_Info))
 #define MAX_BC_PER_BLOCK (1024 * 8)
 
 IR_Block *
@@ -109,43 +108,39 @@ ast_to_bytecode(File_Contents **files)
 	ptr_type->pointer.type = type_64;
 
 	IR **result = SDCreate(IR *);
+	IR first = {};
+	first.allocated = SDCreate(Data_Segment);
+	first.reg_count = reg_invalid + 1; // starting from here so we know that
+					   // anything under is a physical register instead of a virtual one
+	first.blocks = SDCreate(IR_Block *);
+	alloc_block("global_block", &first);
+	// @NOTE: maybe not needed since we are at global scope?
+	SDPush(result, first);
+
 	LOOP_FILES {
 		File_Contents *f = files[file_idx];
 		auto ir = SDCreate(IR);
-
-		{
-			IR global_block = {};
-			global_block.allocated = SDCreate(Data_Segment);
-			global_block.reg_count = reg_invalid + 1; // starting from here so we know that
-											   // anything under is a physical register instead of a virtual one
-			global_block.blocks = SDCreate(IR_Block *);
-			alloc_block("global_block", &global_block);
-			SDPush(ir, global_block);
-		}
-
-		// @NOTE: Always return pointers of dynamic arrays in case they realocate inside the function
-		ir = ast_to_bc_file_level_list(f, f->ast_root->statements.list, ir);
+		ast_to_bc_file_level_list(f, f->ast_root->statements.list, ir);
 		SDPush(result, ir);
 	}
 	
 	return result;
 }
 
-IR *
+void
 ast_to_bc_file_level_list(File_Contents *f, Ast_Node **list, IR *ir)
 {
 	size_t count = SDCount(list);
 	for(size_t i = 0; i < count; ++i) {
-		ir = ast_to_bc_file_level(f, list[i], &ir[0], false);
+		ast_to_bc_file_level(f, list[i], &ir[0], false);
 	}
 
 	for(size_t i = 0; i < count; ++i) {
-		ir = ast_to_bc_file_level(f, list[i], ir, true);
+		ast_to_bc_file_level(f, list[i], ir, true);
 	}
-	return ir;
 }
 
-IR *
+void
 ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func)
 {
 	switch((int)node->type)
@@ -153,25 +148,25 @@ ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func)
 		case type_assignment:
 		{
 			if(gen_func)
-				return ir;
+				return;
 
 			Assert(node->assignment.is_declaration);
 			b32 failed = false;
 			auto value = interpret_expression(node->assignment.rhs, &failed);
 			Data_Segment global_var;
 			global_var.virtual_register = -1;
-			if(ir[0].allocated == NULL || SDCount(ir[0].allocated) == 0)
+			if(ir->allocated == NULL || SDCount(ir->allocated) == 0)
 				global_var.position = 0;
 			else {
-				size_t segment_size = SDCount(ir[0].allocated);
-				auto last_segment = ir[0].allocated[segment_size - 1];
+				size_t segment_size = SDCount(ir->allocated);
+				auto last_segment = ir->allocated[segment_size - 1];
 				global_var.position = last_segment.position + last_segment.size;
 			}
 			auto size = get_type_size(*value.type);
 			global_var.init_val = (u64)value.pointed;
 			global_var.size = size;
-			SDPush(ir[0].allocated, global_var);
-			shput(f->global_table, node->assignment.token.identifier, SDCount(ir[0].allocated) - 1);
+			SDPush(ir->allocated, global_var);
+			shput(f->global_table, node->assignment.token.identifier, SDCount(ir->allocated) - 1);
 		} break;
 		case type_func:
 		{
@@ -205,7 +200,6 @@ ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func)
 
 		} break;
 	}
-	return ir;
 }
 
 i32
@@ -663,7 +657,7 @@ atom_expr_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir, b32 g
 			// we want to derefrence them so we pass false get_pointer
 			// but arrays are just the first element so we
 			// pass true to get_pointer if it's an array
-			result = expression_to_bc(f, expr->index.operand, block, ir, expr->index.operand_type.type != T_POINTER);
+			result = expression_to_bc(expr->index.operand, block, ir, expr->index.operand_type.type != T_POINTER);
 			i64 type_size;
 			Type_Info *out_type = NULL;
 			if(expr->index.operand_type.type == T_POINTER)
@@ -678,11 +672,10 @@ atom_expr_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir, b32 g
 			}
 			else
 				Assert(false);
-			i32 index_expression = expression_to_bc(f, expr->index.expression, block, ir, false);
-
+			i32 index_expression = expression_to_bc(expr->index.expression, block, ir, false);
 			Interp_Val type_size_val;
 			type_size_val._i64 = type_size;
-			COPY_TYPE(type_size_val.type, type_64);
+			type_size_val.type = *type_64;
 			i32 type_size_register = val_to_register(&type_size_val, ir, block);
 
 			// @TODO: IMUL can accept 2 different registers, we don't have to use rax
@@ -720,7 +713,7 @@ atom_expr_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir, b32 g
 			else {
 				struct_type = struct_type->pointer.type;
 			}
-			i32 struct_start = expression_to_bc(f, expr->selector.operand, block, ir, !derefrence_pointer);
+			i32 struct_start = expression_to_bc(expr->selector.operand, block, ir, !derefrence_pointer);
 			i64 offset = struct_get_offset_to_element_in_bytes(struct_type, expr->selector.selected_index);
 			i32 offset_register = allocate_register(ir);
 
@@ -758,7 +751,7 @@ atom_expr_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir, b32 g
 }
 
 i32
-unary_expression_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
+unary_expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 {
 	i32 result;
 	if(expr->type == type_unary_expr)
@@ -768,12 +761,12 @@ unary_expression_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir
 		{
 			case '@':
 			{
-				i32 expr_reg = expression_to_bc(f, expr->unary_expr.expression, block, ir, true);
+				i32 expr_reg = expression_to_bc(expr->unary_expr.expression, block, ir, true);
 				return expr_reg;
 			} break;
 			case '*':
 			{
-				i32 expr_reg = expression_to_bc(f, expr->unary_expr.expression, block, ir, get_pointer);
+				i32 expr_reg = expression_to_bc(expr->unary_expr.expression, block, ir, get_pointer);
 				result = allocate_register(ir); 
 				Type_Info *result_type = &expr->unary_expr.expr_type;
 				if(!get_pointer)
@@ -783,7 +776,7 @@ unary_expression_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir
 			} break;
 			case '-':
 			{
-				i32 expr_reg = expression_to_bc(f, expr->unary_expr.expression, block, ir, false);
+				i32 expr_reg = expression_to_bc(expr->unary_expr.expression, block, ir, false);
 				if(is_float(expr->unary_expr.expr_type))
 				{
 					result = allocate_register(ir);
@@ -797,7 +790,7 @@ unary_expression_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir
 			} break;
 			case '!':
 			{
-				i32 expr_reg = expression_to_bc(f, expr->unary_expr.expression, block, ir, false);
+				i32 expr_reg = expression_to_bc(expr->unary_expr.expression, block, ir, false);
 				Assert(expr->unary_expr.expr_type.type == T_BOOLEAN);
 				result = allocate_register(ir);
 				instruction(expr_reg, -1, result, BC_LOGICAL_NOT, block, &expr->unary_expr.expr_type);
@@ -814,33 +807,32 @@ unary_expression_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir
 		int size = get_type_size(expr->size.operand_type);
 		Interp_Val val;
 		val._u64 = size;
-		val.type = NewType(Type_Info);
-		val.type->type = T_INTEGER;
-		val.type->primitive.size = ubyte8;
-		val.type->identifier = (u8 *)"u64";
+		val.type.type = T_INTEGER;
+		val.type.primitive.size = ubyte8;
+		val.type.identifier = (u8 *)"u64";
 		result = val_to_register(&val, ir, block);
 	}
 	else if(expr->type == type_cast)
 	{
-		i32 to_cast = expression_to_bc(f, expr->cast.expression, block, ir, get_pointer);
-		result = do_cast(to_cast, &expr->cast.expr_type, expr->cast.type, ir, block);
+		i32 to_cast = expression_to_bc(expr->cast.expression, block, ir, get_pointer);
+		result = do_cast(to_cast, &expr->cast.expr_type, &expr->cast.type, ir, block);
 		if(result == -1)
 			result = to_cast;
 	}
 	else
-		result = atom_expr_to_bc(f, expr, block, ir, get_pointer);
+		result = atom_expr_to_bc(expr, block, ir, get_pointer);
 	return result;
 }
 
 i32
-expression_to_bc(File_Contents *f, Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
+expression_to_bc(Ast_Node *expr, IR_Block *block, IR *ir, b32 get_pointer)
 {
 	if(expr->type != type_binary_expr) {	
-		return unary_expression_to_bc(f, expr, block, ir, get_pointer);
+		return unary_expression_to_bc(expr, block, ir, get_pointer);
 	}
 
-	i32 left  = expression_to_bc(f, expr->left, block, ir, get_pointer);
-	i32 right = expression_to_bc(f, expr->right, block, ir, get_pointer);
+	i32 left  = expression_to_bc(expr->left, block, ir, get_pointer);
+	i32 right = expression_to_bc(expr->right, block, ir, get_pointer);
 	i32 result = allocate_register(ir);
 	switch((int)expr->binary_expr.op)
 	{
@@ -1125,7 +1117,7 @@ allocate_stack_space(IR *ir, size_t size)
 }
 
 i32
-store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type_Info *expr_type, Type_Info *store_type, b32 should_align, b32 is_removable)
+store_expression(Ast_Node *node, IR *ir, IR_Block *block, Type_Info *expr_type, Type_Info *store_type, b32 should_align, b32 is_removable)
 {
 	if(should_align) {
 		i32 alignment = get_type_alignment(*store_type);
@@ -1144,7 +1136,7 @@ store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type
 		// on the stack, so we store -3, -2, -1, instead of -1, -2, -3
 		// so it's correctly continuous in memory
 		for(i64 i = count - 1; i >= 0; --i) {
-			store_expression(f, expressions[i], ir, block, &expr_types[i], &member_types[i], !store_type->structure.is_packed, false);
+			store_expression(expressions[i], ir, block, &expr_types[i], &member_types[i], !store_type->structure.is_packed, false);
 		}
 		return SDCount(ir->allocated) - 1;
 	}
@@ -1159,7 +1151,7 @@ store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type
 		// on the stack, so we store -3, -2, -1, instead of -1, -2, -3
 		// so it's correctly continuous in memory
 		for(i64 i = count - 1; i >= 0; --i) {
-			store_expression(f, expressions[i], ir, block, &expr_types[i], store_type->array.type, false, false);
+			store_expression(expressions[i], ir, block, &expr_types[i], store_type->array.type, false, false);
 		}
 		return SDCount(ir->allocated) - 1;
 	}
@@ -1167,7 +1159,7 @@ store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type
 	{
 		Assert(expr_type->type != T_ARRAY && expr_type->type != T_STRUCT);
 
-		i32 expr_register = expression_to_bc(f, node, block, ir, false);
+		i32 expr_register = expression_to_bc(node, block, ir, false);
 		i32 casted = do_cast(expr_register, expr_type, store_type, ir, block);
 		if(casted == -1)
 			casted = expr_register;
@@ -1181,19 +1173,19 @@ store_expression(File_Contents *f, Ast_Node *node, IR *ir, IR_Block *block, Type
 }
 
 void
-assign_to_bc(File_Contents *f, Ast_Node *node, IR_Block *block, IR *ir)
+assign_to_bc(Ast_Node *node, IR_Block *block, IR *ir)
 {
 	if(node->assignment.is_declaration) {
-		i32 result = store_expression(f, node->assignment.rhs, ir, block, &node->assignment.rhs_type, node->assignment.decl_type, true, true);
+		i32 result = store_expression(node->assignment.rhs, ir, block, &node->assignment.rhs_type, &node->assignment.decl_type, true, true);
 		shput(ir->lookup, node->assignment.token.identifier, result);
 	}
 	else {
-		i32 expr_register = expression_to_bc(f, node->assignment.rhs, block, ir, false);
-		i32 dst_pointer = expression_to_bc(f, node->assignment.lhs, block, ir, true);
-		i32 casted = do_cast(expr_register, &node->assignment.rhs_type, node->assignment.decl_type, ir, block);
+		i32 expr_register = expression_to_bc(node->assignment.rhs, block, ir, false);
+		i32 dst_pointer = expression_to_bc(node->assignment.lhs, block, ir, true);
+		i32 casted = do_cast(expr_register, &node->assignment.rhs_type, &node->assignment.decl_type, ir, block);
 		if(casted == -1)
 			casted = expr_register;
-		instruction(dst_pointer, casted, -1, BC_STORE_REG, block, node->assignment.decl_type);
+		instruction(dst_pointer, casted, -1, BC_STORE_REG, block, &node->assignment.decl_type);
 	}
 }
 
@@ -1232,7 +1224,7 @@ ast_to_bc_func_level_list(File_Contents *f, Ast_Node **list, i32 *optional_index
 IR_Block *
 ast_to_bc_func_level_list(Ast_Node **list, i32 *optional_index, IR_Block *optional_block, const char *id, IR *ir, IR_Block *to_go)
 {
-	return ast_to_bc_func_level_list(list, optional_index, optional_block, id, ir, to_go);
+	return ast_to_bc_func_level_list(list, optional_index, optional_block, (u8 *)id, ir, to_go);
 }
 
 void
@@ -1269,7 +1261,7 @@ get_function_arguments(Ast_Node *function, IR *ir, IR_Block *block)
 	for(size_t i = 0; i < count; ++i)
 	{
 		auto arg = &args[i]->variable;
-		auto type = arg->type;
+		auto type = &arg->type;
 		i32 result = allocate_register(ir);
 		if(type->type == T_STRUCT || type->type == T_ARRAY)
 		{
@@ -1324,7 +1316,7 @@ ast_to_bc_function(File_Contents *f, Ast_Node **list, Ast_Node *function)
 	instruction(reg_bp, -1, -1, BC_PUSH_REG, entry, type_64);
 	instruction(reg_bp, reg_sp, reg_bp, BC_MOVE_REG_TO_REG, entry, type_64);
 	get_function_arguments(function, &result, entry);
-	ast_to_bc_func_level_list(f, list, NULL, entry, (u8 *)"entry", &result, NULL);
+	ast_to_bc_func_level_list(f, list, NULL, entry, "entry", &result, NULL);
 
 	// Write function signature to file to be able to read ir
 	u8 func_signature[1024] = {};
@@ -1333,7 +1325,7 @@ ast_to_bc_function(File_Contents *f, Ast_Node **list, Ast_Node *function)
 	platform_write_file(func_signature, signature_size, "out.ir", false);
 	size_t block_count = SDCount(result.blocks);
 
-#if 1
+#if 0
 	write_blocks_to_file(&result, "out.ir");
 #endif
 
@@ -1363,7 +1355,7 @@ ast_to_bc_function(File_Contents *f, Ast_Node **list, Ast_Node *function)
 	// but it's better to profile it when there are actually programs
 	// to profile it on
 	remove_useless_stores(&result);
-#if 0
+#if 1
 	write_blocks_to_file(&result, "out.ir");
 #endif
 
@@ -1400,7 +1392,7 @@ bc_cond_branch(i32 expression_register, IR_Block *from, IR_Block *_true, IR_Bloc
 }
 
 IR_Block *
-if_to_bc(File_Contents *f, IR *ir, IR_Block *block, Ast_Node *node, i32 *idx, Ast_Node **list, IR_Block *to_go)
+if_to_bc(IR *ir, IR_Block *block, Ast_Node *node, i32 *idx, Ast_Node **list, IR_Block *to_go)
 {
 	IR_Block *block_true = alloc_block("if.true", ir);
 	IR_Block *block_aftr = alloc_block("if.aftr", ir);
@@ -1427,7 +1419,7 @@ if_to_bc(File_Contents *f, IR *ir, IR_Block *block, Ast_Node *node, i32 *idx, As
 		bc_branch(block_aftr, to_go);
 	}
 
-	i32 evaluation = expression_to_bc(f, node->condition.expr, block, ir, false);
+	i32 evaluation = expression_to_bc(node->condition.expr, block, ir, false);
 	bc_cond_branch(evaluation, block, block_true, block_else ? block_else : block_aftr);
 	return block_aftr;
 }
@@ -1448,7 +1440,7 @@ ast_to_bc_func_level(File_Contents *f, Ast_Node *node, IR_Block *current_block, 
 		} break;
 		case type_if:
 		{
-			result = if_to_bc(f, ir, current_block, node, optional_index, list, to_go);
+			result = if_to_bc(ir, current_block, node, optional_index, list, to_go);
 		} break;
 		case type_return:
 		{
@@ -1459,7 +1451,7 @@ ast_to_bc_func_level(File_Contents *f, Ast_Node *node, IR_Block *current_block, 
 			}
 			else
 			{
-				i32 ret_reg = expression_to_bc(f, node->ret.expression, current_block, ir, false);
+				i32 ret_reg = expression_to_bc(node->ret.expression, current_block, ir, false);
 				i32 casted = do_cast(ret_reg, &node->ret.expression_type, &node->ret.func_type, ir, current_block);
 				if(casted == -1)
 					casted = ret_reg;

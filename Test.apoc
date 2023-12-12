@@ -1,4 +1,11 @@
 
+fn main() -> i32
+{
+	x := 10;
+	-> x as i32;
+}
+
+/*
 String :: $import "Standard/String.apoc"
 
 
@@ -20,4 +27,5 @@ struct Printable_Struct {
 	num1: i32;
 	num2: i32;
 }
+*/
 

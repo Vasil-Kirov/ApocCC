@@ -4,7 +4,7 @@
 #include <Basic.h>
 #include <Stack.h>
 
-#ifndef NO_VM
+#if !defined (NOVM)
 #include <LLVM_Helpers.h>
 #endif
 
@@ -268,7 +268,7 @@ typedef void *(*Extern_Call_Intermidiate_Fn)();
 Interp_Val
 jit_foreign_function_call(Ast_Node *func, Ast_Node *call, b32 *failed)
 {
-#if defined(NO_VM)
+#if defined(NOVM)
 	Assert(false);
 #else
 	auto fn = find_function(func->function.identifier.name);

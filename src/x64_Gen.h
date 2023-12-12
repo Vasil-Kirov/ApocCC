@@ -67,7 +67,7 @@ enum CMP_OP {
 
 // @NOTE: primary function
 Code_Buffer
-x64_generate_code(File_Contents *f, IR *ir, Relocation **out_relocations, u32 *out_relocation_count);
+x64_generate_code(File_Contents **files, IR **ir, Relocation **out_relocations, u32 *out_relocation_count);
 
 void
 x64_gen_ir(IR *ir, Code_Buffer *buffer, Relative_Relocation_Array *relocs, Data_Segment *global_ds, int buffer_idx, Fixable_Array *fixables);

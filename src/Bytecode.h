@@ -193,7 +193,7 @@ typedef struct {
 IR **
 ast_to_bytecode(File_Contents **files);
 
-void
+IR *
 ast_to_bc_file_level_list(File_Contents *f, Ast_Node **list, IR *ir);
 
 i32
@@ -205,7 +205,7 @@ allocate_stack_space(IR *ir, size_t size);
 void
 do_store_instruction(i32 idx, i32 right, i32 result, IR_Block *block, Type_Info *type, b32 is_removable);
 
-void
+IR *
 ast_to_bc_file_level(File_Contents *f, Ast_Node *node, IR *ir, b32 gen_func);
 
 void
@@ -215,7 +215,10 @@ void
 remove_useless_stores(IR *ir);
 
 void
-print_bytecode(IR *ir, IR_Block *block);
+write_blocks_to_file(IR *ir, char *path);
+
+void
+print_bytecode(IR *ir, IR_Block *block, char *path);
 
 IR_Block *
 ast_to_bc_func_level_list(File_Contents *f, Ast_Node **list, i32 *optional_index, IR_Block *optional_block, u8 *id, IR *ir, IR_Block *to_go);
